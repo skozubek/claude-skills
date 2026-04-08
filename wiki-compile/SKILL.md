@@ -186,7 +186,7 @@ $HOME/.claude/skills/wiki-compile/templates/
   └── .obsidian/{app,core-plugins,community-plugins,graph,app-exclude}.json
 ```
 
-**Note on path:** `~/.claude/skills/wiki-compile/` is a symlink to `~/Library/Mobile Documents/com~apple~CloudDocs/claude-sync/wiki-compile/` (master in iCloud, synced between machines). Templates resolve transparently through the symlink.
+**Note on path:** `~/.claude/skills/wiki-compile/` is a symlink to `~/Coding/claude-skills/wiki-compile/` (private git repo, synced between machines via `git pull`). Templates resolve transparently through the symlink.
 
 #### Sub-step 0B.1: Gather project metadata
 
@@ -196,9 +196,9 @@ Use AskUserQuestion to gather:
 3. **Setup level** (radio):
    - **Minimal** — just LESSONS, DECISIONS, INDEX, raw/ structure (5 files)
    - **Standard** — + wiki-health-check.md, karpathy-kb-alignment.md (8 files)
-   - **Full Horacy-style** — + .obsidian/ config, .gitignore, README.md, CLAUDE.md (recommended for new projects, ~17 files)
+   - **Full** — + `docs/.obsidian/` vault config (scoped to docs/, no code indexing), .gitignore, README.md, CLAUDE.md (recommended for new projects, ~17 files)
 
-Default to **Full Horacy-style**.
+Default to **Full**.
 
 #### Sub-step 0B.2: Copy templates with placeholder substitution
 
@@ -250,10 +250,12 @@ fi
 
 # Full level — Obsidian config + .gitignore + README + CLAUDE.md
 if [ "$SETUP_LEVEL" = "full" ]; then
-  # Obsidian config (commit stable, ignore volatile)
-  mkdir -p .obsidian
+  # Obsidian vault scoped to docs/ — keeps code out of the index, fast graph,
+  # cross-layer backlinks between wiki/ and raw/ work because both are under vault root.
+  # (Legacy Horacy-style put .obsidian/ at repo root; new projects should NOT do that.)
+  mkdir -p docs/.obsidian
   for f in app.json core-plugins.json community-plugins.json graph.json app-exclude.json; do
-    [ -f ".obsidian/$f" ] || cp "$TEMPLATES/.obsidian/$f" ".obsidian/$f"
+    [ -f "docs/.obsidian/$f" ] || cp "$TEMPLATES/.obsidian/$f" "docs/.obsidian/$f"
   done
 
   # .gitignore (note: template stored as 'gitignore' to avoid hidden file issues in iCloud)
@@ -298,7 +300,7 @@ If yes, run init + initial commit. If no, exit Step 0B with reminder.
 ✅ Karpathy KB structure initialized in {PROJECT_NAME}
 
 Next steps:
-1. Open the project as Obsidian vault: File → Open another vault → select this folder
+1. Open the wiki as Obsidian vault: File → Open another vault → select the `docs/` folder (NOT project root — keeps code out of the vault index for speed)
 2. Add your first lesson: docs/LESSONS.md (format: ## [YYYY-MM-DD] L-001: Title)
 3. Add your first decision: docs/DECISIONS.md (format: ## [YYYY-MM-DD] AD-001: Title)
 4. Drop source documents into docs/raw/<subfolder>/

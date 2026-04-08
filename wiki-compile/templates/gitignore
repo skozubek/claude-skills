@@ -63,12 +63,13 @@ tmp/
 *.tmp
 .history/
 
-# Obsidian — commit stable config, ignore per-machine UI state
-.obsidian/workspace*.json
-.obsidian/cache
-.obsidian/plugins/*/data.json
-.obsidian/plugins/*/main.js
-.obsidian/plugins/*/manifest.json
-.obsidian/plugins/*/styles.css
-.obsidian/themes/
-.obsidian/hotkeys.json
+# Obsidian — vault lives at docs/.obsidian/ (scoped to docs/ for speed, no code indexing)
+# Commit stable config, ignore per-machine UI state and plugin binaries
+docs/.obsidian/workspace*.json
+docs/.obsidian/cache
+docs/.obsidian/plugins/*/data.json
+docs/.obsidian/plugins/*/main.js
+docs/.obsidian/plugins/*/manifest.json
+docs/.obsidian/plugins/*/styles.css
+docs/.obsidian/themes/
+docs/.obsidian/hotkeys.json
