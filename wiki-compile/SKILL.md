@@ -490,11 +490,11 @@ For each affected article:
   {Lessons learned, common mistakes}
 
   ## Related
-  - [{Other Article}]({other-article}.md)
+  - [[other-article]] — short description of why it's related
   ```
 
 - **Source references:** Inline as `(source: docs/DECISIONS.md AD-007)` or `(source: docs/LESSONS.md L-012)` or `(source: docs/research/filename.md)`
-- **Cross-references:** As `[Title](filename.md)` linking to other wiki articles
+- **Cross-references between wiki articles: use Obsidian wikilinks `[[article-name]]`** (without `.md` extension, matches the filename slug). This enables Obsidian graph view + automatic backlinks per Karpathy's pattern. Example: `see [[gemini-reliability]] for retry strategy`. Old `[Title](file.md)` markdown links still work but new compilations should use `[[...]]` for intra-wiki references. **Only for wiki↔wiki links** — raw source citations stay as `(source: ...)` inline, not `[[...]]`.
 - **No fluff.** This is developer reference material, not marketing.
 - **Preserve accurate existing content.** Don't rewrite from scratch unless structure changed significantly. Add new information, update outdated sections.
 - **Polish and English OK.** Match the language of the raw sources. If the project is bilingual, wiki can be bilingual.
@@ -511,13 +511,18 @@ If creating a new article:
 
 ## Step 4: Verify Cross-References
 
-Check all wiki links are valid:
+Check all wiki links are valid (both legacy markdown `[text](file.md)` and Obsidian `[[wikilink]]` syntax):
 
 ```bash
 echo "=== CROSS-REFERENCE CHECK ==="
 for f in docs/wiki/*.md; do
+  # Legacy markdown links: [text](filename.md)
   grep -o '\[.*\]([a-z].*\.md)' "$f" 2>/dev/null | grep -o '([^)]*\.md)' | tr -d '()' | while read ref; do
-    [ ! -f "docs/wiki/$ref" ] && echo "BROKEN: $f → $ref"
+    [ ! -f "docs/wiki/$ref" ] && echo "BROKEN (md): $f → $ref"
+  done
+  # Obsidian wikilinks: [[article-name]] — resolve to docs/wiki/{name}.md
+  grep -oE '\[\[[a-z0-9-]+\]\]' "$f" 2>/dev/null | tr -d '[]' | while read ref; do
+    [ ! -f "docs/wiki/${ref}.md" ] && echo "BROKEN (wikilink): $f → [[$ref]]"
   done
 done
 echo "Done."
