@@ -1,0 +1,74 @@
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+
+# Secrets — paranoia level
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.key
+*.pem
+!**/conf/public.pem
+*credentials*
+*secret*
+*.crt
+*.p12
+*.pfx
+auth.json
+.aws/
+.gcp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+.python-version
+pip-log.txt
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+.npm/
+.pnp.*
+yarn-debug.log*
+yarn-error.log*
+npm-debug.log*
+
+# IDE / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+
+# OS / temp
+.cache/
+tmp/
+*.log
+*.tmp
+.history/
+
+# Obsidian — commit stable config, ignore per-machine UI state
+.obsidian/workspace*.json
+.obsidian/cache
+.obsidian/plugins/*/data.json
+.obsidian/plugins/*/main.js
+.obsidian/plugins/*/manifest.json
+.obsidian/plugins/*/styles.css
+.obsidian/themes/
+.obsidian/hotkeys.json

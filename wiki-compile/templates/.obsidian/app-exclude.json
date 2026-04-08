@@ -1,0 +1,10 @@
+{
+  "userIgnoreFilters": [
+    ".git/",
+    "node_modules/",
+    ".venv/",
+    "venv/",
+    ".cache/",
+    "tmp/"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "layoutVersion": 1,
+  "logs": [
+    {
+      "name": "lessons",
+      "path": "docs/LESSONS.md",
+      "idPrefix": "L",
+      "supportsLegacyHeadings": false,
+      "supportsDatePrefix": true
+    },
+    {
+      "name": "decisions",
+      "path": "docs/DECISIONS.md",
+      "idPrefix": "AD",
+      "supportsLegacyHeadings": false,
+      "supportsDatePrefix": true
+    }
+  ],
+  "sourceRoots": [
+    {
+      "path": "docs/raw",
+      "extensions": [
+        ".md",
+        ".pdf",
+        ".txt",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".webp"
+      ]
+    }
+  ],
+  "sourceFiles": [],
+  "wiki": {
+    "directory": "docs/wiki",
+    "index": "docs/wiki/INDEX.md",
+    "health": "docs/wiki/HEALTH.md",
+    "healthCheck": "docs/wiki/wiki-health-check.md",
+    "requiredMetadata": [
+      "Status",
+      "Updated",
+      "Source scope"
+    ],
+    "metadataFiles": [
+      "docs/wiki/INDEX.md",
+      "docs/wiki/HEALTH.md",
+      "docs/wiki/wiki-health-check.md",
+      "docs/wiki/karpathy-kb-alignment.md"
+    ],
+    "articles": [],
+    "snapshotLabels": {
+      "compiledArticles": "Compiled articles",
+      "researchDocuments": "Raw documents",
+      "lessonEntries": "Lesson entries",
+      "decisionEntries": "Decision entries"
+    }
+  }
+}
