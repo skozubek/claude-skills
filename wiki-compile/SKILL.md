@@ -463,6 +463,62 @@ AskUserQuestion: "This is the recompilation plan. Proceed?"
 
 ---
 
+## Step 2.5: Conflict Detection (deconflict pass)
+
+**Why this step exists.** Without explicit conflict scanning, the LLM-compiler in Step 3 reads "preserve accurate existing content" and conservatively *appends* new sections — leaving stale code samples, outdated rules, and contradicting paragraphs in place from older compile generations. The result: articles that contradict themselves (a new rule in §3, an obsolete code sample in §5 written from a superseded lesson). Step 2.5 forces the compiler to *enumerate contradictions explicitly* before any write, which is the only signal strong enough to override the preservation instinct.
+
+For each article in the recompilation plan from Step 2:
+
+1. Read the **FULL current article** (not just first 10 lines from Step 2 mapping).
+2. Read **all raw sources** that currently feed it (per INDEX.md source coverage + new entries).
+3. Walk the article section by section, code-sample by code-sample, claim by claim. For each unit, ask:
+   - Does it still match the canonical pattern in the **current** source corpus?
+   - Has any newer lesson/decision (by date prefix `[YYYY-MM-DD]` or AD/L number) **superseded** it?
+   - Does it contradict any other part of the same article (especially newer sections)?
+   - Are cross-references (`[[wikilinks]]`, inline `(source: ...)`) still valid?
+
+4. Produce a structured **CONFLICT REPORT** per article:
+
+```
+ARTICLE: docs/wiki/{slug}.md
+
+CONTRADICTIONS DETECTED:
+- Lines {N}-{M}: "{verbatim fragment}"
+  SUPERSEDED BY: {L-NNN or AD-NNN} ({date}) — {1-line reason}
+  ALSO CONTRADICTS: Line {X} of same article ("{newer claim}")
+  ACTION: REWRITE to "{proposed replacement}"
+
+STALE FACTS DETECTED:
+- Lines {N}: "{verbatim claim}"
+  STATE OF WORLD NOW: {what's actually true per current sources}
+  ACTION: REWRITE | DELETE | ADD QUALIFIER ("legacy 2.x pattern; see §X for 3.x")
+
+OUTDATED CROSS-REFS DETECTED:
+- Line {N}: link to `{file or [[wikilink]]}` no longer exists / now points to different topic
+  ACTION: REPOINT to {new target} | REMOVE
+
+NO ISSUES: <or list "none" if clean>
+```
+
+5. Present the consolidated report to the user via AskUserQuestion:
+   - **A) Apply all flagged rewrites** (default — fully deconflict)
+   - **B) Apply some (let me pick which)** — user gets per-item toggle
+   - **C) Skip deconflict, just append new sections** (legacy behavior — record as known debt in HEALTH.md)
+
+6. If A or B: tag each approved rewrite as a **mandatory edit** for Step 3 (not just an additive append). The Step 3 prompt must read: *"Apply these specific REWRITE/DELETE actions in addition to incorporating new source material. Do NOT preserve content marked for rewrite."*
+
+### Failure mode to watch for
+
+The compiler may report "no conflicts" when there are obvious ones — this is the same conservative bias the step exists to defeat. If the user sees the conflict report come back empty BUT they know the article has known stale content, re-run Step 2.5 with the prompt anchored on a specific suspected contradiction: *"In `{article}` line {N} says X. In source `{L-NNN}` the canonical pattern is Y. Are these consistent?"* Force the compiler to answer concretely.
+
+### When to skip Step 2.5
+
+- First compile of a new project (no legacy content to deconflict)
+- User explicitly invokes `/wiki-compile --append-only` (escape hatch for fast adds)
+- Article was created less than 30 days ago AND no superseding lessons reference it
+
+---
+
 ## Step 3: Recompile Affected Articles
 
 For each affected article:
