@@ -40,7 +40,8 @@ fi
 
 echo "== Matt Pocock's teach skill (re-fetch latest, NOT vendored) =="
 TEACH="$SKILLS/teach"
-BASE="https://raw.githubusercontent.com/mattpocock/skills/main/skills/in-progress/teach"
+# Matt graduated teach from in-progress/ -> productivity/ on 2026-06-10. If this 404s again, he moved it.
+BASE="https://raw.githubusercontent.com/mattpocock/skills/main/skills/productivity/teach"
 mkdir -p "$TEACH"
 for f in SKILL.md MISSION-FORMAT.md RESOURCES-FORMAT.md LEARNING-RECORD-FORMAT.md GLOSSARY-FORMAT.md; do
   curl -fsS "$BASE/$f" -o "$TEACH/$f" && echo "fetched teach/$f"
