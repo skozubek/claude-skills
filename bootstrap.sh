@@ -26,6 +26,7 @@ link() { # link <target> <linkpath>
 echo "== git-synced skills =="
 link "$REPO/wiki-compile" "$SKILLS/wiki-compile"
 link "$REPO/wiki-query"   "$SKILLS/wiki-query"
+link "$REPO/mol-report"   "$SKILLS/mol-report"
 
 echo "== git-synced commands =="
 link "$REPO/commands/debrief.md" "$COMMANDS/debrief.md"

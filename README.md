@@ -10,6 +10,7 @@ claude-skills/
 ├── bootstrap.sh          # idempotent: re-creates all symlinks + fetches teach
 ├── wiki-compile/         # Karpathy-style LLM wiki compiler (global skill)
 ├── wiki-query/           # wiki Q&A (global skill)
+├── mol-report/           # cross-project MOL weekly note + monthly invoice (git-scans ~/Coding/MOL/*)
 └── commands/
     └── debrief.md        # /debrief — drill on work just done (sister to /teach)
 ```
@@ -19,6 +20,7 @@ claude-skills/
 | Thing                | Mechanism            | Notes                                              |
 |----------------------|----------------------|----------------------------------------------------|
 | wiki-* skills        | git + symlink        | this repo → `~/.claude/skills/`                     |
+| mol-report skill     | git + symlink        | this repo → `~/.claude/skills/`; needs `~/Coding/MOL/` repos cloned to run |
 | `/debrief` command   | git + symlink        | this repo → `~/.claude/commands/`                   |
 | `/teach` skill (Matt)| re-fetch (curl)      | NOT vendored — `bootstrap.sh` pulls latest from GitHub |
 | `~/learning/` content| iCloud + symlink     | iCloud Drive `learning/` ← `~/learning` symlink     |
