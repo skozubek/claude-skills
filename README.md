@@ -10,7 +10,11 @@ claude-skills/
 ├── bootstrap.sh          # idempotent: re-creates all symlinks + fetches teach
 ├── wiki-compile/         # Karpathy-style LLM wiki compiler (global skill)
 ├── wiki-query/           # wiki Q&A (global skill)
+├── wiki-brief/           # morning push briefing of the project wiki
+├── wiki-health/          # wiki semantic + operational health audit
 ├── mol-report/           # cross-project MOL weekly note + monthly invoice (git-scans ~/Coding/MOL/*)
+├── devils-advocate/      # anti-sycophancy diagnostic — force the opposite argument
+├── reflect/              # abstract a recurring mistake into a persisted learning
 └── commands/
     └── debrief.md        # /debrief — drill on work just done (sister to /teach)
 ```
