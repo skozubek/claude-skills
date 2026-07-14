@@ -31,6 +31,7 @@ link "$REPO/wiki-health"     "$SKILLS/wiki-health"
 link "$REPO/mol-report"      "$SKILLS/mol-report"
 link "$REPO/devils-advocate" "$SKILLS/devils-advocate"
 link "$REPO/reflect"         "$SKILLS/reflect"
+link "$REPO/transcribe"      "$SKILLS/transcribe"
 
 echo "== git-synced commands =="
 link "$REPO/commands/debrief.md" "$COMMANDS/debrief.md"

@@ -15,6 +15,7 @@ claude-skills/
 ├── mol-report/           # cross-project MOL weekly note + monthly invoice (git-scans ~/Coding/MOL/*)
 ├── devils-advocate/      # anti-sycophancy diagnostic — force the opposite argument
 ├── reflect/              # abstract a recurring mistake into a persisted learning
+├── transcribe/           # Obsidian audio → structured meeting note (mlx_whisper, Apple Silicon)
 └── commands/
     └── debrief.md        # /debrief — drill on work just done (sister to /teach)
 ```
