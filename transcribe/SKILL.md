@@ -118,9 +118,6 @@ Structure the note:
 
 **Source:** `Recording YYYYMMDDHHMMSS.m4a` (archived in `~/Obsidian-Recordings-Archive/`)
 
-## Transcript
-<full transcript text>
-
 ## Summary
 <AI-generated 3-5 bullet point summary of key topics discussed>
 
@@ -130,9 +127,20 @@ Structure the note:
 ## Action Items
 - [ ] <extract any commitments, tasks, or follow-ups mentioned>
 
+## Transcript
+<FULL verbatim transcript text — the whole thing, not a paraphrase or a
+condensed version. Paste the raw whisper output as-is. It is the primary
+artifact; the summary above is a convenience layer on top of it.>
+
 ---
 Related: [[relevant hub links based on content]]
 ```
+
+**Section order is deliberate:** scannable digest first (Summary → Key Decisions
+→ Action Items), full raw transcript last. The transcript is the source of truth
+and MUST be the complete verbatim text — never silently substitute a summarized
+or paraphrased version. If a shorter transcript is ever wanted, that's a change
+to this skill, not a per-note judgment call.
 
 **Hub linking:** Read the transcript content and determine which hubs are relevant:
 - If MOL/campaign/client topics → `[[MOL]]`
