@@ -39,8 +39,23 @@ Both modes also write a combined snapshot to
 
 ## Hard rules (learned the hard way)
 
-- **Cross-project by default.** Scan every git repo under `~/Coding/MOL/*/`, not
-  just the cwd repo. The billing unit is "Serge this week", not one product.
+- **Cross-project by default.** Scan every git repo under `~/Coding/MOL/`, not just
+  the cwd repo. The billing unit is "Serge this week", not one product. Discover
+  with `find -maxdepth 3 -name .git`, never a `*/` glob (see Step 2).
+- **Panel internal material NEVER enters a report.** `MOL/Panel/meta/` (state
+  review, findings, decision and collaboration notes) is internal-only. Report the
+  fact a review happened and the effort it took; never the content. Keep out:
+  findings and their counts, names of functions/endpoints/tables tied to an
+  access-control gap, HTTP codes or config flags describing exposure, colleagues'
+  names attached to commit counts and LOC (write "second developer"), and
+  unresolved disputes framed as who-holds-what-position. Test each sentence against
+  "does this survive the report being forwarded outside MOL". Exclude `Panel/meta/`
+  from mtime scans too — the filenames alone leak.
+- **Multi-author repos: split by author.** Panel has three (Serge, second dev,
+  Lovable bot); only Serge-authored commits are billable hours, the rest is context.
+  Author names differ per repo (`skozubek-mol` in campaign-builder, `Serge Kozubek`
+  and `Serge` elsewhere), so `--author="Serge"` returns a silent 0 in CB. Run
+  `git shortlog -sn` before trusting any author split.
 - **NEVER use `/retro global`.** Its discovery binary fails EPERM under Claude
   Code (macOS TCC: the `claude` process lacks Full Disk Access; Warp's grant does
   not propagate). Use the git-scan below. Root cause: `~/Coding/MOL/.claude/RETRO-POLICY.md`.
@@ -104,10 +119,15 @@ Also read the latest existing report of the same kind for tone + structure
 
 ## Step 2 — git-scan every MOL repo in the window
 
+Discover repos by finding `.git`, NEVER by globbing `"$MOL"/*/`. Some repos sit a
+level deeper (`Panel/panel-manager-marki`, `Leads/lead-qualification-app`) and the
+glob silently dropped Panel — the top-priority project — from every report until
+2026-07-27. **Sanity check: the repo list must include `Panel/panel-manager-marki`.**
+
 ```bash
-for d in "$MOL"/*/; do
-  [ -d "$d/.git" ] || continue
-  name=$(basename "$d")
+find "$MOL" -maxdepth 3 -name .git -type d -not -path '*/node_modules/*' 2>/dev/null \
+| sed 's|/.git$||' | sort | while read -r d; do
+  name="${d#$MOL/}"
   cnt=$(git -C "$d" log --since="$SINCE" --until="$UNTIL" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
   [ "$cnt" -eq 0 ] && continue
   echo "=== $name : $cnt non-merge commits ==="
