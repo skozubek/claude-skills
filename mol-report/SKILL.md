@@ -56,6 +56,10 @@ Both modes also write a combined snapshot to
   Author names differ per repo (`skozubek-mol` in campaign-builder, `Serge Kozubek`
   and `Serge` elsewhere), so `--author="Serge"` returns a silent 0 in CB. Run
   `git shortlog -sn` before trusting any author split.
+- **Fetch before you measure, and measure the upstream ref.** Repos Serge does not
+  work in daily (Panel above all) sit hundreds of commits behind `origin` locally. A
+  scan off bare `HEAD` reports zero commits and reads as a quiet week. The Step 2
+  script does both; do not simplify it away.
 - **NEVER use `/retro global`.** Its discovery binary fails EPERM under Claude
   Code (macOS TCC: the `claude` process lacks Full Disk Access; Warp's grant does
   not propagate). Use the git-scan below. Root cause: `~/Coding/MOL/.claude/RETRO-POLICY.md`.
@@ -91,9 +95,10 @@ TODAY="<YYYY-MM-DD from session currentDate>"
 # --- weekly window (ISO Mon–Sun) ---
 DOW=$(date -j -f "%Y-%m-%d" "$TODAY" +%u)              # 1=Mon..7=Sun
 MON=$(date -j -v-$((DOW-1))d -f "%Y-%m-%d" "$TODAY" +%Y-%m-%d)
-SUN=$(date -j -f "%Y-%m-%d" "$MON" -v+6d +%Y-%m-%d)
+# BSD date: every -v must come BEFORE -f, or it parses the shifted value as input
+SUN=$(date -j -v+6d -f "%Y-%m-%d" "$MON" +%Y-%m-%d)
 WK=$(date -j -f "%Y-%m-%d" "$TODAY" +%V); YR=$(date -j -f "%Y-%m-%d" "$TODAY" +%G)
-SINCE="${MON}T00:00:00"; UNTIL="$(date -j -f "%Y-%m-%d" "$SUN" -v+1d +%Y-%m-%d)T00:00:00"
+SINCE="${MON}T00:00:00"; UNTIL="$(date -j -v+1d -f "%Y-%m-%d" "$SUN" +%Y-%m-%d)T00:00:00"
 echo "WEEKLY W${WK} (${MON} .. ${SUN}) -> _reports/weekly/${YR}-W${WK}.md"
 
 # --- monthly window (calendar month) ---
@@ -124,25 +129,41 @@ level deeper (`Panel/panel-manager-marki`, `Leads/lead-qualification-app`) and t
 glob silently dropped Panel — the top-priority project — from every report until
 2026-07-27. **Sanity check: the repo list must include `Panel/panel-manager-marki`.**
 
+**Fetch first, then scan the upstream ref, never bare `HEAD`.** The local Panel clone
+runs hundreds of commits behind `origin` (290 in W33, 717 in W35) because Serge does
+not work in that repo. A scan off `HEAD` reports zero for it and the zero looks
+credible. Both steps below are in the script; do not drop either.
+
 ```bash
 find "$MOL" -maxdepth 3 -name .git -type d -not -path '*/node_modules/*' 2>/dev/null \
 | sed 's|/.git$||' | sort | while read -r d; do
   name="${d#$MOL/}"
-  cnt=$(git -C "$d" log --since="$SINCE" --until="$UNTIL" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
+  git -C "$d" fetch --all --quiet 2>/dev/null
+  # scan what the remote has, not what this Mac happens to hold
+  if git -C "$d" rev-parse --abbrev-ref '@{upstream}' >/dev/null 2>&1; then REF='@{upstream}'; else REF='HEAD'; fi
+  behind=$(git -C "$d" rev-list --count 'HEAD..@{upstream}' 2>/dev/null || echo 0)
+  cnt=$(git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --no-merges --oneline 2>/dev/null | wc -l | tr -d ' ')
   [ "$cnt" -eq 0 ] && continue
-  echo "=== $name : $cnt non-merge commits ==="
-  git -C "$d" log --since="$SINCE" --until="$UNTIL" --no-merges --numstat --format="" 2>/dev/null \
-    | awk 'NF==3 {add+=$1; del+=$2; if ($3 ~ /\.(test|spec)\./) t+=$1} END {print "ins="add" del="del" net="add-del" test_ins="t}'
-  echo -n "active days: "; git -C "$d" log --since="$SINCE" --until="$UNTIL" --format="%ad" --date=format:"%Y-%m-%d" 2>/dev/null | sort -u | wc -l | tr -d ' '
-  echo "authors:"; git -C "$d" log --since="$SINCE" --until="$UNTIL" --no-merges --format="%aN" 2>/dev/null | sort | uniq -c
-  echo "types:"; git -C "$d" log --since="$SINCE" --until="$UNTIL" --no-merges --format="%s" 2>/dev/null | grep -oE '^[a-z]+' | sort | uniq -c | sort -rn
-  echo "versions:"; git -C "$d" log --since="$SINCE" --until="$UNTIL" --format="%s" 2>/dev/null | grep -oE "v?[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?" | sort -V -u | sed -n '1p;$p'
-  echo "subjects:"; git -C "$d" log --since="$SINCE" --until="$UNTIL" --no-merges --format="%ad %s" --date=format:"%m-%d" --reverse 2>/dev/null
+  echo "=== $name : $cnt non-merge commits (ref=$REF, local behind upstream: $behind) ==="
+  git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --no-merges --numstat --format="" 2>/dev/null \
+    | awk 'NF==3 {add+=$1; del+=$2; if ($3 ~ /(test|spec)/) t+=$1} END {print "ins="add" del="del" net="add-del" test_ins="t}'
+  echo -n "active days: "; git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --format="%ad" --date=format:"%Y-%m-%d" 2>/dev/null | sort -u | tr '\n' ' '; echo ""
+  echo "authors:"; git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --no-merges --format="%aN" 2>/dev/null | sort | uniq -c | sort -rn
+  echo "merge PRs:"; git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --merges --format="%s" 2>/dev/null | grep -c "Merge pull request"
+  echo "types:"; git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --no-merges --format="%s" 2>/dev/null | grep -oE '^[a-z]+' | sort | uniq -c | sort -rn
+  echo "versions:"; git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --format="%s" 2>/dev/null | grep -oE "v?[0-9]+\.[0-9]+\.[0-9]+(\.[0-9]+)?" | sort -V -u | tr '\n' ' '; echo ""
+  echo "subjects:"; git -C "$d" log "$REF" --since="$SINCE" --until="$UNTIL" --no-merges --format="%ad %s" --date=format:"%m-%d" --reverse 2>/dev/null
 done
 ```
 
-For monthly, swap `$SINCE`/`$UNTIL` for `${MSTART}T00:00:00` / `${MEND}T00:00:00`
-and also count merged PRs: `git -C "$d" log --since=… --until=… --merges --format="%s" | grep -c "Merge pull request"`.
+The test-file pattern is deliberately loose (`test|spec` anywhere in the path), because
+tests live in `__tests__/`, `supabase/tests/*.test.sql` and `*.test.ts` alike; an
+anchored `\.(test|spec)\.` undercounted whole directories.
+
+`AADC` has no upstream (its only commit is local, see the standing blocker), so it
+falls back to `HEAD` and the `behind` count is empty. That is expected, not a scan bug.
+
+For monthly, swap `$SINCE`/`$UNTIL` for `${MSTART}T00:00:00` / `${MEND}T00:00:00`.
 
 ## Step 3 — non-git projects (AADC / BAIC)
 
