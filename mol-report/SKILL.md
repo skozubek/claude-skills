@@ -42,13 +42,17 @@ Both modes also write a combined snapshot to
 - **Cross-project by default.** Scan every git repo under `~/Coding/MOL/`, not just
   the cwd repo. The billing unit is "Serge this week", not one product. Discover
   with `find -maxdepth 3 -name .git`, never a `*/` glob (see Step 2).
-- **`Panel/panel-manager-marki` is OUT of every report, table, snapshot and total.**
-  Serge does not work in that repo. Commits there belong to other people, so they are
-  neither his hours nor a context section, and a report that recites their week is
-  reporting on someone else's work. Skip the repo at discovery: no section, no table
-  row, no `repos` entry in the JSON, no "context, not my hours" paragraph. Where CB
-  genuinely depends on something owned by the Panel side, that lives as one line in
-  **Blockers**, phrased from CB's side and without their commit counts or themes.
+- **`Panel/panel-manager-marki`: always scan it, never bill it, never recite it.**
+  Three separate things hide under "Panel context" and they get three answers. (1)
+  Serge-authored commits there are hours like any other and go in the table — today
+  that is zero, but he expects to commit in that repo before long, so the scan must
+  already be counting it rather than discovering it late. (2) The cross-project signal
+  is worth a short section: did anything move on what CB waits for, and does anything
+  over there change his own work. (3) An inventory of the other authors' themes and
+  features is NOT worth writing — that is reporting on someone else's week. Give their
+  volume one line (commit and PR counts, "second developer" and the bot, no names, no
+  per-person split) and spend the section on (2). Never a table row when his own
+  commits are zero.
 - **Serge's own review notes stay private, but the effort counts.** `MOL/Panel/meta/`
   and PPJL `meta/` hold his state reviews, findings and collaboration notes. Report
   the fact a review happened and the effort (files, days); never the content. Keep
@@ -61,10 +65,13 @@ Both modes also write a combined snapshot to
   hours. Author names differ per repo (`skozubek-mol` in campaign-builder, `Serge
   Kozubek` and `Serge` elsewhere), so `--author="Serge"` returns a silent 0 in CB.
   Run `git shortlog -sn` before trusting any author split.
-- **Fetch before you measure, and measure the upstream ref.** Serge works from two
-  Macs, so a repo last touched on the other one sits behind `origin` here. A scan off
-  bare `HEAD` misses that work and the report reads as a quiet week. The Step 2
-  script does both; do not simplify it away.
+- **Fetch before you measure, and measure the upstream ref.** Two reasons, both real:
+  Serge works from two Macs, so a repo last touched on the other one is behind
+  `origin` here; and the Panel clone runs hundreds of commits behind (290 in W33, 717
+  in W35) because he does not work there daily. A scan off bare `HEAD` reports zero
+  and a zero reads exactly like a quiet week. Harmless while his Panel commits are
+  zero, load-bearing the day they are not. The Step 2 script does both; do not
+  simplify it away.
 - **NEVER use `/retro global`.** Its discovery binary fails EPERM under Claude
   Code (macOS TCC: the `claude` process lacks Full Disk Access; Warp's grant does
   not propagate). Use the git-scan below. Root cause: `~/Coding/MOL/.claude/RETRO-POLICY.md`.
@@ -130,20 +137,20 @@ Also read the latest existing report of the same kind for tone + structure
 ## Step 2 — git-scan every MOL repo in the window
 
 Discover repos by finding `.git`, NEVER by globbing `"$MOL"/*/`. Some repos sit a
-level deeper (`Leads/lead-qualification-app`, and PPJL's app lives inside its working
-directory) and the glob silently dropped them.
-
-`Panel/panel-manager-marki` is filtered out in the script below and stays out. See the
-hard rule: Serge does not work there, so its commits are neither hours nor context.
+level deeper (`Panel/panel-manager-marki`, `Leads/lead-qualification-app`, and PPJL's
+app inside its working directory) and the glob silently dropped Panel from every
+report until 2026-07-27. **Sanity check: the repo list must include
+`Panel/panel-manager-marki`.** Scanning it is not the same as billing it — see the
+hard rule for what does and does not reach the report.
 
 **Fetch first, then scan the upstream ref, never bare `HEAD`.** Serge works from two
-Macs; a repo last touched on the other one is behind `origin` here, and a scan off
-`HEAD` misses that work while looking perfectly credible. Both steps are in the
-script; do not drop either.
+Macs, and the Panel clone in particular runs hundreds of commits behind. A scan off
+`HEAD` reports zero while looking perfectly credible. Both steps are in the script;
+do not drop either.
 
 ```bash
 find "$MOL" -maxdepth 3 -name .git -type d -not -path '*/node_modules/*' 2>/dev/null \
-| sed 's|/.git$||' | grep -v '/Panel/panel-manager-marki$' | sort | while read -r d; do
+| sed 's|/.git$||' | sort | while read -r d; do
   name="${d#$MOL/}"
   git -C "$d" fetch --all --quiet 2>/dev/null
   # scan what the remote has, not what this Mac happens to hold
