@@ -44,6 +44,22 @@ Domyślny `opus` sprawia, że pominięty parametr kosztuje tokeny, a nie jakoś�
 
 ## Przebieg
 
+### 0. Czy to robota na foremana
+
+Foreman kosztuje plan, recenzję Codexa, worktree i odbiór; zwraca się dopiero
+przy robocie, której jedna sesja nie udźwignie w oknie albo w czasie. Bierzesz
+ją, gdy zachodzi choć jedno:
+
+- graf ma co najmniej trzy zadania, z czego dwa niezależne;
+- robota ma trwać dłużej niż jedna sesja albo iść bez nadzoru (noc);
+- zmiana przecina kilka warstw naraz (schemat, funkcja, front) z kontraktem
+  między nimi.
+
+Poprawka, którą da się opisać jednym zdaniem i zamknąć jednym diffem, idzie
+zwykłą drogą repo: celowana zmiana w tej sesji, bramki repo, bez planu
+i floty. Wtedy mówisz Serge'owi jednym zdaniem, że foreman tu nie pasuje
+i dlaczego, i robisz zmianę sam.
+
 ### 1. Rozpoznanie (osobiście)
 
 Plan zbudowany na cudzym streszczeniu dziedziczy cudze przeoczenia, więc kod,
@@ -241,6 +257,6 @@ nazwij dowód, którego wtedy brakło.
 
 ## Kiedy nie używać
 
-Zmiana w jednym pliku: zrób ją sam. Zakres mglisty: najpierw doprecyzuj,
+Robota spoza kryteriów kroku 0: zrób ją sam. Zakres mglisty: najpierw doprecyzuj,
 bo flota na mgłę daje trzy interpretacje równolegle. Robota wymagająca
 rozmowy z Serge'em w trakcie: subagent nie ma z kim rozmawiać.
