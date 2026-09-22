@@ -50,7 +50,9 @@ Foreman kosztuje plan, recenzję Codexa, worktree i odbiór; zwraca się dopiero
 przy robocie, której jedna sesja nie udźwignie w oknie albo w czasie. Bierzesz
 ją, gdy zachodzi choć jedno:
 
-- graf ma co najmniej trzy zadania, z czego dwa niezależne;
+- co najmniej dwa zadania wymagają własnego rozpoznania albo projektu,
+  a razem nie zmieszczą się w oknie jednej sesji; paczka drobnych poprawek
+  po kilka linii to jedna sesja, nie flota, choćby było ich dziesięć;
 - robota ma trwać dłużej niż jedna sesja albo iść bez nadzoru (noc);
 - zmiana przecina kilka warstw naraz (schemat, funkcja, front) z kontraktem
   między nimi.
