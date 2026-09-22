@@ -59,7 +59,7 @@ i miejsce odczytu.
   której bez budzika nikt nie wraca. Sesja nocna startuje od `/coffee`, bo bez
   niego śpi razem z Makiem (LC-038).
 - **Sędzia próbki** tam, gdzie próg mówi „ocena człowieka": model spoza rodziny
-  wykonawcy (Codex; przy dużej próbce najtańszy model OpenAI, który na kilku
+  wykonawcy (Codex; przy dużej próbce `-m gpt-6-luna`, jeśli na kilku
   przypadkach z oczywistym werdyktem zgadza się z Sol), zanonimizowana próbka, status ustalony przed pokazaniem werdyktu,
   ten sam przydział i kontekst decyzyjny, który miał audytor (LC-093).
 - **Progi ogłaszane przed liczbami.** Kryterium zaliczenia stoi w planie przed
