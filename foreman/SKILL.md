@@ -90,9 +90,13 @@ następnej sesji, gdyby okno albo limit się skończyły.
 ### 3. Recenzja planu innym modelem
 
 Przegląd inżynierski właściwy dla repo, potem Codex:
-`codex exec -s read-only "<pytania>" < plan.md`. Plan idzie na stdin, bo
-sandbox nie zawsze widzi pliki spoza repo, a treść wklejona w cudzysłów psuje
-się na cudzysłowach i limicie argumentów. Stałe pytania: gdzie plan
+`codex exec -s read-only -c 'model_reasoning_effort="high"' "<pytania>" < plan.md`.
+Model idzie z `~/.codex/config.toml`, jedynego miejsca jego wyboru; `high`, bo
+recenzja jest adwersarialna, a `xhigh` na długim kontekście wisi dziesiątki
+minut. Plan idzie na stdin, bo sandbox nie zawsze widzi pliki spoza repo,
+a treść wklejona w cudzysłów psuje się na cudzysłowach i limicie argumentów.
+Zakaz zapisu daje sandbox `-s read-only`, nie prompt: modele OpenAI obchodzą
+słowną odmowę dostępu w większości prób. Stałe pytania: gdzie plan
 kopiuje wzorzec repo i czy ten wzorzec jest poprawny; czy kontrakt między
 zadaniami jest jednoznaczny dla dwóch wykonawców; czego plan nie wymienia,
 a co zepsuje produkcję (konsument schematu, stare wiersze, bramka CI).
@@ -175,7 +179,8 @@ z DOM-u liczbami.
 ### 7. Brama i wdrożenie
 
 Brama repo w kolejności, którą repo definiuje: jego `verify` albo bramki
-z `AGENTS.md`/`CLAUDE.md`, przegląd diffu, Codex jako drugie oko. Flota, która
+z `AGENTS.md`/`CLAUDE.md`, przegląd diffu, `/codex challenge` na diffie gałęzi
+integracyjnej jako drugie oko z innej rodziny modeli. Flota, która
 raportowała sukces, nie widziała kodu pozostałych zadań, więc brama biegnie
 w całości.
 
