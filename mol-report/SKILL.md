@@ -80,6 +80,17 @@ Both modes also write a combined snapshot to
   If they change, this skill follows — do not hardcode the format.
 - **Don't fabricate.** A repo with 0 commits in the window gets no section / no
   table row. Skip dormant repos silently.
+- **A blocker described as "waiting on the other side" needs a cheap check
+  before it goes in another week's report.** A position blocked on someone
+  else's action does not notify you when it resolves; the entry must carry
+  a concrete command/query that settles it in seconds, run at every backlog
+  pass — otherwise it survives its own resolution and rides five reports as
+  a stale priority (LC-030).
+- **Before quoting or reporting hours on friend/pilot work, the rate is
+  agreed before the first commit, not negotiated from a place of fear at
+  invoice time.** A plan for a client without a stated amount or model is
+  a promise of work for nothing; ask "how much and in what model" up front,
+  especially with friends (LC-072).
 - **Honest partial weeks.** If the week is written early (e.g. Friday before
   vacation), say so in the header and base `Active days: N/M` on real working days,
   not 7.
