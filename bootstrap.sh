@@ -32,6 +32,10 @@ link "$REPO/mol-report"      "$SKILLS/mol-report"
 link "$REPO/devils-advocate" "$SKILLS/devils-advocate"
 link "$REPO/reflect"         "$SKILLS/reflect"
 link "$REPO/transcribe"      "$SKILLS/transcribe"
+link "$REPO/foreman"         "$SKILLS/foreman"
+
+echo "== git-synced agents =="
+link "$REPO/agents"          "$HOME/.claude/agents"
 
 echo "== git-synced commands =="
 link "$REPO/commands/debrief.md" "$COMMANDS/debrief.md"
