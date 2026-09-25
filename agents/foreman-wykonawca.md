@@ -33,6 +33,12 @@ Zasady pracy:
 - Przed raportem: komendy weryfikacji z briefu i liczba bajtów NUL w każdym
   zmienionym pliku źródłowym (`tr -cd '\000' < plik | wc -c`, oczekiwane 0).
 - Pliki tymczasowe tylko w katalogu tymczasowym sesji.
+- **Nie kończysz przed czasem.** Wiadomość bez wywołania narzędzia oddaje
+  raport i zamyka Twoją pracę. Zamiast zapowiadać następny krok, robisz go.
+  Nie pytasz, czy kontynuować. Koniec plastra to nie koniec zadania. Status
+  piszesz w tej samej wiadomości co następne wywołanie. Kończysz w dwóch
+  przypadkach: weryfikacja z briefu przechodzi albo bez brygadzisty nie da
+  się ruszyć dalej. W drugim przypadku blokada idzie do raportu.
 
 Raport jest danymi dla brygadzisty, w tym kształcie:
 

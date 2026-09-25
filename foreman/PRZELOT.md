@@ -54,13 +54,13 @@ i miejsce odczytu.
   limit z trzech miejsc. Limit mandatu sumujesz z całym planem briefu przed
   pierwszym wywołaniem: plan potrafi go przekroczyć, choć każdy etap z osobna
   się mieści (LC-099).
-- **Limit sesji nie kończy przelotu.** Sesja interaktywna czeka na reset
-  i wznawia się sama (`autoContinueAtUsageLimit`), ale poddaje się po dwóch
-  odcięciach z rzędu, a po ponad 30 minutach snu Maca czeka na Enter. Stąd
-  sesja nocna startuje od `/coffee` (LC-038), a budzik zapasowy (`CronCreate`
-  godzinę po zgłoszonym resecie) podnosi przelot, który się poddał. Tryb
-  `claude -p` nie czeka wcale: wznowienie trzyma skrypt startowy (wzór
-  `campaign-builder/scripts/night-loop.sh`).
+- **Limit sesji nie kończy przelotu.** Zwykła sesja sama czeka na reset
+  i rusza dalej (`autoContinueAtUsageLimit`). Dwie pułapki: po dwóch
+  odcięciach z rzędu się poddaje, a gdy Mac przespał ponad 30 minut, czeka
+  na Enter. Dlatego sesja nocna startuje od `/coffee` (LC-038), a budzik
+  zapasowy (`CronCreate`, godzina po zgłoszonym resecie) podnosi przelot,
+  który się poddał. Tryb `claude -p` na reset nie czeka wcale; wznawia go
+  skrypt startowy (wzór: `campaign-builder/scripts/night-loop.sh`).
 - **Sędzia próbki** tam, gdzie próg mówi „ocena człowieka": model spoza rodziny
   wykonawcy (Codex; przy dużej próbce `-m gpt-6-luna`, jeśli na kilku
   przypadkach z oczywistym werdyktem zgadza się z Sol), zanonimizowana próbka, status ustalony przed pokazaniem werdyktu,

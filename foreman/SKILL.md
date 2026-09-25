@@ -63,16 +63,19 @@ zwykłą drogą repo: celowana zmiana w tej sesji, bramki repo, bez planu
 i floty. Wtedy mówisz Serge'owi jednym zdaniem, że foreman tu nie pasuje
 i dlaczego, i robisz zmianę sam.
 
-**Warunek ukończenia, zanim cokolwiek przeczytasz.** Z polecenia piszesz go
-od razu i pokazujesz Serge'owi w jednej wiadomości: droga użytkownika jednym
-zdaniem (kto, co robi, co widzi na końcu), dwa do pięciu kryteriów odbioru,
-każde z odczytem i oczekiwanym wynikiem (komenda, zapytanie, liczba z DOM-u),
-i czego robota nie obejmuje. „Testy zielone" ani „zaimplementowane X" nie są
-kryterium: mówią o kodzie, nie o drodze. To jedyne pytanie przed startem, bo
-intencja należy do Serge'a; akceptuje albo poprawia. Bez odpowiedzi jedziesz
-na szkicu oznaczonym w planie jako założenie, a przelot bez zaakceptowanego
-warunku się nie zaczyna. Rozpoznanie może warunek zmienić; zmiana idzie do
-meldunku z powodem.
+**Warunek ukończenia, zanim cokolwiek przeczytasz.** Z samego polecenia
+piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
+
+- **droga użytkownika** jednym zdaniem: kto, co robi, co widzi na końcu;
+- **kryteria odbioru**, od dwóch do pięciu. Każde mówi, co odczytać (komenda,
+  zapytanie, liczba na ekranie) i jaki wynik ma wyjść. „Testy zielone” to nie
+  kryterium, bo mówi o kodzie, a nie o tym, co widzi użytkownik;
+- **czego robota nie obejmuje**.
+
+To jedyne pytanie przed startem, bo to Serge wie, czego chce. Akceptuje albo
+poprawia. Jeśli nie odpowie, jedziesz na swoim szkicu i zapisujesz go w planie
+jako założenie. Przelot nocny bez zaakceptowanego warunku się nie zaczyna.
+Jeśli rozpoznanie zmieni warunek, meldunek mówi, co się zmieniło i dlaczego.
 
 ### 1. Rozpoznanie (osobiście)
 
