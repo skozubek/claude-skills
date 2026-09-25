@@ -5,6 +5,7 @@ description: |
   subagentów dobranych modelem do trudności zadania, także bez nadzoru.
   Wyzwalacze: "foreman", "rozdziel na agentów", "zaimplementuj autonomicznie".
 argument-hint: "[opis zadania albo ścieżka do planu]"
+effort: high
 allowed-tools:
   - Agent
   - SendMessage
