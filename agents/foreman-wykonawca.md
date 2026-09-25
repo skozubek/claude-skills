@@ -2,6 +2,7 @@
 name: foreman-wykonawca
 description: Wykonawca zadania z grafu skilla foreman, we własnym worktree. Spawnuje go wyłącznie brygadzista foremana.
 model: opus
+effort: high
 isolation: worktree
 maxTurns: 200
 disallowedTools: Agent

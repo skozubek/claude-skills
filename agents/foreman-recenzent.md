@@ -2,6 +2,7 @@
 name: foreman-recenzent
 description: Recenzent świeżym okiem dla skilla foreman; czyta gałąź integracyjną względem planu. Spawnuje go wyłącznie brygadzista foremana.
 model: opus
+effort: high
 tools: Read, Grep, Glob
 ---
 
