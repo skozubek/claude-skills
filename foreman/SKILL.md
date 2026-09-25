@@ -62,6 +62,17 @@ zwykłą drogą repo: celowana zmiana w tej sesji, bramki repo, bez planu
 i floty. Wtedy mówisz Serge'owi jednym zdaniem, że foreman tu nie pasuje
 i dlaczego, i robisz zmianę sam.
 
+**Warunek ukończenia, zanim cokolwiek przeczytasz.** Z polecenia piszesz go
+od razu i pokazujesz Serge'owi w jednej wiadomości: droga użytkownika jednym
+zdaniem (kto, co robi, co widzi na końcu), dwa do pięciu kryteriów odbioru,
+każde z odczytem i oczekiwanym wynikiem (komenda, zapytanie, liczba z DOM-u),
+i czego robota nie obejmuje. „Testy zielone" ani „zaimplementowane X" nie są
+kryterium: mówią o kodzie, nie o drodze. To jedyne pytanie przed startem, bo
+intencja należy do Serge'a; akceptuje albo poprawia. Bez odpowiedzi jedziesz
+na szkicu oznaczonym w planie jako założenie, a przelot bez zaakceptowanego
+warunku się nie zaczyna. Rozpoznanie może warunek zmienić; zmiana idzie do
+meldunku z powodem.
+
 ### 1. Rozpoznanie (osobiście)
 
 Plan zbudowany na cudzym streszczeniu dziedziczy cudze przeoczenia, więc kod,
@@ -88,7 +99,7 @@ z zapytania.
 
 ### 2. Plan jako graf
 
-Plan w pliku, w kolejności: problem, architektura z **odrzuconymi wariantami
+Plan w pliku, w kolejności: warunek ukończenia z kroku 0, problem, architektura z **odrzuconymi wariantami
 i powodem**, findingi z `file:line`, kontrakt tego, co powstaje, mapa pokrycia
 testami, tryby awarii, zakres poza pracą, **graf zadań**.
 
@@ -117,7 +128,8 @@ Zakaz zapisu daje sandbox `-s read-only`, nie prompt: modele OpenAI obchodzą
 słowną odmowę dostępu w większości prób. Stałe pytania: gdzie plan
 kopiuje wzorzec repo i czy ten wzorzec jest poprawny; czy kontrakt między
 zadaniami jest jednoznaczny dla dwóch wykonawców; czego plan nie wymienia,
-a co zepsuje produkcję (konsument schematu, stare wiersze, bramka CI).
+a co zepsuje produkcję (konsument schematu, stare wiersze, bramka CI);
+które kryterium odbioru przejdzie przy niedziałającej drodze użytkownika.
 
 Każdy finding weryfikujesz w kodzie; odrzucony dostaje powód. Przyjęte
 wtapiasz w plan i przepisujesz go jako stan: plan wygląda, jakby powstał dziś.
@@ -210,6 +222,9 @@ i tym, co czeka na decyzję.
 Smoke idzie drogą produkcji: ten sam starter, ładunek z tego samego źródła,
 odczyt wyniku z miejsca, w którym zapisuje go produkcja. Dowodem wdrożenia
 jest odczyt żywego stanu (wersja funkcji, wiersz w bazie).
+
+Meldunek idzie po kryteriach odbioru: przy każdym odczyt, który je
+potwierdził, albo powód, dla którego nie przeszło.
 
 Robota kończy się meldunkiem według reguły globalnej i sprzątniętym
 stanowiskiem: worktree agentów zdjęte (`git worktree list` pokazuje tylko
