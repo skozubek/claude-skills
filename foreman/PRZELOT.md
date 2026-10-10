@@ -13,9 +13,9 @@ wymieniają jawnie:
 - zakres: zadania i pliki z grafu; znalezisko spoza zakresu idzie do raportu;
 - dane: na których kontach, markach i projektach przelot zapisuje na
   produkcji, a gdzie tylko czyta;
-- tożsamość i sekrety z nazwy i miejsca: która komenda daje klucz, która
-  funkcja go przyjmuje; klucz idzie drutem do pliku w katalogu tymczasowym,
-  nigdy na ekran, i jest kasowany po użyciu;
+- tożsamość z nazwy i miejsca: która komenda daje klucz, która funkcja go
+  przyjmuje, czego klucz nie otworzy (np. starter wymagający tokenu
+  użytkownika) i jaki jest wtedy zastępczy odbiór;
 - koszt: płatne wywołania z limitem liczbowym;
 - kroki, których przelot nie wykona sam (publikacja przez przeglądarkę,
   wiadomość do człowieka, logowanie czyimś kontem): każdy ma zastępczy
