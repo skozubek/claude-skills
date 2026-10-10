@@ -53,6 +53,12 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
   wymagające czynności spoza granic wychodzi na jaw przy odbiorze, gdy nie ma
   już kogo zapytać.
 
+- tożsamość jest sprawdzona dopiero po jednym prawdziwym wywołaniu każdej
+  bramki z planu (odpowiedź 200 albo 4xx z treścią), nie po odczycie, skąd
+  wziąć klucz: funkcja porównuje Bearer z kluczem wstrzykniętym przez
+  platformę (`sb_secret_…`), a lista kluczy CLI pokazuje też legacy
+  `service_role`, który daje 401 (MOL/Panel/meta/LEKCJE.md 2026-10-10).
+
 Gotowe, gdy każde kryterium odbioru z planu ma przypisaną komendę, konto
 i miejsce odczytu.
 
