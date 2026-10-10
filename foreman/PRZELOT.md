@@ -4,25 +4,34 @@ Czytasz przed pierwszym spawnem każdego przelotu, przy którym bramek nie
 pilnuje człowiek. Bez tego pliku bramki, które kosztują pieniądze albo
 dotykają produkcji, agent pomija albo przyznaje je sobie sam.
 
-## Mandat
+## Granice
 
-Przelot startuje z mandatem spisanym w pliku projektu, przed startem.
-Wzorzec: `~/Coding/MOL/Panel/meta/seo-geo/MANDAT-AUTONOMII.md`. Mandat wymienia
-jawnie:
+Przelot startuje dopiero, gdy plan ma sekcję „Granice”, spisaną przed startem.
+Zasady repo (`AGENTS.md`/`CLAUDE.md`) obowiązują bez powtarzania. Granice
+wymieniają jawnie:
 
-- zakres: które zadania, które pliki, a znalezisko spoza zakresu idzie do
-  raportu;
-- co wolno wydać: płatne evale, wywołania modeli, z limitem liczbowym;
-- co wolno wypchnąć i wdrożyć: commit, push, gałąź kontra `main`, wdrożenie
-  i na czym;
-- zakres danych: projekty, konta, marki;
-- z nazwy i miejsca sekrety, tożsamości i adres produkcji: który `.env`, która
-  karta przeglądarki, którą funkcją się startuje; klasyfikator uprawnień odmówi
-  wyciągnięcia tokenu z przeglądarki, więc tożsamość zostaje w karcie,
-  a wywołania idą JS-em w niej;
-- bramki z człowiekiem: miejsca, w których przelot staje i czeka.
+- zakres: zadania i pliki z grafu; znalezisko spoza zakresu idzie do raportu;
+- dane: na których kontach, markach i projektach przelot zapisuje na
+  produkcji, a gdzie tylko czyta;
+- tożsamość i sekrety z nazwy i miejsca: która komenda daje klucz, która
+  funkcja go przyjmuje; klucz idzie drutem do pliku w katalogu tymczasowym,
+  nigdy na ekran, i jest kasowany po użyciu;
+- koszt: płatne wywołania z limitem liczbowym;
+- kroki, których przelot nie wykona sam (publikacja przez przeglądarkę,
+  wiadomość do człowieka, logowanie czyimś kontem): każdy ma zastępczy
+  odbiór w przelocie i linię „do zrobienia po przelocie” w raporcie
+  końcowym.
 
-Wszystko spoza mandatu jest poza zakresem. Mandatu sesja nie edytuje sama.
+Granic sesja nie poszerza w trakcie. Zawsze, w każdym przelocie:
+
+- nie osłabiasz bramek: bez pomijania testów, rozluźniania asercji,
+  podnoszenia progów i wyjątków w kontrolach CI;
+- stop i raport („czego brakuje, co próbowano”), gdy trzeba zmienić kontrakt
+  albo zakres poza planem, gdy pojawia się ustalenie dotyczące
+  bezpieczeństwa, gdy to samo CI jest czerwone po dwóch próbach naprawy,
+  gdy produkcja zachowuje się inaczej, niż zakłada plan, i gdy limit kosztu
+  się wyczerpał;
+- merge, wdrożenie i odbiór na produkcji to trzy osobne kamienie meldunku.
 
 ## Droga odbioru, sprawdzona przed startem
 
@@ -40,8 +49,8 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
   (`supabase db query --linked … > plik` po `supabase link` w worktree);
   pobranie z przeglądarki i każdy krok kończący się dialogiem to w przelocie
   ślepa uliczka; karta w tle dławi pętle, więc postęp czyta się z bazy (LC-106);
-- każde kryterium odbioru z planu da się wykonać w kopercie mandatu; kryterium
-  wymagające czynności spoza mandatu wychodzi na jaw przy odbiorze, gdy nie ma
+- każde kryterium odbioru z planu da się wykonać w granicach planu; kryterium
+  wymagające czynności spoza granic wychodzi na jaw przy odbiorze, gdy nie ma
   już kogo zapytać.
 
 Gotowe, gdy każde kryterium odbioru z planu ma przypisaną komendę, konto
@@ -51,7 +60,7 @@ i miejsce odczytu.
 
 - **Licznik płatnych wywołań per obiekt** (strona, klient, dokument) w notatce
   stanu, od pierwszego wywołania. Zadania, smoke i porównania biją w ten sam
-  limit z trzech miejsc. Limit mandatu sumujesz z całym planem briefu przed
+  limit z trzech miejsc. Limit z granic sumujesz z całym planem briefu przed
   pierwszym wywołaniem: plan potrafi go przekroczyć, choć każdy etap z osobna
   się mieści (LC-099).
 - **Limit sesji nie kończy przelotu.** Zwykła sesja sama czeka na reset

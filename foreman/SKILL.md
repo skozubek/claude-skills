@@ -202,7 +202,11 @@ blokada, a pełna weryfikacja na gałęzi integracyjnej przechodzi.
 Dostaje wskaźniki: plan, plik diffu, katalog repo. Czyta diff bez transkryptów
 wykonawców i ocenia trzy osie: zgodność
 z planem, standardy repo, **prawdziwość tekstów widocznych dla użytkownika**
-we wszystkich gałęziach kodu, które je produkują. Findingi weryfikujesz
+we wszystkich gałęziach kodu, które je produkują, **łącznie z pomocą „?”
+i opisami ekranów, których dotyka diff** — pomoc leży poza diffem, więc
+recenzent dostaje jej ścieżki wprost, a zmiana zachowania ekranu poprawia
+jego pomoc w tym samym przelocie (fala 4 SEO/GEO: pomoc on-site dalej
+uczyła „Stwórz zadania” po jego usunięciu). Findingi weryfikujesz
 w kodzie jak findingi Codexa; przyjęte wracają do pętli frontu jako nowe
 zadania.
 
@@ -219,7 +223,7 @@ raportowała sukces, nie widziała kodu pozostałych zadań, więc brama biegnie
 w całości.
 
 Push i PR kończą każdy przebieg. Merge do `main` i wdrożenie idą dalej tylko
-wtedy, gdy wymienia je mandat albo słowo Serge'a w tej sesji, a graf nie ma
+wtedy, gdy wymieniają je granice planu albo słowo Serge'a w tej sesji, a graf nie ma
 blokad; w każdym innym przypadku przebieg kończy się na PR z listą blokad
 i tym, co czeka na decyzję.
 
@@ -263,8 +267,9 @@ w częściową czystość" przetrwa. Komendy weryfikacji są dokładne, nie
 ## Przelot bez nadzoru
 
 Gdy przy bramkach nie stoi człowiek, przed pierwszym spawnem przeczytaj
-[PRZELOT.md](PRZELOT.md): mandat, droga odbioru sprawdzona jako operator,
-liczniki i budziki. Bez spisanego mandatu przelot się nie zaczyna.
+[PRZELOT.md](PRZELOT.md): granice w planie, droga odbioru sprawdzona jako
+operator, liczniki i budziki. Bez sekcji „Granice” w planie przelot się nie
+zaczyna.
 
 ## Czego nie dokładać
 
