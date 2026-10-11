@@ -176,7 +176,9 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    najwyżej trzech agentów; reszta frontu czeka na wolne miejsce. SHA
    gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta
    zapisujesz w pliku sesji w katalogu tymczasowym: to rejestr własności
-   tego przelotu, z którego korzysta odbiór i sprzątanie.
+   tego przelotu, z którego korzysta odbiór i sprzątanie. Ten sam plik
+   dostaje każdą inną rzecz, którą przelot stawia (budzik, `/coffee`,
+   proces w tle, konto testowe, gałąź PR), w chwili jej postawienia.
 2. Na powiadomienie o końcu zadania robisz **odbiór** w ścieżce worktree
    z wyniku agenta:
    - `git merge-base --is-ancestor <SHA ze spawnu> HEAD`: worktree wyrósł
@@ -269,10 +271,19 @@ Przed sprzątaniem, póki przelot jest w kontekście: [POSTMORTEM.md](POSTMORTEM
 Wynik wchodzi do skilla jednym commitem i do meldunku sekcją „Skill”.
 
 Robota kończy się meldunkiem według reguły globalnej i sprzątniętym
-stanowiskiem: worktree i gałęzie z rejestru własności tego przelotu zdjęte
-po sprawdzeniu, że nie mają niezacommitowanej pracy (cudzych nie ruszasz,
-także w klonie dzielonym), plan skasowany albo przepisany w dokumentację
-stanu, materiał sekcji zwłok skasowany.
+stanowiskiem. Przelot zostawia rzeczy, które przeżyją sesję albo ją obudzą,
+więc rejestr własności wymienia każdą, a sprzątanie odhacza je po kolei:
+
+- worktree i gałęzie agentów, gałąź integracyjna i gałęzie PR-ów, lokalnie
+  i na zdalnym (merge z `--delete-branch`), po sprawdzeniu, że nie mają
+  niezacommitowanej pracy; cudzych nie ruszasz, także w klonie dzielonym;
+- budziki `CronCreate` usunięte (`CronDelete`): sesja zostaje otwarta i budzik
+  odpalony po przelocie wznawia robotę, której już nie ma;
+- `/coffee off`: zadanie launchd trzyma Maca bez snu po końcu sesji;
+- procesy uruchomione przez przelot (dev serwer, daemon przeglądarki),
+  sesje i dostępy nadane na czas odbioru;
+- plan skasowany albo przepisany w dokumentację stanu, materiał sekcji zwłok
+  i pliki w katalogu tymczasowym skasowane.
 
 ## Brief
 

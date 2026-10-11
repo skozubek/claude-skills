@@ -74,8 +74,8 @@ i miejsce odczytu.
 
 ## Rachuba w trakcie
 
-- **Licznik płatnych wywołań per obiekt** (strona, klient, dokument) w notatce
-  stanu, od pierwszego wywołania. Zadania, smoke i porównania biją w ten sam
+- **Licznik płatnych wywołań per obiekt** (strona, klient, dokument) w pliku
+  rejestru przelotu, od pierwszego wywołania. Zadania, smoke i porównania biją w ten sam
   limit z trzech miejsc. Limit z granic sumujesz z całym planem briefu przed
   pierwszym wywołaniem: plan potrafi go przekroczyć, choć każdy etap z osobna
   się mieści (LC-099).
