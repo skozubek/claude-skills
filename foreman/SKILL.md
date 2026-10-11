@@ -32,12 +32,16 @@ niesie tylko to, co specyficzne dla zadania:
 - `foreman-wykonawca` pisze kod jednego zadania we własnym worktree;
 - `foreman-recenzent` odbiera całość świeżym okiem, tylko do odczytu.
 
+Brygadzista to sesja na `opus`. Jego kontekst rośnie przez cały przelot
+i każda odpowiedź płaci za całość, więc najdroższy model w tej roli mnoży
+koszt bez dowodu lepszej orkiestracji; `fable` tylko na słowo Serge'a.
+
 Model wykonawcy dobierasz per zadanie parametrem `model` w wywołaniu `Agent`:
 
 | Model | Zadanie |
 |---|---|
-| `sonnet` | jednoznaczne, sprawdzalne kryterium i istniejący wzorzec w repo: dokumenty, przeniesienia, predykaty, asercje, powtórzenie kształtu, który już stoi |
-| `opus` (domyślny w definicji) | ścieżka krytyczna: schemat, autoryzacja, prompty LLM, nowy kształt, każde zadanie, w którym zły wybór jest drogi i cichy |
+| `sonnet` | jednoznaczne, sprawdzalne kryterium i istniejący wzorzec w repo: dokumentacja techniczna, przeniesienia, predykaty, asercje, powtórzenie kształtu, który już stoi |
+| `opus` (domyślny w definicji) | ścieżka krytyczna: schemat, autoryzacja, prompty LLM, nowy kształt; tekst, który czyta klient albo ocenia sędzia; każde zadanie, w którym zły wybór jest drogi i cichy |
 | `fable` | wyłącznie na wyraźne słowo Serge'a przed spawnem |
 
 Domyślny `opus` sprawia, że pominięty parametr kosztuje tokeny, a nie jakość.
@@ -88,7 +92,10 @@ linii, dane przenoszone drutem do pliku. Szukasz:
 - **bramek**: rejestry, allowlisty, mapy handlerów; nowa powierzchnia
   niedopisana do bramki jest niewidoczna dokładnie tam, gdzie ma działać;
 - **liczb**: limity, sufity, objętości zmierzone zapytaniem; próg z jednego
-  klienta sprawdzony starym i nowym kodem na całym zbiorze (LC-094);
+  klienta sprawdzony starym i nowym kodem na całym zbiorze (LC-094); testy
+  repo z twardym progiem czasu albo pamięci (`grep -rnE "toBeLessThan|performance\.now"`
+  po plikach testów) z zapasem wobec `main`: test „czerwony pod obciążeniem,
+  osobno przechodzi” to dług, który oblewa CI w następnym przelocie;
 - **materiału pomiaru**: gdy robota domyka pętlę „napraw → zmierz ponownie",
   co jest materiałem pomiaru, kto go odświeża i czy użytkownik ma ten krok na
   ekranie (LC-111);
@@ -108,17 +115,23 @@ i powodem**, findingi z `file:line`, kontrakt tego, co powstaje, mapa pokrycia
 testami, tryby awarii, zakres poza pracą, **graf zadań**.
 
 Zadanie w grafie to lista plików z jednym właścicielem, model wykonawcy
-z uzasadnieniem w pół zdania, zadania, od których zależy, i komenda
-weryfikacji. Każde zadanie po scaleniu zostawia gałąź integracyjną zieloną;
-zmiany zielone dopiero razem (schemat i jego konsument) są jednym zadaniem.
-Dwa zadania w jednym pliku to konflikt, który wyjdzie dopiero przy scaleniu:
-dziel po właścicielu pliku, nie po temacie.
+z uzasadnieniem w pół zdania, zadania, od których zależy, spodziewany czas,
+komenda weryfikacji i **czytelnicy** jego pól poza jego plikami (komponent
+renderujący, eksport, drugi dom tej samej reguły). Każde zadanie po scaleniu
+zostawia gałąź integracyjną zieloną; zmiany zielone dopiero razem (schemat
+i jego konsument) są jednym zadaniem. Dwa zadania równoległe w jednym pliku
+to konflikt przy scaleniu: dziel po właścicielu pliku; kolejne w tym samym
+pliku rozdziela zależność.
 
 Model dobierasz do ciężaru zadania, nie do wagi tematu. Wątpliwość rozstrzyga
-koszt pomyłki: tania i głośna → `sonnet`, droga albo cicha → `opus`.
+koszt pomyłki: tania i głośna → `sonnet`, droga albo cicha → `opus`. Masowa
+zmiana oceniana sędzią (setki tekstów) zaczyna od próbki: wynik poniżej
+progu na próbce przenosi zadanie na `opus`, zanim tańszy model przerobi
+całość.
 
-Plan wskazuje też **szew sesji**: punkt, w którym powstaje notatka startowa
-następnej sesji, gdyby okno albo limit się skończyły.
+Plan ustala też **granice PR-ów** (zadanie, front albo całość) i zależności
+między nimi, a zadanie ustalające kontrakt, z którego biorą następne fronty,
+dostaje recenzenta świeżym okiem zaraz po scaleniu, nie dopiero na końcu.
 
 ### 3. Recenzja planu innym modelem
 
@@ -160,8 +173,10 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
 1. Każde zadanie frontu dostaje spawn: `Agent` z
    `subagent_type: "foreman-wykonawca"`, `model` z grafu,
    `run_in_background: true`, wszystkie w jednym komunikacie. Naraz żyje
-   najwyżej trzech agentów; reszta frontu czeka na wolne miejsce. Przy
-   spawnie zapisujesz w planie SHA gałęzi integracyjnej.
+   najwyżej trzech agentów; reszta frontu czeka na wolne miejsce. SHA
+   gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta
+   zapisujesz w pliku sesji w katalogu tymczasowym: to rejestr własności
+   tego przelotu, z którego korzysta odbiór i sprzątanie.
 2. Na powiadomienie o końcu zadania robisz **odbiór** w ścieżce worktree
    z wyniku agenta:
    - `git merge-base --is-ancestor <SHA ze spawnu> HEAD`: worktree wyrósł
@@ -169,12 +184,16 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    - `git diff --name-only <SHA ze spawnu>...HEAD` mieści się w liście plików
      zadania; plik spoza listy oblewa odbiór;
    - komenda weryfikacji z grafu i sekcja odejść od planu.
-   Raport agenta to hipoteza (LC-077); dowodem jest Twój przebieg komend.
-   Agent, który przekroczył swój limit tur albo milczy dłużej niż dwukrotność
-   najdłuższego zaliczonego zadania, dostaje `TaskStop` i liczy się jako
-   niezaliczony odbiór.
+   Raport agenta to hipoteza (LC-077); dowodem jest Twój przebieg komend,
+   zapisany jako komenda, SHA i wynik. Ten sam dowód na tym samym SHA nie
+   biegnie drugi raz.
+   Agent, który przekroczył swój limit tur albo pracuje dłużej niż dwukrotność
+   czasu z grafu (bez przerw sieci i limitu), dostaje `TaskStop` i liczy się
+   jako niezaliczony odbiór.
 3. Odbiór zaliczony → `git merge --no-ff <gałąź agenta>` w głównym klonie,
-   weryfikacja pełna na gałęzi integracyjnej, przeliczenie frontu, spawn.
+   przeliczenie frontu, spawn. Pełna weryfikacja integracji biegnie po
+   zamknięciu frontu i przed PR-em, a po pojedynczym scaleniu tylko wtedy,
+   gdy zadanie dotknęło plików albo kontraktu innego scalonego zadania.
    Konflikt scalenia oznacza błąd w podziale grafu: przerywasz merge, ten sam
    agent przez `SendMessage` wciąga gałąź integracyjną do swojej i rozwiązuje
    konflikt skillem `resolving-merge-conflicts`, a plan dostaje poprawkę podziału.
@@ -188,12 +207,18 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    pozostałe gałęzie grafu idą dalej.
 
 Odejście od planu z dobrym powodem to luka w planie: poprawiasz plan.
-Odejście bez powodu to robota do zwrotu. Mała prośba, która odsłania dług,
+Odejście, które zmienia kontrakt (pole, nazwa, kardynalność), przyjmujesz
+dopiero po wskazaniu czytelników tej części kontraktu w grafie i poprawieniu
+ich briefów. Odejście bez powodu to robota do zwrotu. Mała prośba, która odsłania dług,
 jest punktem decyzyjnym dla Serge'a, nie zleceniem na cały dług; robota
 przekraczająca dwukrotność zapowiedzi wraca po decyzję (LC-036).
 
 Pętla kończy się, gdy każde zadanie grafu jest scalone albo opisane jako
 blokada, a pełna weryfikacja na gałęzi integracyjnej przechodzi.
+
+Twój kontekst to największa pozycja kosztu przelotu: każda odpowiedź czyta
+go od nowa. Wyniki komend idą drutem do pliku, a do rozmowy liczby; raport
+agenta czytasz, transkryptu nie.
 
 ### 6. Odbiór świeżym okiem
 
@@ -222,7 +247,11 @@ integracyjnej jako drugie oko z innej rodziny modeli. Flota, która
 raportowała sukces, nie widziała kodu pozostałych zadań, więc brama biegnie
 w całości.
 
-Push i PR kończą każdy przebieg. Merge do `main` i wdrożenie idą dalej tylko
+Push i PR kończą każdy przebieg, w granicach PR-ów z planu. PR po squash
+merge'ach poprzedników budujesz z gałęzi integracyjnej po wciągnięciu `main`
+merge'em, nigdy z gałęzi agenta: ta niesie zmiany, które `main` ma już
+w squashu, i daje konflikt na tych samych liniach (MOL/Panel/meta/LEKCJE.md
+2026-10-11). Merge do `main` i wdrożenie idą dalej tylko
 wtedy, gdy wymieniają je granice planu albo słowo Serge'a w tej sesji, a graf nie ma
 blokad; w każdym innym przypadku przebieg kończy się na PR z listą blokad
 i tym, co czeka na decyzję.
@@ -234,10 +263,16 @@ jest odczyt żywego stanu (wersja funkcji, wiersz w bazie).
 Meldunek idzie po kryteriach odbioru: przy każdym odczyt, który je
 potwierdził, albo powód, dla którego nie przeszło.
 
+### 8. Sekcja zwłok i sprzątanie
+
+Przed sprzątaniem, póki przelot jest w kontekście: [POSTMORTEM.md](POSTMORTEM.md).
+Wynik wchodzi do skilla jednym commitem i do meldunku sekcją „Skill”.
+
 Robota kończy się meldunkiem według reguły globalnej i sprzątniętym
-stanowiskiem: worktree agentów zdjęte (`git worktree list` pokazuje tylko
-główny klon), gałęzie agentów skasowane, plan skasowany albo przepisany
-w dokumentację stanu.
+stanowiskiem: worktree i gałęzie z rejestru własności tego przelotu zdjęte
+po sprawdzeniu, że nie mają niezacommitowanej pracy (cudzych nie ruszasz,
+także w klonie dzielonym), plan skasowany albo przepisany w dokumentację
+stanu, materiał sekcji zwłok skasowany.
 
 ## Brief
 
@@ -246,10 +281,12 @@ zamykasz mu drogi do rozwiązań złych. Stałe reguły (commity, raport,
 komentarze, zakazy) niesie definicja typu agenta; brief niesie tylko to:
 
 ```
-Zadanie <nazwa z grafu> z planu <ścieżka>, sekcja <nagłówek>. Przeczytaj
-plan w całości przed pierwszą linijką kodu.
+Zadanie <nazwa z grafu> z planu <ścieżka>, sekcja <nagłówek>. Przed
+pierwszą linijką kodu przeczytaj w planie: Granice, kontrakt, swoje zadanie
+i zadania, od których zależysz. Resztę planu czytasz, gdy jej potrzebujesz.
 
 Twoje pliki: <lista>. Pozostałe pliki należą do innych zadań.
+Czytelnicy Twoich pól poza Twoimi plikami: <lista z grafu>.
 
 Warunki:
 - <warunek> — bo <powód liczbowy albo file:line>

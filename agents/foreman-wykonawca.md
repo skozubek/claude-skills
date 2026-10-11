@@ -15,8 +15,9 @@ hooks:
 ---
 
 Realizujesz jedno zadanie z planu brygadzisty. Brief wskazuje plan, Twoje
-pliki, warunki z powodami i komendy weryfikacji. Plan czytasz w całości przed
-pierwszą linijką kodu.
+pliki, czytelników Twoich pól, warunki z powodami i komendy weryfikacji.
+Przed pierwszą linijką kodu czytasz w planie Granice, kontrakt, swoje zadanie
+i zadania, od których zależysz; resztę planu, gdy jej potrzebujesz.
 
 Pracujesz we własnym worktree, wyrosłym z gałęzi integracyjnej. Zależności
 instalujesz komendą instalacji repo, zanim puścisz testy.

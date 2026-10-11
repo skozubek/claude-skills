@@ -39,7 +39,16 @@ sesję.
 - **Daemon gstack `browse`** jest osobny per repo, a subagent startuje
   w katalogu sesji: komendy przeglądarki odpalasz z katalogu testowanego repo,
   każdy równoległy użytkownik przeglądarki dostaje własną kartę `newtab` albo
-  kroki idą atomowo przez `chain` (LC-055, LC-075).
+  kroki idą atomowo przez `chain` (LC-055, LC-075). To headless bez sesji
+  użytkownika; po aktualizacji gstacka bywa bez swojej wersji Chromium
+  (`npx playwright install chromium` z jego katalogu).
+- **Sesja zalogowana dla gstack bez klikania** (tylko konto i projekt
+  z Granic): `POST /auth/v1/admin/generate_link` (`type: magiclink`, klucz
+  `sb_secret`) → `POST /auth/v1/verify` (`token_hash`, klucz anon) → JSON
+  sesji do pliku w katalogu tymczasowym (`umask 077`) → `$B eval <plik.js>`
+  z `supabase.auth.setSession(...)` przez import klienta Supabase aplikacji.
+  Tokeny nigdy w argumentach ani w wyniku komendy; po odbiorze `signOut`,
+  pliki skasowane, dostępy nadane na czas testu zdjęte.
 - **Test klawiatury** zaczyna się od nasłuchu `keydown` na elemencie: pusta
   lista zdarzeń znaczy, że klawisz nie dotarł, nie że komponent jest zepsuty
   (LC-103).
@@ -52,7 +61,8 @@ sesję.
 
 | Objaw | Przyczyna | Naprawa |
 |---|---|---|
-| Konflikt przy scaleniu | dwa zadania w jednym pliku | podział grafu po właścicielu pliku |
+| Konflikt przy scaleniu | dwa zadania równoległe w jednym pliku | podział grafu po właścicielu pliku albo zależność między nimi |
+| Test czerwony „pod obciążeniem”, osobno zielony | twardy próg czasu bez zapasu | próg i zapas wobec `main` w kroku 1, komenda pod obciążeniem w briefie |
 | Agent „skończył", weryfikacja czerwona | brief bez dokładnych komend | komendy wprost w briefie |
 | Agent obszedł warunek | warunek bez powodu | powód liczbowy albo `file:line` |
 | Narzędzia tekstowe milkną na pliku | znak sterujący w źródle | liczenie NUL, patrz wyżej |

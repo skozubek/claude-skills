@@ -26,11 +26,13 @@ Granic sesja nie poszerza w trakcie. Zawsze, w każdym przelocie:
 
 - nie osłabiasz bramek: bez pomijania testów, rozluźniania asercji,
   podnoszenia progów i wyjątków w kontrolach CI;
-- stop i raport („czego brakuje, co próbowano”), gdy trzeba zmienić kontrakt
-  albo zakres poza planem, gdy pojawia się ustalenie dotyczące
-  bezpieczeństwa, gdy to samo CI jest czerwone po dwóch próbach naprawy,
-  gdy produkcja zachowuje się inaczej, niż zakłada plan, i gdy limit kosztu
-  się wyczerpał;
+- stop całego przelotu i raport („czego brakuje, co próbowano”), gdy trzeba
+  zmienić zakres poza planem, gdy pojawia się ustalenie dotyczące
+  bezpieczeństwa, gdy produkcja zachowuje się inaczej, niż zakłada plan,
+  i gdy limit kosztu się wyczerpał;
+- blokada jednego zadania (reszta grafu idzie dalej), gdy to samo CI jest
+  czerwone po dwóch próbach naprawy albo zadanie wymaga zmiany kontraktu,
+  której czytelnicy nie są w grafie;
 - merge, wdrożenie i odbiór na produkcji to trzy osobne kamienie meldunku.
 
 ## Droga odbioru, sprawdzona przed startem
@@ -53,11 +55,19 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
   wymagające czynności spoza granic wychodzi na jaw przy odbiorze, gdy nie ma
   już kogo zapytać.
 
+- odbiór ekranu nie zależy od przeglądarki człowieka: rozszerzenie w Brave
+  pada razem z siecią i wraca dopiero po jego ruchu. Sesję zalogowaną dla
+  gstack mintuje się bez klikania (przepis w [PULAPKI.md](PULAPKI.md)), ale
+  dev serwer na localhost czyta ten sam projekt Supabase co produkcja, więc
+  Granice wymieniają projekt, konto, dozwolone zapisy i sposób zdjęcia
+  dostępu po odbiorze; konto spoza Granic odbiera człowiek po przelocie;
 - tożsamość jest sprawdzona dopiero po jednym prawdziwym wywołaniu każdej
-  bramki z planu (odpowiedź 200 albo 4xx z treścią), nie po odczycie, skąd
-  wziąć klucz: funkcja porównuje Bearer z kluczem wstrzykniętym przez
-  platformę (`sb_secret_…`), a lista kluczy CLI pokazuje też legacy
-  `service_role`, który daje 401 (MOL/Panel/meta/LEKCJE.md 2026-10-10).
+  bramki z planu, z odpowiedzią, którą plan zapowiada (200 albo konkretny
+  4xx z treścią bramki; 401 znaczy, że tożsamość nie działa), nie po
+  odczycie, skąd wziąć klucz: funkcja porównuje Bearer z kluczem
+  wstrzykniętym przez platformę (`sb_secret_…`), a lista kluczy CLI pokazuje
+  też legacy `service_role`, który daje 401 (MOL/Panel/meta/LEKCJE.md
+  2026-10-10).
 
 Gotowe, gdy każde kryterium odbioru z planu ma przypisaną komendę, konto
 i miejsce odczytu.
@@ -69,18 +79,31 @@ i miejsce odczytu.
   limit z trzech miejsc. Limit z granic sumujesz z całym planem briefu przed
   pierwszym wywołaniem: plan potrafi go przekroczyć, choć każdy etap z osobna
   się mieści (LC-099).
-- **Limit sesji nie kończy przelotu.** Zwykła sesja sama czeka na reset
-  i rusza dalej (`autoContinueAtUsageLimit`). Dwie pułapki: po dwóch
-  odcięciach z rzędu się poddaje, a gdy Mac przespał ponad 30 minut, czeka
-  na Enter. Dlatego sesja nocna startuje od `/coffee` (LC-038), a budzik
-  zapasowy (`CronCreate`, godzina po zgłoszonym resecie) podnosi przelot,
-  który się poddał. Tryb `claude -p` na reset nie czeka wcale; wznawia go
-  skrypt startowy (wzór: `campaign-builder/scripts/night-loop.sh`).
-- **Sędzia próbki** tam, gdzie próg mówi „ocena człowieka": model spoza rodziny
-  wykonawcy (Codex; przy dużej próbce `-m gpt-6-luna`, jeśli na kilku
-  przypadkach z oczywistym werdyktem zgadza się z Sol), zanonimizowana próbka, status ustalony przed pokazaniem werdyktu,
-  ten sam przydział i kontekst decyzyjny, który miał audytor (LC-093).
+- **Sieć i limit.** Sieć pada częściej niż limit, a sesja po awarii sieci nie
+  wraca sama. Przelot startuje od `/coffee` (LC-038) i budzika zapasowego
+  (`CronCreate`) postawionego od razu, na porę, o której Serge wstaje; drugi
+  budzik stawiasz godzinę po każdym zgłoszonym resecie limitu, bo sesja po
+  dwóch odcięciach z rzędu się poddaje, a po ponad 30 minutach snu Maca
+  czeka na Enter. Po podniesieniu: `git status` w worktree z rejestru,
+  agenty floty wznawiasz `SendMessage` (worktree trzyma niezacommitowaną
+  robotę), czas awarii nie liczy się do czasu zadania
+  (MOL/Panel/meta/LEKCJE.md 2026-10-11). Tryb `claude -p` na reset nie
+  czeka wcale; wznawia go skrypt startowy (wzór:
+  `campaign-builder/scripts/night-loop.sh`).
+- **Sędzia próbki** tam, gdzie próg mówi „ocena człowieka”. Procedura,
+  ustalona przed pierwszą rundą (LC-093, MOL/Panel/meta/LEKCJE.md
+  2026-10-11):
+  1. losowanie próbki ze stałym ziarnem do pliku, zanonimizowanej, ze
+     statusem każdego elementu zapisanym przed pokazaniem werdyktu;
+  2. w próbce kontrola: elementy, o których wiesz, że muszą oblać; runda,
+     w której kontrola przechodzi, jest nieważna;
+  3. punktacja per rodzaj pola: pole z akcją ocenia „wiem, co zrobić”,
+     pole bez akcji ocenia się po słowach (zrozumiałość bez żargonu);
+  4. sędzia z innej rodziny niż wykonawca (Codex; przy dużej próbce
+     `-m gpt-6-luna`, jeśli na kilku oczywistych przypadkach zgadza się
+     z domyślnym), z tym samym przydziałem i kontekstem, który miał autor;
+  5. druga runda: te same elementy plus świeża próbka wylosowana przed
+     poprawką, żeby poprawka nie uczyła się pod test; skrypt sprawdzający
+     słowa nie zastępuje czytania pola po polu.
 - **Progi ogłaszane przed liczbami.** Kryterium zaliczenia stoi w planie przed
   pierwszym wynikiem; próg dopisany po zobaczeniu liczb to opis.
-- **Blokada zatrzymuje zadanie, nie przelot.** Zablokowane zadanie kończy się
-  wpisem „czego brakuje, co próbowano", pozostałe gałęzie grafu idą dalej.
