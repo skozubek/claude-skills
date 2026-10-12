@@ -5,11 +5,14 @@ set -euo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 
 [ -x "$REPO/node_modules/.bin/vite" ] || { echo "BŁĄD: brak node_modules w $REPO. Najpierw: (cd $REPO && bun install)" >&2; exit 2; }
-if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "BŁĄD: port $PORT już zajęty. Uruchom bin/doctor: powie, czyj to proces." >&2; exit 3
+mkdir -p "$(dirname "$STAN_DIR")"
+# Blokada: drugi start tego samego checkoutu odpada, zanim dotknie stanu pierwszego.
+mkdir "$STAN_DIR" 2>/dev/null || { echo "BŁĄD: stan $STAN_DIR istnieje: serwer tego checkoutu już działa albo nie sprzątnięto. bin/doctor, potem bin/sprzataj." >&2; exit 3; }
+if [ -n "$(pid_portu)" ]; then
+  rmdir "$STAN_DIR"
+  echo "BŁĄD: port $PORT zajęty przez pid $(pid_portu) z '$(cwd_procesu "$(pid_portu)")'. Nie ruszam cudzego procesu." >&2; exit 3
 fi
 
-mkdir -p "$STAN_DIR"
 echo $$ > "$STAN_DIR/serwer.pid"
 echo "$REPO" > "$STAN_DIR/checkout"
 echo "Serwer: $URL (checkout $REPO)"

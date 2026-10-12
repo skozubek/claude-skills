@@ -1,12 +1,17 @@
 #!/usr/bin/env bash
-# Zrzut ekranu prosto do katalogu dowodów (gstack zapisuje tylko w /tmp i w repo).
+# Zrzut ekranu prosto do katalogu dowodów (gstack zapisuje tylko w /tmp i w repo) plus metryka:
+# czas, HEAD checkoutu, adres karty, zalogowane konto. Bez metryki zrzut nie jest dowodem.
 # Użycie: bin/zrzut <katalog-dowodów> <nazwa-z-id-kroku>   np. bin/zrzut ~/Coding/MOL/Panel/dowody/2026-10-12-crm ZAP-06-po
 set -euo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 cd "$REPO"
 CEL="${1:?katalog dowodów}"; NAZWA="${2:?nazwa z id kroku}"
 mkdir -p "$CEL"
-TMP="$(mktemp -d)/$NAZWA.png"
-"$B" screenshot "$TMP" >/dev/null
-mv "$TMP" "$CEL/$NAZWA.png" && rmdir "$(dirname "$TMP")"
+W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
+"$B" screenshot "$W/$NAZWA.png" >/dev/null
+mv "$W/$NAZWA.png" "$CEL/$NAZWA.png"
+printf '%s' "(async () => { const m = await import('/src/integrations/supabase/client.ts'); const r = await m.supabase.auth.getUser(); return r.data.user ? r.data.user.email + ' ' + r.data.user.id : 'niezalogowany'; })()" > "$W/kto.js"
+jq -n --arg czas "$(date -u +%FT%TZ)" --arg head "$(git rev-parse HEAD)" --arg galaz "$(git branch --show-current)" \
+  --arg url "$("$B" url | tail -1)" --arg konto "$("$B" eval "$W/kto.js" | tail -1)" \
+  '{czas:$czas, head:$head, galaz:$galaz, url:$url, konto:$konto}' > "$CEL/$NAZWA.meta.json"
 echo "$CEL/$NAZWA.png"

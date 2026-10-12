@@ -243,9 +243,10 @@ zadania.
 
 Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z gałęzi
 integracyjnej, dane z tego samego źródła co produkcja, kryteria odczytane
-z DOM-u liczbami. W AdMotiv odbiór robi osobny weryfikator, nie wykonawca:
-skill `verify-admotiv` (start, logowanie, kontrola instancji, dowód) na
-wpisach mapy, które dotyka zmiana; ten sam wpis przechodzi smoke na produkcji.
+z DOM-u liczbami. W AdMotiv odbiór robi agent `foreman-weryfikator`, nie wykonawca:
+skill `verify-admotiv` na krokach mapy z obszarów, które wskazuje
+`bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
+ten sam krok przechodzi smoke na produkcji.
 
 ### 7. Brama i wdrożenie
 

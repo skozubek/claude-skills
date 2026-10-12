@@ -19,6 +19,21 @@ zostaje osąd: co przejść, czy dowód dowodzi, czy zmiana działa.
 Narzędzie jest prywatne (Serge + jego agenci). Repo AdMotiv o nim nie wie:
 nic z tego skilla nie trafia do repo ani do PR-ów.
 
+## Zakres i koszt
+
+Budżet to jedna subskrypcja na miesiąc, więc weryfikacja idzie za diffem:
+- przechodzisz **tylko obszary, których dotyka zmiana**; listę podaje
+  `bin/doctor` (pliki zmienione na gałęzi i w drzewie roboczym zestawione ze
+  ścieżkami obszarów w `przejscia.tsv`), a w obszarze tylko kroki, których
+  zachowanie zmiana może ruszyć;
+- ekran czytasz wąsko: `$B js` z selektorem i wynikiem w kilkudziesięciu
+  znakach albo `snapshot -i -s '<kontener>'`; pełny `snapshot` strony i
+  `text` całej strony tylko przy diagnozie;
+- zrzuty idą na dysk i zostają nieobejrzane; otwierasz je dopiero, gdy odczyt
+  tekstowy jest niejasny;
+- bez subagentów do weryfikacji jednej zmiany; pełny przegląd modułu tylko
+  przy jego odbiorze.
+
 ## Start
 
 ```bash
@@ -42,9 +57,15 @@ zewnętrzne” niżej.
 ```
 
 Bez hasła i bez klikania: link logowania generowany kluczem serwisowym,
-sesja wstrzyknięta przez klienta Supabase aplikacji. Tokeny nie trafiają na
-wyjście ani do argumentów. Skrypt nie zakłada kont: nieznany adres kończy się
-błędem przed wygenerowaniem linku.
+sesja wstrzyknięta przez klienta Supabase aplikacji. Odmawia, gdy: konta nie
+ma w tabeli kont README mapy, projekt CLI nie zgadza się z `.env` aplikacji,
+na porcie nie słucha serwer tego checkoutu, konto nie istnieje (skrypt kont
+nie zakłada), sesja w przeglądarce należy do innego użytkownika niż
+zamówiony. Sekrety nie trafiają na wyjście ani do argumentów procesów.
+Wylogowanie jest lokalne: sesje konta na innych urządzeniach zostają.
+Tokenów nigdy nie wpisujesz do `$B js` ani do argumentów: gstack zapisuje
+treść komend w swoim dzienniku audytu. Kod z sekretem idzie przez plik
+i `$B eval <plik>`, jak w `bin/sesja`.
 
 ## Kontrola instancji
 
@@ -56,10 +77,13 @@ Odpowiada, czy instancję warto sterować: checkout i gałąź, serwer na porcie
 tego checkoutu z tego katalogu (nie cudzy), strona 200, jeden daemon
 przeglądarki, karta na właściwym adresie, kto jest zalogowany, błędy konsoli.
 Z nazwą modułu pokazuje commity w jego kodzie od ostatniego pełnego przejścia
-mapy, z autorem. Cudza zmiana w module oznacza: najpierw przejście mapy, potem
-twoja robota. Wtedy regresja wychodzi jako znalezisko, nie jako „mój kod
-zepsuł”.
+mapy, z autorem. Cudza zmiana w module oznacza: najpierw przejście wpisów mapy
+tych obszarów, których dotykają te commity, potem twoja robota. Wtedy regresja
+wychodzi jako znalezisko, nie jako „mój kod zepsuł”. Pełny przegląd modułu
+tylko przy jego odbiorze.
 
+Kolejność: `bin/start`, `bin/sesja <email>`, `bin/doctor`. Bez sesji, bez
+karty na tym serwerze i z cudzym procesem na porcie wynik to błąd.
 Uruchamiasz przed pierwszym sterowaniem, po każdym nieudanym kroku i zawsze,
 gdy coś wygląda dziwnie. Nigdy nie sterujesz instancją, której nie
 sprawdziłeś od ostatniej niespodzianki. Gdy kontrola nie widzi problemu
@@ -82,10 +106,16 @@ Najczęściej: `goto`, `snapshot -i` (drzewo z referencjami `@eN`), `click`,
   w bazie), nigdy na stały sen.
 - `$B eval` zwraca wynik tylko z wyrażenia: kod z `await` owijasz w
   `(async () => { …; return x; })()`.
-- Przyciski w panelach bocznych (Sheet) klikasz przez DOM, nie po `@eN`:
-  ten sam napis w wielu wierszach i nakładki sprawiają, że referencja trafia
-  w inny przycisk. Pole Reacta wypełniasz natywnym setterem i zdarzeniem
-  `input`.
+- Klikasz jak użytkownik: `click` po roli i nazwie albo `@eN`, klawiatura
+  przez `press`. Klik i wypełnienie przez DOM (`eval` z `.click()`, natywny
+  setter pola Reacta) omijają nakładki i zablokowane przyciski, które
+  zatrzymałyby człowieka, więc to diagnostyka: krok tak przejęty ma w dowodzie
+  dopisek „klik DOM, dowód niepełny” i powód (np. `@eN` w panelu bocznym trafił
+  w inny przycisk o tym samym napisie).
+- Okna potwierdzeń: gstack domyślnie je zatwierdza. Przed krokiem, który może
+  otworzyć `confirm`, ustawiasz politykę jawnie (`dialog-dismiss` albo
+  `dialog-accept`), a po kroku czytasz `$B dialog`: treść okna jest częścią
+  dowodu. Akcja niszcząca nigdy nie przechodzi na domyślnym zatwierdzeniu.
 - `eval` służy do odczytu stanu po przejściu ścieżki użytkownika, nie do
   wywoływania wewnętrznych funkcji aplikacji jako dowodu.
 - Równoległy agent bierze własną kartę (`newtab`) albo kroki idą atomowo
@@ -119,9 +149,14 @@ który przyjąłby sceptyczny recenzent. Zrzut „otwiera się” nie jest dowod
   w danych to porażka przejścia z powodem, a powód idzie do „Pułapek” pliku
   mapy.
 
-Artefakty: `~/Coding/MOL/Panel/dowody/<RRRR-MM-DD>-<temat>/` (zrzuty,
-`snapshot` w tekście, wyniki zapytań). Każdy artefakt niesie identyfikator
-wpisu mapy i użyte wejście. Meldunek cytuje odczyty liczbami i podaje
+Artefakty: `~/Coding/MOL/Panel/dowody/<RRRR-MM-DD>-<temat>/`. Zrzut przez
+`bin/zrzut <katalog> <ID-kroku-stan>`, który dopisuje metrykę (czas, HEAD,
+adres, konto z id). Obok: odczyt ekranu w tekście (`snapshot` albo `js`)
+i każde zapytanie SQL **razem z jego treścią** i identyfikatorami wierszy, nie
+same liczby. Liczba zgodna z ekranem dowodzi tylko wtedy, gdy zapytanie
+liczy tę samą regułę co ekran (widok „Spam” to werdykt człowieka albo agenta,
+nie sam status). Krok mapy oznaczasz „przeszło na żywo <data>” dopiero, gdy
+przeszły jego akcja i jego stan końcowy, nie sam odczyt liczników. Meldunek cytuje odczyty liczbami i podaje
 katalog. Katalog żyje do odbioru na produkcji, potem kasujesz.
 
 ## Skutki zewnętrzne
@@ -134,14 +169,25 @@ pisze do systemu klienta. Plik mapy oznacza takie kroki. W każdym innym
 przypadku ścieżka kończy się przed akcją, a dowodem jest stan tuż przed nią
 plus odczyt, że akcja nie poszła.
 
+## Dane testowe
+
+Kroki zapisu na produkcji idą tylko w cyklu: (1) identyfikator przebiegu
+w danych, które da się nim odnaleźć (np. adres `test-verify+<RRRRMMDD-HHMM>@…`
+w zapytaniu), (2) odczyt stanu przed, (3) przebieg, (4) sprzątanie według
+przepisu SQL z pliku mapy, (5) odczyt, że po przebiegu nie zostało nic z jego
+identyfikatorem. Plik obszaru bez przepisu sprzątania ma kroki zapisu
+oznaczone jako zablokowane. Prawdziwych danych (etapy lejka, ustawienia
+agencji) przebieg nie zmienia bez planu i słowa Serge’a.
+
 ## Sprzątanie
 
 ```bash
 <skill>/bin/sprzataj
 ```
 
-Wylogowuje przeglądarkę i zatrzymuje serwer uruchomiony przez `bin/start`
-dla tego checkoutu (po pid, nigdy po nazwie procesu). Dowodów nie rusza.
+Wylogowuje przeglądarkę lokalnie i zatrzymuje serwer uruchomiony przez
+`bin/start` dla tego checkoutu: po pid z własnego stanu i tylko wtedy, gdy ten
+proces wciąż pracuje w tym checkoucie (nigdy po nazwie procesu). Dowodów nie rusza.
 Dane testowe, które przebieg zapisał, sprzątasz według „Pułapek” pliku mapy.
 Sprzątasz też po każdej nieudanej iteracji, żeby nie zostawiać serwerów
 i portów.
@@ -150,9 +196,11 @@ i portów.
 
 `~/Coding/MOL/Panel/meta/mapa/`: `README.md` (warunki wstępne, konta testowe,
 konwencje, spis i kolejność pełnego przeglądu), jeden plik na obszar,
-`sciezki-przekrojowe.md` (drogi przez kilka ekranów, zawsze na końcu
-pełnego przeglądu) i `przejscia.tsv` (moduł, ścieżki kodu, SHA i data
-ostatniego pełnego przejścia; czyta je `bin/doctor`).
+`<moduł>-sciezki-przekrojowe.md` (drogi przez kilka ekranów, zawsze na końcu
+pełnego przeglądu), skrypty danych testowych modułu (np.
+`crm-zapytanie-testowe.sh`, `crm-sprzatanie.sh`) i `przejscia.tsv` (obszar,
+ścieżki kodu, SHA `origin/main` i data ostatniego przejścia ścieżki głównej
+obszaru na żywo; czyta je `bin/doctor`).
 
 Plik obszaru: tytuł, jeden akapit o tym, co widzi użytkownik, potem dokładnie
 cztery sekcje w tej kolejności:
@@ -170,33 +218,30 @@ zaczyna potrzebować własnych warunków wstępnych.
 
 **Moduł bez pliku mapy nie jest domknięty.** Plik powstaje przy domykaniu
 modułu i jest definicją „działa”. Zmiana zachowania ekranu, którą sam
-robisz, poprawia jego plik w tej samej robocie. Pełne przejście modułu
-aktualizuje jego wiersz w `przejscia.tsv` (SHA `origin/main`, data).
+robisz, poprawia jego plik w tej samej robocie. Przejście ścieżki głównej obszaru
+aktualizuje jego wiersz w `przejscia.tsv` (SHA `origin/main`, data). Nowy
+plik obszaru dostaje wiersz od razu, z `-` zamiast SHA.
 
 ## Przegląd mapy
 
-Kiedy: `bin/doctor <moduł>` pokazuje cudze zmiany, przed odbiorem modułu,
-na prośbę. Przebieg:
+Kiedy: przed odbiorem modułu i na prośbę. Po cudzej zmianie wystarcza
+przejście dotkniętych obszarów (sekcja „Kontrola instancji”). Przebieg:
 
-1. Spis: martwe, brakujące i zdublowane wpisy w README.
-2. Źródło: jeden subagent tylko do odczytu na plik obszaru, równolegle.
-   Każdy wyjaśnia z kodu, jak działa funkcja, wskazuje prawdopodobny rozjazd
-   z cytatem i zwraca jeden przepis na przejście. Nie steruje aplikacją, nie
-   edytuje plików.
-3. Uzgodnienie: łączysz przepisy w jak najmniej stanów aplikacji. Nowa
-   powierzchnia z ostatnich zmian jest „brakująca” dopiero z konkretną
-   ścieżką w kodzie.
-4. Przejście na żywo, obowiązkowe nawet przy czystym źródle: jedna instancja,
+1. Spis: martwe, brakujące i zdublowane wpisy w README i `przejscia.tsv`.
+2. Źródło: tylko dla obszarów z commitami od ostatniego przejścia czytasz
+   diff tych commitów (`git log -p <SHA>..origin/main -- <ścieżki>`), nie
+   cały kod; nowa powierzchnia jest „brakująca” dopiero z konkretną ścieżką.
+3. Przejście na żywo, obowiązkowe nawet przy czystym źródle: jedna instancja,
    sterowana szeregowo, każda funkcja co najmniej raz. Zawsze trzy
    niezmienniki: kontrola instancji przed pierwszym sterowaniem i po każdym
    niepowodzeniu; dowody przetrwały każde sprzątanie (sprawdzone na dysku);
    nic, co przebieg uruchomił, nie żyje dłużej, niż jest potrzebne.
-5. Rozróżnienie: zły opis → rozjazd, poprawiasz mapę. Działające zachowanie,
+4. Rozróżnienie: zły opis → rozjazd, poprawiasz mapę. Działające zachowanie,
    którego narzędzie nie umie przejść → luka narzędzia, poprawiasz `bin/`
    i przechodzisz ponownie. Zepsute zachowanie aplikacji → regresja,
    **raportujesz, nie zamazujesz w mapie** i nie ruszasz kodu produktu
    w tym przebiegu.
-6. Wynik, jeden z trzech: **czysto** (pełne pokrycie), **zmiana** (poprawki
+5. Wynik, jeden z trzech: **czysto** (pełne pokrycie), **zmiana** (poprawki
    mapy lub `bin/`, każda dowiedziona), **zablokowane** (co dokładnie).
 
 ## Dźwignia

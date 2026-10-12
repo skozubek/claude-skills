@@ -1,23 +1,30 @@
 #!/usr/bin/env bash
-# Zamyka to, co uruchomił ten przebieg: wylogowuje przeglądarkę i zabija serwer z pliku pid tego checkoutu.
-# Nigdy nie zabija po nazwie procesu. Dowodów nie rusza.
+# Zamyka to, co uruchomił ten przebieg: wylogowuje przeglądarkę lokalnie i zatrzymuje serwer tego checkoutu.
+# Zabija tylko pid z własnego stanu i tylko gdy ten proces wciąż ma katalog roboczy w tym checkoucie.
+# Nigdy po nazwie procesu. Cudzego stanu i dowodów nie rusza.
 set -uo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 cd "$REPO"
 
-"$(dirname "$0")/sesja" --wyloguj 2>/dev/null || echo "UWAGA  wylogowanie nieudane (przeglądarka nie na $URL?)"
+if serwer_nasz; then
+  "$(dirname "$0")/sesja" --wyloguj || echo "UWAGA  wylogowanie nieudane: sprawdź \$B url i sesję ręcznie"
+fi
 
 if [ -f "$STAN_DIR/serwer.pid" ]; then
   PID=$(cat "$STAN_DIR/serwer.pid")
-  if [ "$(cat "$STAN_DIR/checkout" 2>/dev/null)" = "$REPO" ] && kill -0 "$PID" 2>/dev/null; then
-    kill "$PID" && echo "OK     serwer pid $PID zatrzymany"
+  if kill -0 "$PID" 2>/dev/null; then
+    if [ "$(cwd_procesu "$PID")" = "$REPO" ]; then
+      kill "$PID" && echo "OK     serwer pid $PID zatrzymany"
+    else
+      echo "UWAGA  pid $PID żyje, ale nie w $REPO (pid użyty ponownie?). Nie zabijam."
+    fi
   else
     echo "OK     serwer pid $PID już nie żyje"
   fi
-  rm -rf "$STAN_DIR"
+  rm -f "$STAN_DIR/serwer.pid" "$STAN_DIR/checkout"; rmdir "$STAN_DIR" 2>/dev/null
 else
   echo "OK     brak serwera uruchomionego przez bin/start dla $REPO"
 fi
-lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1 && echo "UWAGA  port $PORT dalej zajęty: nie przez ten przebieg, zostawiam"
+[ -n "$(pid_portu)" ] && echo "UWAGA  port $PORT dalej zajęty przez pid $(pid_portu): nie przez ten przebieg, zostawiam"
 ls -d "$DOWODY_DIR"/*/ 2>/dev/null | tail -3 | sed 's/^/DOWODY /'
 exit 0

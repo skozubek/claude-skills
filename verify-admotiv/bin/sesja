@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
-# Loguje przeglądarkę headless (gstack browse) na istniejące konto, bez klikania i bez hasła.
+# Loguje przeglądarkę headless (gstack browse) na konto z listy kont testowych, bez klikania i bez hasła.
 # Użycie: bin/sesja <email>      bin/sesja --wyloguj
-# Tokeny i klucze nie trafiają do argumentów ani na wyjście: tylko do plików 0600, kasowanych na końcu.
-# Konta nie zakłada: magiclink dla nieistniejącego adresu kończy się błędem.
+# Sekrety tylko w plikach 0600 (nagłówki curl przez @plik, nie w argumentach procesu), kasowanych na końcu.
+# Konta nie zakłada. Wylogowanie jest lokalne: nie rusza sesji tego konta na innych urządzeniach.
 set -euo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 cd "$REPO"
 
+serwer_nasz || { echo "BŁĄD: na $URL nie słucha serwer z $REPO. bin/start, potem bin/doctor." >&2; exit 3; }
+
 if [ "${1:-}" = "--wyloguj" ]; then
-  W="$(mktemp -d)"
-  printf '%s' "(async () => { const m = await import('/src/integrations/supabase/client.ts'); await m.supabase.auth.signOut(); return 'wylogowano'; })()" > "$W/w.js"
-  "$B" eval "$W/w.js"; rm -rf "$W"; exit 0
+  W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
+  case "$("$B" url 2>/dev/null | tail -1)" in "$URL"*) ;; *) "$B" goto "$URL/" >/dev/null ;; esac
+  printf '%s' "(async () => { const m = await import('/src/integrations/supabase/client.ts'); const r = await m.supabase.auth.signOut({ scope: 'local' }); if (r.error) return 'BŁĄD signOut: ' + r.error.message; const s = await m.supabase.auth.getSession(); return s.data.session ? 'BŁĄD: sesja dalej jest' : 'wylogowano'; })()" > "$W/w.js"
+  WYNIK=$("$B" eval "$W/w.js" | tail -1); echo "$WYNIK"
+  [ "$WYNIK" = "wylogowano" ] || exit 7
+  exit 0
 fi
 
 EMAIL="${1:?Użycie: bin/sesja <email>}"
@@ -18,37 +23,51 @@ SB_URL="$(env_val VITE_SUPABASE_URL)"
 ANON="$(env_val VITE_SUPABASE_PUBLISHABLE_KEY)"
 REF="$(env_val VITE_SUPABASE_PROJECT_ID)"
 
+# Lista kont, na które wolno się logować: kolumna 1 tabeli kont w README mapy.
+grep -qiF "| \`$EMAIL\` |" "$MAPA_DIR/README.md" || { echo "BŁĄD: $EMAIL nie stoi w tabeli kont $MAPA_DIR/README.md" >&2; exit 6; }
+# Jeden projekt: .env aplikacji, adres API i projekt podpięty do CLI muszą się zgadzać.
+LINKED="$(cat "$SUPA_DIR/supabase/.temp/project-ref" 2>/dev/null || true)"
+[ -n "$REF" ] && [ "$LINKED" = "$REF" ] || { echo "BŁĄD: projekt CLI '$LINKED' ≠ projekt aplikacji '$REF' (klon główny $SUPA_DIR nie ma supabase link; CLI ma własne poświadczenia, .env aplikacji mu nie dawaj)" >&2; exit 4; }
+case "$SB_URL" in "https://$REF.supabase.co"*) ;; *) echo "BŁĄD: adres API '$SB_URL' nie należy do projektu $REF" >&2; exit 4 ;; esac
+
 umask 077
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
 
-# Bezpiecznik: generate_link typu magiclink dla nieznanego adresu zakłada konto. Najpierw sprawdzamy, że istnieje.
+# Bezpiecznik: generate_link typu magiclink dla nieznanego adresu zakłada konto. Najpierw: konto istnieje, jego id.
 case "$EMAIL" in *"'"*|*\\*) echo "BŁĄD: niedozwolony znak w adresie" >&2; exit 2 ;; esac
-supabase db query --linked -o json "select count(*)::int as n from auth.users where lower(email) = lower('$EMAIL')" > "$T/jest.json" 2>"$T/err" \
-  || { echo "BŁĄD: nie mogę sprawdzić konta w bazie (supabase link w tym checkoucie?)" >&2; exit 4; }
-[ "$(jq -r '(.rows // .)[0].n // 0' "$T/jest.json")" = "1" ] || { echo "BŁĄD: konto $EMAIL nie istnieje. Skrypt kont nie zakłada." >&2; exit 6; }
+supabase --workdir "$SUPA_DIR" db query --linked -o json "select id::text from auth.users where lower(email) = lower('$EMAIL')" > "$T/jest.json" 2>"$T/err" \
+  || { echo "BŁĄD: nie mogę sprawdzić konta w bazie" >&2; exit 4; }
+UID_KONTA="$(jq -r '(.rows // .) | if length == 1 then .[0].id else "" end' "$T/jest.json")"
+[ -n "$UID_KONTA" ] || { echo "BŁĄD: konto $EMAIL nie istnieje. Skrypt kont nie zakłada." >&2; exit 6; }
 
 supabase projects api-keys --project-ref "$REF" --reveal -o json > "$T/klucze.json" 2>"$T/err" \
   || { echo "BŁĄD: supabase CLI nie oddało kluczy (zalogowany? \`supabase login\`)" >&2; exit 4; }
-jq -r '.[] | select(.type=="secret") | .api_key' "$T/klucze.json" | head -1 > "$T/secret"
-[ -s "$T/secret" ] || { echo "BŁĄD: brak klucza typu secret w projekcie" >&2; exit 4; }
+jq -r '[.[] | select(.type=="secret")][0].api_key // empty | "apikey: \(.)\nAuthorization: Bearer \(.)"' "$T/klucze.json" > "$T/naglowki"
+[ -s "$T/naglowki" ] || { echo "BŁĄD: brak klucza typu secret w projekcie" >&2; exit 4; }
+rm -f "$T/klucze.json"
 
 jq -n --arg e "$EMAIL" '{type:"magiclink", email:$e}' > "$T/link.req"
-curl -sS -o "$T/link.json" -w '%{http_code}' -X POST "$SB_URL/auth/v1/admin/generate_link" \
-  -H "apikey: $(cat "$T/secret")" -H "Authorization: Bearer $(cat "$T/secret")" \
-  -H 'Content-Type: application/json' --data @"$T/link.req" > "$T/kod"
-[ "$(cat "$T/kod")" = "200" ] || { echo "BŁĄD: generate_link HTTP $(cat "$T/kod"): $(jq -r '.msg // .error_description // .message // "?"' "$T/link.json")" >&2; exit 5; }
+KOD=$(curl -sS -o "$T/link.json" -w '%{http_code}' -X POST "$SB_URL/auth/v1/admin/generate_link" \
+  -H @"$T/naglowki" -H 'Content-Type: application/json' --data @"$T/link.req")
+[ "$KOD" = "200" ] || { echo "BŁĄD: generate_link HTTP $KOD: $(jq -r '.msg // .error_description // .message // "?"' "$T/link.json")" >&2; exit 5; }
+[ "$(jq -r '.id // .user.id // empty' "$T/link.json")" = "$UID_KONTA" ] || { echo "BŁĄD: link wygenerowany dla innego użytkownika niż $UID_KONTA" >&2; exit 5; }
 
 jq '{type:"magiclink", token_hash:(.properties.hashed_token // .hashed_token)}' "$T/link.json" > "$T/verify.req"
-curl -sS -o "$T/sesja.json" -w '%{http_code}' -X POST "$SB_URL/auth/v1/verify" \
-  -H "apikey: $ANON" -H 'Content-Type: application/json' --data @"$T/verify.req" > "$T/kod"
-[ "$(cat "$T/kod")" = "200" ] || { echo "BŁĄD: verify HTTP $(cat "$T/kod")" >&2; exit 5; }
+printf 'apikey: %s\n' "$ANON" > "$T/anon"
+KOD=$(curl -sS -o "$T/sesja.json" -w '%{http_code}' -X POST "$SB_URL/auth/v1/verify" \
+  -H @"$T/anon" -H 'Content-Type: application/json' --data @"$T/verify.req")
+[ "$KOD" = "200" ] || { echo "BŁĄD: verify HTTP $KOD" >&2; exit 5; }
 
 jq -r '"(async () => { const m = await import(\"/src/integrations/supabase/client.ts\");
 const r = await m.supabase.auth.setSession({access_token: \(.access_token|@json), refresh_token: \(.refresh_token|@json)});
-return r.error ? \"BŁĄD setSession: \" + r.error.message : \"zalogowano: \" + r.data.user.email; })()"' "$T/sesja.json" > "$T/ustaw.js"
+return r.error ? \"BŁĄD setSession: \" + r.error.message : \"zalogowano: \" + r.data.user.email + \" \" + r.data.user.id; })()"' "$T/sesja.json" > "$T/ustaw.js"
+rm -f "$T/sesja.json"
 
 "$B" goto "$URL/" >/dev/null
-"$B" eval "$T/ustaw.js"
+WYNIK=$("$B" eval "$T/ustaw.js" | tail -1)
+[ "$WYNIK" = "zalogowano: $EMAIL $UID_KONTA" ] || [ "$WYNIK" = "zalogowano: $(echo "$EMAIL" | tr 'A-Z' 'a-z') $UID_KONTA" ] \
+  || { echo "BŁĄD: $WYNIK" >&2; exit 7; }
 "$B" console --clear >/dev/null
 "$B" reload >/dev/null
+echo "zalogowano: $EMAIL ($UID_KONTA)"
