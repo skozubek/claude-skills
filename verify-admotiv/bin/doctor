@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# Czy tę instancję warto sterować? Tylko odczyt. Uruchamiasz przed pierwszym sterowaniem,
+# po każdym nieudanym kroku i zawsze, gdy coś wygląda dziwnie.
+# Użycie: bin/doctor [moduł]   (moduł z meta/mapa/przejscia.tsv: pokaże cudze zmiany od ostatniego przejścia mapy)
+set -uo pipefail
+source "$(dirname "$0")/_wspolne.sh"
+cd "$REPO"
+BLAD=0
+ok()    { echo "OK     $*"; }
+uwaga() { echo "UWAGA  $*"; }
+blad()  { echo "BŁĄD   $*"; BLAD=1; }
+
+# 1. Checkout
+GAL=$(git branch --show-current); HEAD=$(git rev-parse --short HEAD)
+BRUD=$(git status --porcelain | wc -l | tr -d ' ')
+ZA=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo "?")
+ok "checkout $REPO, gałąź ${GAL:-(odłączona)} @ $HEAD, zmienionych plików $BRUD, za origin/main o $ZA (bez fetch)"
+
+# 2. Serwer: czy na porcie tego checkoutu słucha proces z TEGO katalogu
+PID=$(lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1)
+if [ -z "$PID" ]; then
+  blad "na porcie $PORT nic nie słucha. Start: bin/start (Bash z run_in_background)"
+else
+  CWD=$(lsof -a -p "$PID" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+  if [ "$CWD" = "$REPO" ]; then ok "serwer $URL, pid $PID, z tego checkoutu"
+  else blad "port $PORT trzyma pid $PID z katalogu '$CWD', nie z $REPO. Nie steruj nim."; fi
+  KOD=$(curl -s -o /dev/null -w '%{http_code}' "$URL/")
+  [ "$KOD" = "200" ] && ok "strona odpowiada 200" || blad "strona odpowiada $KOD"
+fi
+
+# 3. Przeglądarka
+if [ -n "$PID" ]; then
+  ADR=$("$B" url 2>/dev/null | tail -1)
+  DEMONY=$(pgrep -f 'browse/src/server.ts' | wc -l | tr -d ' ')
+  [ "$DEMONY" -le 1 ] && ok "daemonów gstack browse: $DEMONY" || uwaga "daemonów gstack browse: $DEMONY (dwa dają pozorne regresje wszystkiego)"
+  case "$ADR" in
+    "$URL"*) ok "karta na $ADR" ;;
+    *) uwaga "karta przeglądarki na '$ADR', nie na $URL (bin/sesja przenosi i loguje)" ;;
+  esac
+  T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+  printf '%s' "(async () => { const m = await import('/src/integrations/supabase/client.ts'); const r = await m.supabase.auth.getUser(); return r.data.user ? 'zalogowany: ' + r.data.user.email : 'niezalogowany'; })()" > "$T/kto.js"
+  case "$ADR" in "$URL"*)
+    KTO=$("$B" eval "$T/kto.js" 2>&1 | tail -1)
+    case "$KTO" in zalogowany:*) ok "$KTO" ;; *) uwaga "sesja: $KTO (bin/sesja <email>)" ;; esac
+    BLEDY=$("$B" console --errors 2>/dev/null | grep -c '\[error\]' || true)
+    [ "${BLEDY:-0}" -eq 0 ] && ok "konsola bez błędów od logowania" || uwaga "błędów w konsoli od logowania: $BLEDY (\$B console --errors | grep '\[error\]')"
+  esac
+fi
+
+# 4. Mapa: cudze zmiany w module od ostatniego pełnego przejścia
+TSV="$MAPA_DIR/przejscia.tsv"
+if [ -n "${1:-}" ]; then
+  WIERSZ=$(awk -F'\t' -v m="$1" '$1==m' "$TSV" 2>/dev/null)
+  if [ -z "$WIERSZ" ]; then blad "moduł '$1' nie ma wiersza w $TSV"
+  else
+    SCIEZKI=$(echo "$WIERSZ" | cut -f2); SHA=$(echo "$WIERSZ" | cut -f3); DATA=$(echo "$WIERSZ" | cut -f4)
+    if [ "$SHA" = "-" ]; then uwaga "moduł $1: mapa nigdy nie przeszła w całości"
+    else
+      # shellcheck disable=SC2086
+      ZM=$(git log --oneline --format='%h %an: %s' "$SHA"..origin/main -- $SCIEZKI 2>/dev/null)
+      if [ -z "$ZM" ]; then ok "moduł $1: bez zmian w kodzie od przejścia $DATA ($SHA)"
+      else uwaga "moduł $1: zmiany od przejścia $DATA ($SHA). Przejdź mapę ponownie, zanim zaczniesz swoje:"; echo "$ZM" | sed 's/^/         /'; fi
+    fi
+  fi
+fi
+
+[ $BLAD -eq 0 ] && echo "WYNIK  instancja zdatna do sterowania" || echo "WYNIK  NIE steruj, napraw błędy wyżej"
+exit $BLAD

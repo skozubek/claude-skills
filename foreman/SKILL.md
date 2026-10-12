@@ -104,6 +104,10 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   (LC-104);
 - **wspólnych zasobów**: baza, port, karta przeglądarki; ograniczenie dostaje
   każdy żyjący piszący, nie tylko następny spawn (LC-029).
+- **mapy funkcji** (AdMotiv): plik modułu z `MOL/Panel/meta/mapa/` przed kodem,
+  `verify-admotiv/bin/doctor <moduł>` pokazuje cudze zmiany od ostatniego
+  przejścia; kryteria odbioru planu to wpisy mapy, a nowe zachowanie ekranu
+  dostaje w grafie zadanie „dopisz wpis mapy”.
 
 Gotowe, gdy każdy punkt planu opiera się na `file:line` albo na liczbie
 z zapytania.
@@ -239,7 +243,9 @@ zadania.
 
 Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z gałęzi
 integracyjnej, dane z tego samego źródła co produkcja, kryteria odczytane
-z DOM-u liczbami.
+z DOM-u liczbami. W AdMotiv odbiór robi osobny weryfikator, nie wykonawca:
+skill `verify-admotiv` (start, logowanie, kontrola instancji, dowód) na
+wpisach mapy, które dotyka zmiana; ten sam wpis przechodzi smoke na produkcji.
 
 ### 7. Brama i wdrożenie
 

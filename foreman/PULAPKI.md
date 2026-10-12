@@ -42,13 +42,16 @@ sesję.
   kroki idą atomowo przez `chain` (LC-055, LC-075). To headless bez sesji
   użytkownika; po aktualizacji gstacka bywa bez swojej wersji Chromium
   (`npx playwright install chromium` z jego katalogu).
-- **Sesja zalogowana dla gstack bez klikania** (tylko konto i projekt
-  z Granic): `POST /auth/v1/admin/generate_link` (`type: magiclink`, klucz
-  `sb_secret`) → `POST /auth/v1/verify` (`token_hash`, klucz anon) → JSON
-  sesji do pliku w katalogu tymczasowym (`umask 077`) → `$B eval <plik.js>`
-  z `supabase.auth.setSession(...)` przez import klienta Supabase aplikacji.
-  Tokeny nigdy w argumentach ani w wyniku komendy; po odbiorze `signOut`,
-  pliki skasowane, dostępy nadane na czas testu zdjęte.
+- **Sesja zalogowana dla gstack bez klikania** w AdMotiv: `verify-admotiv/bin/sesja
+  <email>` (link logowania kluczem serwisowym, tokeny tylko w plikach 0600,
+  nie zakłada kont; tylko konto z Granic). Po odbiorze `bin/sprzataj`.
+- **Klik po referencji `@eN` gstacka w panelu bocznym (Sheet) trafia w inny
+  przycisk** (ten sam napis w wielu wierszach, nakładki): „Zgłoś” przy
+  adresie otworzyło okno „Zgłoś wszystkie”. Przyciski w panelach klikasz
+  przez DOM (`$B eval` ze skryptem: znajdź link wiersza, w jego kontenerze
+  przycisk po napisie, `.click()`), a pole Reacta wypełniasz natywnym
+  setterem + `input`; wynik potwierdzasz w bazie, nie w tekście ekranu
+  (przelot E2E MOL 11.10).
 - **Test klawiatury** zaczyna się od nasłuchu `keydown` na elemencie: pusta
   lista zdarzeń znaczy, że klawisz nie dotarł, nie że komponent jest zepsuty
   (LC-103).

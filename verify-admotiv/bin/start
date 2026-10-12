@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Startuje dev serwer AdMotiv dla tego checkoutu na jego własnym porcie.
+# Uruchamiaj przez Bash z run_in_background: proces żyje do `bin/sprzataj`.
+set -euo pipefail
+source "$(dirname "$0")/_wspolne.sh"
+
+[ -x "$REPO/node_modules/.bin/vite" ] || { echo "BŁĄD: brak node_modules w $REPO. Najpierw: (cd $REPO && bun install)" >&2; exit 2; }
+if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "BŁĄD: port $PORT już zajęty. Uruchom bin/doctor: powie, czyj to proces." >&2; exit 3
+fi
+
+mkdir -p "$STAN_DIR"
+echo $$ > "$STAN_DIR/serwer.pid"
+echo "$REPO" > "$STAN_DIR/checkout"
+echo "Serwer: $URL (checkout $REPO)"
+cd "$REPO"
+exec ./node_modules/.bin/vite --port "$PORT" --strictPort

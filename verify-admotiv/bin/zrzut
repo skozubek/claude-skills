@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Zrzut ekranu prosto do katalogu dowodów (gstack zapisuje tylko w /tmp i w repo).
+# Użycie: bin/zrzut <katalog-dowodów> <nazwa-z-id-kroku>   np. bin/zrzut ~/Coding/MOL/Panel/dowody/2026-10-12-crm ZAP-06-po
+set -euo pipefail
+source "$(dirname "$0")/_wspolne.sh"
+cd "$REPO"
+CEL="${1:?katalog dowodów}"; NAZWA="${2:?nazwa z id kroku}"
+mkdir -p "$CEL"
+TMP="$(mktemp -d)/$NAZWA.png"
+"$B" screenshot "$TMP" >/dev/null
+mv "$TMP" "$CEL/$NAZWA.png" && rmdir "$(dirname "$TMP")"
+echo "$CEL/$NAZWA.png"
