@@ -75,7 +75,7 @@ if [ -f "$TSV" ]; then
     elif [ -n "${1:-}" ]; then uwaga "$OBSZAR: nigdy nie przeszedł na żywo"; fi
   done < "$TSV"
   if [ -n "$DO_PRZEJSCIA" ]; then ok "zmiana dotyka obszarów:$DO_PRZEJSCIA (przejdź tylko je)"
-  elif [ -n "$ZMIENIONE" ]; then uwaga "zmienione pliki nie należą do żadnego obszaru mapy: weryfikacja bez mapy albo brak wiersza w przejscia.tsv"
+  elif [ -n "$ZMIENIONE" ]; then uwaga "zmienione pliki nie należą do żadnego obszaru mapy: weryfikuj z kodu, a przejętą drogę zapisz jako nowy plik obszaru + wiersz w przejscia.tsv (SKILL.md, „Mapa rośnie za robotą”)"
   else ok "brak zmian względem origin/main"; fi
 fi
 

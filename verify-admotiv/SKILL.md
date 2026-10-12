@@ -216,6 +216,14 @@ Bez implementacji: tylko drogi użytkownika, uchwyty, wymagany stan, komendy
 i dowód. Wpis ma się dać wykonać bez czytania kodu. Plik dzielisz, gdy sekcja
 zaczyna potrzebować własnych warunków wstępnych.
 
+**Mapa rośnie za robotą, nie na zapas.** Zmiana poza mapą (doctor: „pliki
+nie należą do żadnego obszaru”) przechodzi według tej samej poprzeczki
+dowodu, a wejścia i uchwyty agent ustala z kodu. Drogę, którą przeszedł,
+zapisuje od razu jako nowy plik obszaru: tylko przejęte kroki, każdy
+z dopiskiem „przeszło na żywo <data>”, plus wiersz w `przejscia.tsv` ze
+ścieżkami zmienionych plików. Obszarów, w których nikt z nas nie pracuje,
+nie mapujesz.
+
 **Moduł bez pliku mapy nie jest domknięty.** Plik powstaje przy domykaniu
 modułu i jest definicją „działa”. Zmiana zachowania ekranu, którą sam
 robisz, poprawia jego plik w tej samej robocie. Przejście ścieżki głównej obszaru
