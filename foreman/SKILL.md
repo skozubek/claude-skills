@@ -107,7 +107,15 @@ linii, dane przenoszone drutem do pliku. Szukasz:
 - **mapy funkcji** (AdMotiv): plik modułu z `MOL/Panel/meta/mapa/` przed kodem,
   `verify-admotiv/bin/doctor <moduł>` pokazuje cudze zmiany od ostatniego
   przejścia; kryteria odbioru planu to wpisy mapy, a nowe zachowanie ekranu
-  dostaje w grafie zadanie „dopisz wpis mapy”.
+  dostaje w grafie zadanie „dopisz wpis mapy”;
+- **słownika**: gdy zmiana dotyka modelu danych albo pojęć, które widzi
+  użytkownik, moduł ma `CONTEXT.md` (skill `domain-modeling`: definicja
+  w dwóch zdaniach, lista „unikaj”, zero implementacji) zrobiony PRZED planem,
+  po researchu, z Serge'em w pętli; sam wybierasz złe słowo i idziesz dalej
+  (CRM 13.10: „zgłoszenie” zamiast „lead”). Scenariusze z nazwiskiem
+  i godziną wyciągają decyzje, których research nie da (upsell bez leada,
+  kto zamyka przypomnienie). Plan i brief używają słów ze słownika, a
+  `AGENTS.md` modułu każe go czytać każdemu agentowi przed zmianą modelu.
 
 Gotowe, gdy każdy punkt planu opiera się na `file:line` albo na liczbie
 z zapytania.
@@ -247,6 +255,10 @@ z DOM-u liczbami. W AdMotiv odbiór robi agent `foreman-weryfikator`, nie wykona
 skill `verify-admotiv` na krokach mapy z obszarów, które wskazuje
 `bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
 ten sam krok przechodzi smoke na produkcji.
+
+Gdy moduł ma `CONTEXT.md`, recenzent grepuje etykiety ekranów, nazwy kolumn
+i komunikaty po liście „unikaj” ze słownika: słowo stamtąd w kodzie to
+rozjazd pojęć, nie styl.
 
 ### 7. Brama i wdrożenie
 
