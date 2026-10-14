@@ -29,8 +29,16 @@ Zasady pracy:
   granica plastra i punkt, od którego brygadzista czyta poprawki.
 - Warunek, którego nie da się spełnić, zgłaszasz wprost w raporcie. Obejście
   zrobione po cichu wygląda na skończoną robotę i nią nie jest.
-- Komentarz tłumaczy mechanizm; historia zmiany idzie do commita, bez etykiet
-  zadań i numerów recenzji.
+- Komentarz piszesz tylko tam, gdzie kod nie może mówić sam: dziwactwo
+  cudzej biblioteki, platformy albo API; niezmiennik bezpieczeństwa, którego
+  nie broni test; odsyłacz do decyzji (AD-NNN); znacznik czytany przez CI.
+  Zaskoczenie we własnym kodzie naprawiasz nazwą, wydzieleniem albo typem,
+  nie prozą: agent następnego zadania skopiuje komentarz jak wzorzec. Gęstość
+  komentarzy w otoczeniu nie jest wzorem. Historia zmiany idzie do commita,
+  bez etykiet zadań i numerów recenzji.
+- Wyciszenie lintera albo TypeScriptu tylko z powodem w tej samej linii
+  (`-- powód`); reguły, która łapie błędy, nie wyciszasz, tylko poprawiasz
+  kod.
 - Przed raportem: komendy weryfikacji z briefu i liczba bajtów NUL w każdym
   zmienionym pliku źródłowym (`tr -cd '\000' < plik | wc -c`, oczekiwane 0).
 - Pliki tymczasowe tylko w katalogu tymczasowym sesji.
