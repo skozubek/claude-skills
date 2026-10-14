@@ -29,6 +29,18 @@ sesję.
   czytasz `state` i `mergedAt`, po cudzym merge'u weryfikujesz wdrożenie od
   zera, a PR zsynchronizowany z czymś jeszcze trzymasz jako draft (LC-105).
 
+- **Skaner sekretów per commit na PR-ze z gałęzi integracyjnej** (gitleaks)
+  widzi każdy commit pośredni; fałszywy alarm w commicie pośrednim nie znika
+  poprawką w następnym. Po potwierdzeniu, że to nie sekret: gałąź z `main`
+  z jednym commitem (`git merge --squash <integracja>`), pełne bramki na nowym
+  SHA, stary PR zamknięty z odsyłaczem. Nie wyjątek w skanerze, nie force push
+  (CRM fala A, UUID marki wzięty za klucz HubSpota).
+- **Kopia lokalna bez kont użytkowników:** klucz obcy do `auth.users`
+  przechodzi na kopii, pada na produkcji (profile skasowanych kont). Przed
+  testem zapytanie na produkcji o anomalie w danych, które czyta zmiana
+  (sieroty, puste, duplikaty), i te przypadki w teście (CRM fala A: import
+  padł na właścicielu bez konta).
+
 ## Narzędzia i pomiar
 
 - **Znak sterujący wpisany surowo do literału** przechodzi typy i testy, a plik

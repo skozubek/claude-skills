@@ -42,7 +42,10 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
 - sesja biegnie w trybie uprawnień, który nie pyta (bypass albo `auto`);
   agent w tle przekazuje pytanie o zgodę do głównej sesji, gdzie bez człowieka
   wisi do rana; próbny wykonawca puszcza raz każdą klasę komend z planu
-  (instalacja, testy, commit) i wraca bez pytania;
+  (instalacja, testy, commit) i wraca bez pytania; każdy krok „Kolejności
+  wdrożenia” z planu brygadzista sprawdza pod hookami sesji bez człowieka
+  (zapis na żywej bazie poza migracją hook odrzuca), a krok bez drogi dostaje
+  przed startem linię „do zrobienia po przelocie” i zastępczy odbiór;
 
 - konto, które będzie wołać narzędzia, ma rolę, którą przepuści bramka z planu;
   plan z bramką „tylko admin" przy koncie pracownika staje na pierwszym
@@ -99,9 +102,8 @@ i miejsce odczytu.
      w której kontrola przechodzi, jest nieważna;
   3. punktacja per rodzaj pola: pole z akcją ocenia „wiem, co zrobić”,
      pole bez akcji ocenia się po słowach (zrozumiałość bez żargonu);
-  4. sędzia z innej rodziny niż wykonawca (Codex; przy dużej próbce
-     `-m gpt-6-luna`, jeśli na kilku oczywistych przypadkach zgadza się
-     z domyślnym), z tym samym przydziałem i kontekstem, który miał autor;
+  4. sędzia z innej rodziny niż wykonawca (Codex, model z `~/.codex/config.toml`,
+     bez `-m`), z tym samym przydziałem i kontekstem, który miał autor;
   5. druga runda: te same elementy plus świeża próbka wylosowana przed
      poprawką, żeby poprawka nie uczyła się pod test; skrypt sprawdzający
      słowa nie zastępuje czytania pola po polu.

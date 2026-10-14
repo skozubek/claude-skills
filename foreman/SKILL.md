@@ -73,7 +73,11 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
 - **droga użytkownika** jednym zdaniem: kto, co robi, co widzi na końcu;
 - **kryteria odbioru**, od dwóch do pięciu. Każde mówi, co odczytać (komenda,
   zapytanie, liczba na ekranie) i jaki wynik ma wyjść. „Testy zielone” to nie
-  kryterium, bo mówi o kodzie, a nie o tym, co widzi użytkownik;
+  kryterium, bo mówi o kodzie, a nie o tym, co widzi użytkownik.
+  Kryterium, które potrzebuje zdarzeń spoza przelotu (ruch użytkowników
+  w systemie źródłowym), dostaje w planie okno i próg przed pierwszym wynikiem;
+  bez zdarzeń w oknie jest „niezweryfikowane”, nie zaliczone, i zostaje
+  blokadą z zadaniem;
 - **czego robota nie obejmuje**.
 
 To jedyne pytanie przed startem, bo to Serge wie, czego chce. Akceptuje albo
@@ -104,10 +108,17 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   (LC-104);
 - **wspólnych zasobów**: baza, port, karta przeglądarki; ograniczenie dostaje
   każdy żyjący piszący, nie tylko następny spawn (LC-029).
+- **danych przenoszonych**: zmiana, która kopiuje dane z obcego systemu
+  (import, lustro), ma w planie odpowiedź, co przenosi (treść notatek, maili,
+  załączników) i kto zobaczy to po stronie docelowej i w raportach; dane
+  dostępowe klientów i dane wrażliwe to decyzja Serge'a przed pierwszym
+  odczytem na produkcji (CRM fala A: hasła klientów z notatek HubSpota na osi
+  czasu dla całej roli sprzedaży, stop przelotu po wdrożeniu).
 - **mapy funkcji** (AdMotiv): plik modułu z `MOL/Panel/meta/mapa/` przed kodem,
   `verify-admotiv/bin/doctor <moduł>` pokazuje cudze zmiany od ostatniego
   przejścia; kryteria odbioru planu to wpisy mapy, a nowe zachowanie ekranu
-  dostaje w grafie zadanie „dopisz wpis mapy”;
+  dostaje w grafie zadanie „dopisz wpis mapy”; wznawiając cudzy plan, przed
+  pierwszym spawnem sprawdzasz graf wobec tego punktu i czytelników;
 - **słownika**: gdy zmiana dotyka modelu danych albo pojęć, które widzi
   użytkownik, moduł ma `CONTEXT.md` (skill `domain-modeling`: definicja
   w dwóch zdaniach, lista „unikaj”, zero implementacji) zrobiony PRZED planem,
@@ -158,7 +169,9 @@ słowną odmowę dostępu w większości prób. Stałe pytania: gdzie plan
 kopiuje wzorzec repo i czy ten wzorzec jest poprawny; czy kontrakt między
 zadaniami jest jednoznaczny dla dwóch wykonawców; czego plan nie wymienia,
 a co zepsuje produkcję (konsument schematu, stare wiersze, bramka CI);
-które kryterium odbioru przejdzie przy niedziałającej drodze użytkownika.
+które kryterium odbioru przejdzie przy niedziałającej drodze użytkownika;
+czy źródło gwarantuje kompletność odczytu, zanim nieobecność rekordu
+uruchomi usunięcie albo archiwum (brak na liście to nie sygnał usunięcia).
 
 Każdy finding weryfikujesz w kodzie; odrzucony dostaje powód. Przyjęte
 wtapiasz w plan i przepisujesz go jako stan: plan wygląda, jakby powstał dziś.
@@ -254,7 +267,8 @@ integracyjnej, dane z tego samego źródła co produkcja, kryteria odczytane
 z DOM-u liczbami. W AdMotiv odbiór robi agent `foreman-weryfikator`, nie wykonawca:
 skill `verify-admotiv` na krokach mapy z obszarów, które wskazuje
 `bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
-ten sam krok przechodzi smoke na produkcji.
+ten sam krok przechodzi smoke na produkcji. Weryfikator mapy nie edytuje:
+dopiski „przeszło na żywo” i wiersz `przejscia.tsv` wpisujesz Ty z jego raportu.
 
 Gdy moduł ma `CONTEXT.md`, recenzent grepuje etykiety ekranów, nazwy kolumn
 i komunikaty po liście „unikaj” ze słownika: słowo stamtąd w kodzie to
