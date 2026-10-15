@@ -20,7 +20,8 @@ sesję.
 - **Klon dzielony z innymi sesjami:** `git stash`, `reset`, `checkout --`
   i `restore` zabierają cudze niezacommitowane edycje (LC-095). Agenci floty
   pracują we własnych worktree, więc ryzyko zostaje po Twojej stronie
-  w głównym klonie: tam robisz tylko checkout, merge i push.
+  w głównym klonie: tam robisz tylko checkout, merge, push i poprawki bramy
+  z kroku 7 (numery migracji i wpisów, odsyłacze) na gałęzi integracyjnej.
 - **Agent z powłoką widzi cudze zmiany** i potrafi uznać je za incydent,
   zabijając procesy orkiestratora. Typy floty mają zablokowane `kill`,
   `pkill`, forki i spawn podagentów w strażniku komend; agent spoza floty
@@ -29,9 +30,12 @@ sesję.
   czytasz `state` i `mergedAt`, po cudzym merge'u weryfikujesz wdrożenie od
   zera, a PR zsynchronizowany z czymś jeszcze trzymasz jako draft (LC-105).
 
-- **Skaner sekretów per commit na PR-ze z gałęzi integracyjnej** (gitleaks)
-  widzi każdy commit pośredni; fałszywy alarm w commicie pośrednim nie znika
-  poprawką w następnym. Po potwierdzeniu, że to nie sekret: gałąź z `main`
+- **Skanery per commit na gałęzi integracyjnej** (gitleaks na PR-ze, strażnik
+  meta w `pre-push`, który odrzuca imiona ludzi z zespołu także w danych
+  testowych) widzą każdy commit pośredni; brief niesie „dane testowe
+  z neutralnymi imionami”, bo agent bierze imiona z planu (CRM B2). Trafienie
+  w commicie pośrednim nie znika poprawką w następnym. Po potwierdzeniu, że to
+  nie sekret (albo po poprawce treści): gałąź z `main`
   z jednym commitem (`git merge --squash <integracja>`), pełne bramki na nowym
   SHA, stary PR zamknięty z odsyłaczem. Nie wyjątek w skanerze, nie force push
   (CRM fala A, UUID marki wzięty za klucz HubSpota).

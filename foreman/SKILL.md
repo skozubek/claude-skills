@@ -137,6 +137,11 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   używają słów ze słownika, a
   `AGENTS.md` modułu każe go czytać każdemu agentowi przed zmianą modelu.
 
+Błąd ze zrzutu albo opisu człowieka: przed spawnem jedno pytanie o warunki,
+których zrzut nie niesie (zoom, szerokość okna, co było rozwinięte, produkcja
+czy lokalnie); wykonawca bez nich mierzy stan, w którym błędu nie ma (CRM B2:
+przewijanie strony od zoomu, 20 min pomiaru bez odtworzenia).
+
 Gotowe, gdy każdy punkt planu opiera się na `file:line` albo na liczbie
 z zapytania.
 
@@ -156,7 +161,9 @@ to konflikt przy scaleniu: dziel po właścicielu pliku; kolejne w tym samym
 pliku rozdziela zależność. Numery migracji i wpisów decyzji w grafie są
 robocze: ostateczne nadajesz w kroku 7, po wciągnięciu `main`. Zadanie, które
 pisze pomoc, opisy ekranów albo komunikaty, ma w grafie listę „działa po tym
-PR-ze / przychodzi później”, a brief ją niesie.
+PR-ze / przychodzi później”, a brief ją niesie; zależy od każdego zadania,
+które opisywane zachowanie zmienia, nie tylko od tego, które je buduje (CRM
+B2: dokumenty równolegle z wpięciem list opisały plan zamiast kodu).
 
 Model dobierasz do ciężaru zadania, nie do wagi tematu. Wątpliwość rozstrzyga
 koszt pomyłki: tania i głośna → `sonnet`, droga albo cicha → `opus`. Masowa
@@ -201,6 +208,14 @@ wymagają testy, wchodzą przez `.worktreeinclude`, wyłącznie w wersji lokalne
 albo testowej: sekrety produkcji zostają u Ciebie, bo strażnik komend łapie
 pomyłki, a nie każdą drogę do zdalnej zmiany. Zależności instaluje agent
 w swoim worktree komendą instalacji repo.
+
+Zadania równoległe, które dzielą typy albo komponent, dostają kontrakt
+w kodzie: przed spawnem wstawiasz na gałąź integracyjną typy (np. funkcji
+bazy) i szkielet komponentu z sygnaturą z planu, osobnym commitem; właściciel
+szkieletu go wypełnia, reszta kompiluje się na nim od pierwszej minuty (CRM
+B2: baza, środek i rekord ruszyły razem). Recenzent świeżym okiem idzie zaraz
+po scaleniu pierwszych implementacji kontraktu, przed zadaniami, które z nich
+biorą.
 
 Porównaj cwd sesji z katalogiem repo planu i powiedz wynik na głos: sesja
 spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
@@ -285,7 +300,13 @@ z DOM-u liczbami. W AdMotiv odbiór robi agent `foreman-weryfikator`, nie wykona
 skill `verify-admotiv` na krokach mapy z obszarów, które wskazuje
 `bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
 ten sam krok przechodzi smoke na produkcji. Weryfikator mapy nie edytuje:
-dopiski „przeszło na żywo” i wiersz `przejscia.tsv` wpisujesz Ty z jego raportu.
+dopiski „przeszło na żywo” i wiersz `przejscia.tsv` wpisuje się z jego raportu
+(treść kroków mapy może z kodu napisać osobny agent po scaleniu ostatniego
+zadania ekranu). Gdy zmiana ma migrację, a dev serwer czyta produkcyjną bazę,
+migracja trafia tam dopiero po mergu: przed nim odbiór na żywo przechodzi
+kroki odczytu, a zapis dowodzą testy SQL na kopii; kroki zapisu przechodzą
+po mergu i migracji na rekordach testowych z Granic, a niezaliczony krok to
+PR poprawkowy, nie cofnięcie (CRM B2).
 
 Gdy moduł ma `CONTEXT.md`, recenzent grepuje etykiety ekranów, nazwy kolumn
 i komunikaty po liście „unikaj” ze słownika: słowo stamtąd w kodzie to
