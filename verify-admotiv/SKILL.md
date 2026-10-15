@@ -54,7 +54,15 @@ zewnętrzne” niżej.
 ```bash
 <skill>/bin/sesja <email>      # tylko konto z warunków wstępnych mapy
 <skill>/bin/sesja --wyloguj
+<skill>/bin/sesja --prod <email>   # smoke na opublikowanym froncie
 ```
+
+`--prod` loguje na opublikowany front (`PROD_URL` w `bin/_wspolne.sh`) zamiast
+dev serwera: sesja trafia do `localStorage` domeny pod kluczem klienta Supabase
+(`sb-<ref>-auth-token`), dopiero gdy bundle domeny woła ten sam projekt co
+`.env` aplikacji; token sprawdza odpowiedź `/auth/v1/user`. Na końcu
+`bin/sprzataj --prod`. Na produkcji przechodzisz tylko kroki odczytu, chyba że
+plan wymienia zapis z rekordem testowym i sprzątaniem.
 
 Bez hasła i bez klikania: link logowania generowany kluczem serwisowym,
 sesja wstrzyknięta przez klienta Supabase aplikacji. Odmawia, gdy: konta nie
@@ -182,7 +190,7 @@ agencji) przebieg nie zmienia bez planu i słowa Serge’a.
 ## Sprzątanie
 
 ```bash
-<skill>/bin/sprzataj
+<skill>/bin/sprzataj          # --prod po sesji na opublikowanym froncie
 ```
 
 Wylogowuje przeglądarkę lokalnie i zatrzymuje serwer uruchomiony przez

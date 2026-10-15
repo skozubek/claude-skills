@@ -1,13 +1,33 @@
 #!/usr/bin/env bash
 # Loguje przeglądarkę headless (gstack browse) na konto z listy kont testowych, bez klikania i bez hasła.
-# Użycie: bin/sesja <email>      bin/sesja --wyloguj
+# Użycie: bin/sesja [--prod] <email>      bin/sesja [--prod] --wyloguj
+# --prod: opublikowany front ($PROD_URL) zamiast dev serwera; sesja trafia do localStorage
+# domeny pod kluczem klienta Supabase, po sprawdzeniu, że bundle domeny należy do tego projektu.
 # Sekrety tylko w plikach 0600 (nagłówki curl przez @plik, nie w argumentach procesu), kasowanych na końcu.
 # Konta nie zakłada. Wylogowanie jest lokalne: nie rusza sesji tego konta na innych urządzeniach.
 set -euo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 cd "$REPO"
+PROD=0
+if [ "${1:-}" = "--prod" ]; then PROD=1; shift; fi
+REF="$(env_val VITE_SUPABASE_PROJECT_ID)"
+KLUCZ_SESJI="sb-$REF-auth-token"
+if [ "$PROD" = 1 ]; then
+  CEL="$PROD_URL"
+else
+  CEL="$URL"
+  serwer_nasz || { echo "BŁĄD: na $URL nie słucha serwer z $REPO. bin/start, potem bin/doctor." >&2; exit 3; }
+fi
 
-serwer_nasz || { echo "BŁĄD: na $URL nie słucha serwer z $REPO. bin/start, potem bin/doctor." >&2; exit 3; }
+if [ "$PROD" = 1 ] && [ "${1:-}" = "--wyloguj" ]; then
+  W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
+  case "$("$B" url 2>/dev/null | tail -1)" in "$CEL"*) ;; *) "$B" goto "$CEL/" >/dev/null ;; esac
+  printf '%s' "(() => { localStorage.removeItem('$KLUCZ_SESJI'); return localStorage.getItem('$KLUCZ_SESJI') === null ? 'wylogowano' : 'BŁĄD: sesja dalej jest'; })()" > "$W/w.js"
+  WYNIK=$("$B" eval "$W/w.js" | tail -1); echo "$WYNIK"
+  [ "$WYNIK" = "wylogowano" ] || exit 7
+  "$B" reload >/dev/null
+  exit 0
+fi
 
 if [ "${1:-}" = "--wyloguj" ]; then
   W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
@@ -21,7 +41,6 @@ fi
 EMAIL="${1:?Użycie: bin/sesja <email>}"
 SB_URL="$(env_val VITE_SUPABASE_URL)"
 ANON="$(env_val VITE_SUPABASE_PUBLISHABLE_KEY)"
-REF="$(env_val VITE_SUPABASE_PROJECT_ID)"
 
 # Lista kont, na które wolno się logować: kolumna 1 tabeli kont w README mapy.
 grep -qiF "| \`$EMAIL\` |" "$MAPA_DIR/README.md" || { echo "BŁĄD: $EMAIL nie stoi w tabeli kont $MAPA_DIR/README.md" >&2; exit 6; }
@@ -33,6 +52,13 @@ case "$SB_URL" in "https://$REF.supabase.co"*) ;; *) echo "BŁĄD: adres API '$S
 umask 077
 T="$(mktemp -d)"
 trap 'rm -rf "$T"' EXIT
+if [ "$PROD" = 1 ]; then
+  # Bezpiecznik: token idzie tylko do domeny, której bundle woła ten sam projekt Supabase.
+  curl -sS "$PROD_URL/" -o "$T/index.html" || { echo "BŁĄD: $PROD_URL nie odpowiada" >&2; exit 3; }
+  JS="$(grep -o '/assets/[^"]*\.js' "$T/index.html" | head -1)"
+  [ -n "$JS" ] && curl -sS "$PROD_URL$JS" -o "$T/bundle.js" && grep -qF "$REF" "$T/bundle.js" \
+    || { echo "BŁĄD: bundle $PROD_URL$JS nie należy do projektu $REF" >&2; exit 4; }
+fi
 
 # Bezpiecznik: generate_link typu magiclink dla nieznanego adresu zakłada konto. Najpierw: konto istnieje, jego id.
 case "$EMAIL" in *"'"*|*\\*) echo "BŁĄD: niedozwolony znak w adresie" >&2; exit 2 ;; esac
@@ -59,13 +85,23 @@ KOD=$(curl -sS -o "$T/sesja.json" -w '%{http_code}' -X POST "$SB_URL/auth/v1/ver
   -H @"$T/anon" -H 'Content-Type: application/json' --data @"$T/verify.req")
 [ "$KOD" = "200" ] || { echo "BŁĄD: verify HTTP $KOD" >&2; exit 5; }
 
+if [ "$PROD" = 1 ]; then
+  jq -r --arg k "$KLUCZ_SESJI" '"(() => { localStorage.setItem(\($k|@json), \(tojson|@json)); return \"ustawiono\"; })()"' "$T/sesja.json" > "$T/ustaw.js"
+  jq -r --arg k "$KLUCZ_SESJI" --arg sb "$SB_URL" --arg anon "$ANON" '"(async () => { const s = JSON.parse(localStorage.getItem(\($k|@json)) || \"null\"); if (!s) return \"BŁĄD: brak sesji\"; const r = await fetch(\($sb|@json) + \"/auth/v1/user\", {headers: {apikey: \($anon|@json), Authorization: \"Bearer \" + s.access_token}}); if (!r.ok) return \"BŁĄD user HTTP \" + r.status; const u = await r.json(); return \"zalogowano: \" + u.email + \" \" + u.id; })()"' "$T/sesja.json" > "$T/sprawdz.js"
+  rm -f "$T/sesja.json"
+  "$B" goto "$CEL/" >/dev/null
+  [ "$("$B" eval "$T/ustaw.js" | tail -1)" = "ustawiono" ] || { echo "BŁĄD: zapis sesji w localStorage" >&2; exit 7; }
+  "$B" reload >/dev/null
+  WYNIK=$("$B" eval "$T/sprawdz.js" | tail -1)
+else
 jq -r '"(async () => { const m = await import(\"/src/integrations/supabase/client.ts\");
 const r = await m.supabase.auth.setSession({access_token: \(.access_token|@json), refresh_token: \(.refresh_token|@json)});
 return r.error ? \"BŁĄD setSession: \" + r.error.message : \"zalogowano: \" + r.data.user.email + \" \" + r.data.user.id; })()"' "$T/sesja.json" > "$T/ustaw.js"
 rm -f "$T/sesja.json"
 
-"$B" goto "$URL/" >/dev/null
+"$B" goto "$CEL/" >/dev/null
 WYNIK=$("$B" eval "$T/ustaw.js" | tail -1)
+fi
 [ "$WYNIK" = "zalogowano: $EMAIL $UID_KONTA" ] || [ "$WYNIK" = "zalogowano: $(echo "$EMAIL" | tr 'A-Z' 'a-z') $UID_KONTA" ] \
   || { echo "BŁĄD: $WYNIK" >&2; exit 7; }
 "$B" console --clear >/dev/null

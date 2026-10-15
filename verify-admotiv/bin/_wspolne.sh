@@ -14,6 +14,8 @@ REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "BŁĄD: nie jeste
 HASZ=$(printf '%s' "$REPO" | cksum | cut -d' ' -f1)
 PORT=$(( 8100 + HASZ % 100 ))
 URL="http://localhost:$PORT"
+# Opublikowany front (Lovable): smoke po wdrożeniu (`bin/sesja --prod`).
+PROD_URL="https://admotiv.marketingonline.pl"
 # Stan przebiegu poza repo (git status checkoutu zostaje czysty), kluczowany checkoutem, nie portem.
 STAN_DIR="$HOME/Coding/MOL/Panel/.verify/$HASZ"
 

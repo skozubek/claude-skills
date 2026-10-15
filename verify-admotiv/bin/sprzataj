@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 # Zamyka to, co uruchomił ten przebieg: wylogowuje przeglądarkę lokalnie i zatrzymuje serwer tego checkoutu.
+# `--prod`: wylogowuje z opublikowanego frontu (po `bin/sesja --prod`).
 # Zabija tylko pid z własnego stanu i tylko gdy ten proces wciąż ma katalog roboczy w tym checkoucie.
 # Nigdy po nazwie procesu. Cudzego stanu i dowodów nie rusza.
 set -uo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 cd "$REPO"
 
-if serwer_nasz; then
+if [ "${1:-}" = "--prod" ]; then
+  "$(dirname "$0")/sesja" --prod --wyloguj || echo "UWAGA  wylogowanie z $PROD_URL nieudane: sprawdź \$B url i localStorage ręcznie"
+elif serwer_nasz; then
   "$(dirname "$0")/sesja" --wyloguj || echo "UWAGA  wylogowanie nieudane: sprawdź \$B url i sesję ręcznie"
 fi
 
