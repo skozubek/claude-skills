@@ -310,7 +310,8 @@ wtedy, gdy wymieniają je granice planu albo słowo Serge'a w tej sesji, a graf 
 blokad; w każdym innym przypadku przebieg kończy się na PR z listą blokad
 i tym, co czeka na decyzję.
 
-Smoke idzie drogą produkcji: ten sam starter, ładunek z tego samego źródła,
+Smoke idzie drogą produkcji (ekran AdMotiv: `verify-admotiv/bin/sesja --prod`
+na opublikowanym froncie): ten sam starter, ładunek z tego samego źródła,
 odczyt wyniku z miejsca, w którym zapisuje go produkcja. Dowodem wdrożenia
 jest odczyt żywego stanu (wersja funkcji, wiersz w bazie).
 
