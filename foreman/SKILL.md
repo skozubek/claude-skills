@@ -117,7 +117,9 @@ linii, dane przenoszone drutem do pliku. Szukasz:
 - **mapy funkcji** (AdMotiv): plik modułu z `MOL/Panel/meta/mapa/` przed kodem,
   `verify-admotiv/bin/doctor <moduł>` pokazuje cudze zmiany od ostatniego
   przejścia; kryteria odbioru planu to wpisy mapy, a nowe zachowanie ekranu
-  dostaje w grafie zadanie „dopisz wpis mapy”; wznawiając cudzy plan, przed
+  dostaje w grafie zadanie „dopisz wpis mapy”; czytelnicy ekranu to też
+  jego opakowanie (strona z h1 i opisem pod tytułem, pozycja menu, ścieżka,
+  pomoc „?”), nawet gdy diff ich nie dotyka; wznawiając cudzy plan, przed
   pierwszym spawnem sprawdzasz graf wobec tego punktu i czytelników;
 - **słownika**: gdy zmiana dotyka modelu danych albo pojęć, które widzi
   użytkownik, moduł ma `CONTEXT.md` (skill `domain-modeling`: definicja
@@ -125,7 +127,11 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   po researchu, z Serge'em w pętli; sam wybierasz złe słowo i idziesz dalej
   (CRM 13.10: „zgłoszenie” zamiast „lead”). Scenariusze z nazwiskiem
   i godziną wyciągają decyzje, których research nie da (upsell bez leada,
-  kto zamyka przypomnienie). Plan i brief używają słów ze słownika, a
+  kto zamyka przypomnienie). Nazwa ekranu, pozycji menu albo ścieżki ze słowem z listy „unikaj” to
+  zadanie w grafie (zmiana nazwy z przekierowaniem starej ścieżki), a nie
+  uwaga recenzenta: grep idzie po całym ekranie, nie po diffie (CRM fala A:
+  ekran „Zapytania” przeżył falę, choć słownik mówi „lead”). Plan i brief
+  używają słów ze słownika, a
   `AGENTS.md` modułu każe go czytać każdemu agentowi przed zmianą modelu.
 
 Gotowe, gdy każdy punkt planu opiera się na `file:line` albo na liczbie
@@ -158,7 +164,10 @@ dostaje recenzenta świeżym okiem zaraz po scaleniu, nie dopiero na końcu.
 
 ### 3. Recenzja planu innym modelem
 
-Przegląd inżynierski właściwy dla repo, potem Codex:
+Plan zmieniający wygląd albo układ ekranów ma w kryteriach odbioru wzorzec
+z repo (klocek tabeli, panelu, filtrów) i sąsiednie ekrany, z którymi ma być
+spójny; „jak w systemie X” bez tego nie jest kryterium. Przegląd inżynierski
+właściwy dla repo, potem Codex:
 `codex exec -s read-only -c 'model_reasoning_effort="high"' "<pytania>" < plan.md`.
 Model idzie z `~/.codex/config.toml`, jedynego miejsca jego wyboru; `high`, bo
 recenzja jest adwersarialna, a `xhigh` na długim kontekście wisi dziesiątki
