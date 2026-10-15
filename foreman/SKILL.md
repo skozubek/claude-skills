@@ -92,7 +92,10 @@ którego dotyczy zmiana, czytasz sam: `grep` po nazwach, zakresy po kilkanaście
 linii, dane przenoszone drutem do pliku. Szukasz:
 
 - **precedensu**: czy repo już robi to samo gdzie indziej; sprawdzony kształt
-  bije nowy;
+  bije nowy. Klocek, na którym stawiasz kontrakt (zapis ustawień, panel,
+  przekierowanie), sprawdzasz odczytem skutku na żywo (wiersz w bazie,
+  szerokość na docelowym ekranie), nie lekturą: klocek w repo bywa martwy od
+  miesięcy (CRM B1: zapis wyborów tabel bez wysłania żądania, 0 wierszy);
 - **bramek**: rejestry, allowlisty, mapy handlerów; nowa powierzchnia
   niedopisana do bramki jest niewidoczna dokładnie tam, gdzie ma działać;
 - **liczb**: limity, sufity, objętości zmierzone zapytaniem; próg z jednego
@@ -150,7 +153,10 @@ renderujący, eksport, drugi dom tej samej reguły). Każde zadanie po scaleniu
 zostawia gałąź integracyjną zieloną; zmiany zielone dopiero razem (schemat
 i jego konsument) są jednym zadaniem. Dwa zadania równoległe w jednym pliku
 to konflikt przy scaleniu: dziel po właścicielu pliku; kolejne w tym samym
-pliku rozdziela zależność.
+pliku rozdziela zależność. Numery migracji i wpisów decyzji w grafie są
+robocze: ostateczne nadajesz w kroku 7, po wciągnięciu `main`. Zadanie, które
+pisze pomoc, opisy ekranów albo komunikaty, ma w grafie listę „działa po tym
+PR-ze / przychodzi później”, a brief ją niesie.
 
 Model dobierasz do ciężaru zadania, nie do wagi tematu. Wątpliwość rozstrzyga
 koszt pomyłki: tania i głośna → `sonnet`, droga albo cicha → `opus`. Masowa
@@ -216,7 +222,9 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
 2. Na powiadomienie o końcu zadania robisz **odbiór** w ścieżce worktree
    z wyniku agenta:
    - `git merge-base --is-ancestor <SHA ze spawnu> HEAD`: worktree wyrósł
-     z integracji, nie z `main`;
+     z integracji, nie z `main` (brief każe agentowi zacząć od
+     `git merge --ff-only <SHA ze spawnu>`, bo worktree potrafi wyrosnąć ze
+     starszego commita niż zapisany SHA);
    - `git diff --name-only <SHA ze spawnu>...HEAD` mieści się w liście plików
      zadania; plik spoza listy oblewa odbiór;
    - komenda weryfikacji z grafu i sekcja odejść od planu.
@@ -287,7 +295,9 @@ rozjazd pojęć, nie styl.
 
 Brama repo w kolejności, którą repo definiuje: jego `verify` albo bramki
 z `AGENTS.md`/`CLAUDE.md`, przegląd diffu, `/codex challenge` na diffie gałęzi
-integracyjnej jako drugie oko z innej rodziny modeli. Flota, która
+integracyjnej jako drugie oko z innej rodziny modeli. Przed PR-em, po
+wciągnięciu `main`, nadajesz ostateczne numery migracji i wpisów decyzji
+(wyższe niż na `main`) i poprawiasz ich odsyłacze. Flota, która
 raportowała sukces, nie widziała kodu pozostałych zadań, więc brama biegnie
 w całości.
 
@@ -334,9 +344,10 @@ zamykasz mu drogi do rozwiązań złych. Stałe reguły (commity, raport,
 komentarze, zakazy) niesie definicja typu agenta; brief niesie tylko to:
 
 ```
-Zadanie <nazwa z grafu> z planu <ścieżka>, sekcja <nagłówek>. Przed
-pierwszą linijką kodu przeczytaj w planie: Granice, kontrakt, swoje zadanie
-i zadania, od których zależysz. Resztę planu czytasz, gdy jej potrzebujesz.
+Zadanie <nazwa z grafu> z planu <ścieżka>, sekcja <nagłówek>. Zacznij od
+`git merge --ff-only <SHA ze spawnu>`. Przed pierwszą linijką kodu przeczytaj
+w planie: Granice, kontrakt, swoje zadanie i zadania, od których zależysz.
+Resztę planu czytasz, gdy jej potrzebujesz.
 
 Twoje pliki: <lista>. Pozostałe pliki należą do innych zadań.
 Czytelnicy Twoich pól poza Twoimi plikami: <lista z grafu>.
@@ -356,9 +367,10 @@ w częściową czystość" przetrwa. Komendy weryfikacji są dokładne, nie
 
 ## Przelot bez nadzoru
 
-Gdy przy bramkach nie stoi człowiek, przed pierwszym spawnem przeczytaj
-[PRZELOT.md](PRZELOT.md): granice w planie, droga odbioru sprawdzona jako
-operator, liczniki i budziki. Bez sekcji „Granice” w planie przelot się nie
+Gdy przy bramkach nie stoi człowiek albo sesja biegnie w trybie bypass lub
+auto (hooki odmawiają wtedy zamiast pytać, także przy człowieku obok), przed
+pierwszym spawnem przeczytaj [PRZELOT.md](PRZELOT.md): granice w planie,
+droga odbioru sprawdzona jako operator, liczniki i budziki. Bez sekcji „Granice” w planie przelot się nie
 zaczyna.
 
 ## Czego nie dokładać

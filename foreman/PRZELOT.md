@@ -54,6 +54,11 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
   (`supabase db query --linked … > plik` po `supabase link` w worktree);
   pobranie z przeglądarki i każdy krok kończący się dialogiem to w przelocie
   ślepa uliczka; karta w tle dławi pętle, więc postęp czyta się z bazy (LC-106);
+- dane testowe każdego kryterium mają drogę bez zapisu SQL na produkcji
+  (ekran, wejście tą samą funkcją co produkcja); przygotowanie SQL-em hook
+  odrzuca w trybie bypass i auto, więc stoi w planie jako krok człowieka
+  w trybie zwykłym (domyślnym, nie auto) albo kryterium przechodzi do PR-a,
+  który da ekran (CRM B1: „Porzuć” bez zadania testowego);
 - każde kryterium odbioru z planu da się wykonać w granicach planu; kryterium
   wymagające czynności spoza granic wychodzi na jaw przy odbiorze, gdy nie ma
   już kogo zapytać.
