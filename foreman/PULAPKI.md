@@ -78,6 +78,15 @@ sesję.
 - **Pomiar i `/code-review` w jednym klonie:** review na chwilę podmienia pliki,
   więc pomiar traci ważność. Rozdziel katalogi albo czas (LC-100).
 
+- **Migracja po mergu w AdMotiv:** CI na pushu do `main` biegnie, zanim
+  zastosujesz migrację, więc `migration-drift` jest czerwony z założenia.
+  Kolejność: merge, workflow „Zastosuj migrację”, `gh run rerun <id CI> --failed`;
+  zielony rerun to dowód wdrożenia migracji. Audyt uprawnień porównuje rejestr
+  założeń (`scripts/konsumenci.json`) z żywymi danymi, więc migracja zmieniająca
+  zarejestrowany obiekt poprawia jego wpis w tym samym PR-ze (check na PR-ze to
+  wymusza), a nowa wartość zapisana przez cudzy moduł zapala audyt na main
+  bez żadnego PR-a.
+
 ## Objawy w pętli frontu
 
 | Objaw | Przyczyna | Naprawa |

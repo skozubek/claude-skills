@@ -79,6 +79,12 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
   w systemie źródłowym), dostaje w planie okno i próg przed pierwszym wynikiem;
   bez zdarzeń w oknie jest „niezweryfikowane”, nie zaliczone, i zostaje
   blokadą z zadaniem;
+  kryterium z progiem jakości (klasyfikator, sędzia, dopasowanie) dzieli
+  próg na bezpieczeństwo (szkoda cicha i trudna do cofnięcia: blokuje) i
+  użyteczność (niezaliczona to decyzja Serge'a z liczbami, nie blokada);
+  jeden próg dla obu kończy się teatrem, gdy model jest bezpieczny, ale
+  mniej przydatny, niż zakładano (CRM B3: 0 ze 117 prawdziwych leadów
+  w spamie, 73% spamu przy progu 80%);
 - **czego robota nie obejmuje**.
 
 To jedyne pytanie o zakres przed startem, bo to Serge wie, czego chce. Akceptuje albo

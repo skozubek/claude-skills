@@ -102,6 +102,12 @@ i miejsce odczytu.
 - **Sędzia próbki** tam, gdzie próg mówi „ocena człowieka”. Procedura,
   ustalona przed pierwszą rundą (LC-093, MOL/Panel/meta/LEKCJE.md
   2026-10-11):
+  0. etykieta najpierw ze śladu decyzji człowieka w systemie źródłowym
+     (status nadany ręcznie, transakcja, zwrot, odpowiedź klienta), sędziowie
+     tylko tam, gdzie śladu brak; ślad daje liczebność klas, której próbka
+     z bieżącego ruchu nie da (CRM B3: etykiety modeli na 25 mailach
+     z 1 prawdziwym leadem; status SPAM handlowca i transakcje z eksportu
+     HubSpota dały 117 prawdziwych i 128 spamu);
   1. losowanie próbki ze stałym ziarnem do pliku, zanonimizowanej, ze
      statusem każdego elementu zapisanym przed pokazaniem werdyktu; materiał
      sędziego to dokładnie wejście modelu (te same pola, nie wycinek), a przed
