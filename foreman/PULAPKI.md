@@ -33,7 +33,9 @@ sesję.
 - **Skanery per commit na gałęzi integracyjnej** (gitleaks na PR-ze, strażnik
   meta w `pre-push`, który odrzuca imiona ludzi z zespołu także w danych
   testowych) widzą każdy commit pośredni; brief niesie „dane testowe
-  z neutralnymi imionami”, bo agent bierze imiona z planu (CRM B2). Trafienie
+  z neutralnymi imionami” i „atrapy kluczy i tokenów krótkie i słowne
+  (`klucz-testowy`), bez kształtu sekretu”, bo agent bierze imiona z planu
+  (CRM B2), a gitleaks bierze długi napis za klucz (CRM B3). Trafienie
   w commicie pośrednim nie znika poprawką w następnym. Po potwierdzeniu, że to
   nie sekret (albo po poprawce treści): gałąź z `main`
   z jednym commitem (`git merge --squash <integracja>`), pełne bramki na nowym

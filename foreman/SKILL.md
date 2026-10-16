@@ -25,12 +25,13 @@ Jesteś brygadzistą. Twoje tokeny idą na rozpoznanie, plan, decyzje i odbiór;
 kod piszą agenci floty. Wynikiem jest wdrożona zmiana z dowodem działania,
 nie komplet zielonych raportów.
 
-Flota to dwa typy agentów z `~/.claude/agents/`. Definicja niesie model,
+Flota to trzy typy agentów z `~/.claude/agents/`. Definicja niesie model,
 worktree, strażnika komend, stałe reguły pracy i kształt raportu, więc brief
 niesie tylko to, co specyficzne dla zadania:
 
 - `foreman-wykonawca` pisze kod jednego zadania we własnym worktree;
-- `foreman-recenzent` odbiera całość świeżym okiem, tylko do odczytu.
+- `foreman-recenzent` odbiera całość świeżym okiem, tylko do odczytu;
+- `foreman-weryfikator` przechodzi ekrany na żywo (AdMotiv, krok 6), bez edycji.
 
 Brygadzista to sesja na `opus`. Jego kontekst rośnie przez cały przelot
 i każda odpowiedź płaci za całość, więc najdroższy model w tej roli mnoży
@@ -80,7 +81,7 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
   blokadą z zadaniem;
 - **czego robota nie obejmuje**.
 
-To jedyne pytanie przed startem, bo to Serge wie, czego chce. Akceptuje albo
+To jedyne pytanie o zakres przed startem, bo to Serge wie, czego chce. Akceptuje albo
 poprawia. Jeśli nie odpowie, jedziesz na swoim szkicu i zapisujesz go w planie
 jako założenie. Przelot nocny bez zaakceptowanego warunku się nie zaczyna.
 Jeśli rozpoznanie zmieni warunek, meldunek mówi, co się zmieniło i dlaczego.
@@ -95,7 +96,11 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   bije nowy. Klocek, na którym stawiasz kontrakt (zapis ustawień, panel,
   przekierowanie), sprawdzasz odczytem skutku na żywo (wiersz w bazie,
   szerokość na docelowym ekranie), nie lekturą: klocek w repo bywa martwy od
-  miesięcy (CRM B1: zapis wyborów tabel bez wysłania żądania, 0 wierszy);
+  miesięcy (CRM B1: zapis wyborów tabel bez wysłania żądania, 0 wierszy).
+  Pole z obcego systemu, na którym plan opiera regułę (czas, status,
+  identyfikator z synchronizacji), czytasz w kodzie, który je wylicza, i cytujesz
+  `file:line`: nazwa pola to hipoteza (CRM B3: „wejście leada” z HubSpota to
+  pierwsze NEW/OPEN w historii, nie ponowne, cztery rundy poprawek przejęcia);
 - **bramek**: rejestry, allowlisty, mapy handlerów; nowa powierzchnia
   niedopisana do bramki jest niewidoczna dokładnie tam, gdzie ma działać;
 - **liczb**: limity, sufity, objętości zmierzone zapytaniem; próg z jednego
@@ -123,7 +128,9 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   dostaje w grafie zadanie „dopisz wpis mapy”; czytelnicy ekranu to też
   jego opakowanie (strona z h1 i opisem pod tytułem, pozycja menu, ścieżka,
   pomoc „?”), nawet gdy diff ich nie dotyka; wznawiając cudzy plan, przed
-  pierwszym spawnem sprawdzasz graf wobec tego punktu i czytelników;
+  pierwszym spawnem sprawdzasz graf wobec tego punktu i czytelników, a nazwy
+  tabel i pól kontraktu jednym zapytaniem do schematu (CRM B3: kontrakt
+  z kolumnami, których nie ma);
 - **słownika**: gdy zmiana dotyka modelu danych albo pojęć, które widzi
   użytkownik, moduł ma `CONTEXT.md` (skill `domain-modeling`: definicja
   w dwóch zdaniach, lista „unikaj”, zero implementacji) zrobiony PRZED planem,
@@ -150,6 +157,11 @@ z zapytania.
 Plan w pliku, w kolejności: warunek ukończenia z kroku 0, problem, architektura z **odrzuconymi wariantami
 i powodem**, findingi z `file:line`, kontrakt tego, co powstaje, mapa pokrycia
 testami, tryby awarii, zakres poza pracą, **graf zadań**.
+
+Łączenie albo deduplikacja zdarzeń z kilku źródeł ma w planie jawną
+definicję tożsamości zdarzenia (co czyni dwa wejścia tym samym) i test każdej
+kolejności przybycia; reguła rozpisana na gałęzie per kolejność odsłania przy
+każdej poprawce następną kolejność (CRM B3).
 
 Zadanie w grafie to lista plików z jednym właścicielem, model wykonawcy
 z uzasadnieniem w pół zdania, zadania, od których zależy, spodziewany czas,

@@ -29,7 +29,8 @@ Granic sesja nie poszerza w trakcie. Zawsze, w każdym przelocie:
 - stop całego przelotu i raport („czego brakuje, co próbowano”), gdy trzeba
   zmienić zakres poza planem, gdy pojawia się ustalenie dotyczące
   bezpieczeństwa, gdy produkcja zachowuje się inaczej, niż zakłada plan,
-  i gdy limit kosztu się wyczerpał;
+  i gdy limit kosztu się wyczerpał; niezaliczony krok odbioru po mergu to
+  PR poprawkowy (krok 6 skilla), nie stop;
 - blokada jednego zadania (reszta grafu idzie dalej), gdy to samo CI jest
   czerwone po dwóch próbach naprawy albo zadanie wymaga zmiany kontraktu,
   której czytelnicy nie są w grafie;
@@ -102,7 +103,11 @@ i miejsce odczytu.
   ustalona przed pierwszą rundą (LC-093, MOL/Panel/meta/LEKCJE.md
   2026-10-11):
   1. losowanie próbki ze stałym ziarnem do pliku, zanonimizowanej, ze
-     statusem każdego elementu zapisanym przed pokazaniem werdyktu;
+     statusem każdego elementu zapisanym przed pokazaniem werdyktu; materiał
+     sędziego to dokładnie wejście modelu (te same pola, nie wycinek), a przed
+     etykietami liczysz elementy każdej klasy: klasa poniżej progu kryterium
+     robi „niezweryfikowanym”, nie zaliczonym (CRM B3: sędziowie bez nazwy
+     nadawcy „test, zignoruj”, 1 prawdziwy lead na 25);
   2. w próbce kontrola: elementy, o których wiesz, że muszą oblać; runda,
      w której kontrola przechodzi, jest nieważna;
   3. punktacja per rodzaj pola: pole z akcją ocenia „wiem, co zrobić”,
