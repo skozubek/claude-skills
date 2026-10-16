@@ -79,6 +79,10 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
   w systemie źródłowym), dostaje w planie okno i próg przed pierwszym wynikiem;
   bez zdarzeń w oknie jest „niezweryfikowane”, nie zaliczone, i zostaje
   blokadą z zadaniem;
+  kryterium wejścia danych (synchronizacja, import, podłączenie źródła)
+  odczytuje rozkład wszystkiego, co weszło w pierwszym przebiegu, nie tylko
+  rekord testowy (CRM B: obok jednego spotkania testowego kalendarz wciągnął
+  1457 wewnętrznych, rozpisanych do 2040);
   kryterium z progiem jakości (klasyfikator, sędzia, dopasowanie) dzieli
   próg na bezpieczeństwo (szkoda cicha i trudna do cofnięcia: blokuje) i
   użyteczność (niezaliczona to decyzja Serge'a z liczbami, nie blokada);
