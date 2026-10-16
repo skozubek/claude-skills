@@ -41,11 +41,6 @@ sesję.
   z jednym commitem (`git merge --squash <integracja>`), pełne bramki na nowym
   SHA, stary PR zamknięty z odsyłaczem. Nie wyjątek w skanerze, nie force push
   (CRM fala A, UUID marki wzięty za klucz HubSpota).
-- **Strażnik meta czyta też wiadomości commitów** w zakresie pushu (imię,
-  „kto zdecydował”): odmowa przychodzi przy pushu, a wiadomość przepisujesz,
-  póki commit jest lokalny. Agent wyrosły z przepisanego commita wchodzi
-  cherry-pickiem swoich commitów, nie merge'em, bo merge przywraca stary
-  commit razem z wiadomością (CRM fala C).
 - **Kopia lokalna bez kont użytkowników:** klucz obcy do `auth.users`
   przechodzi na kopii, pada na produkcji (profile skasowanych kont). Przed
   testem zapytanie na produkcji o anomalie w danych, które czyta zmiana
