@@ -274,6 +274,11 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    Konflikt scalenia oznacza błąd w podziale grafu: przerywasz merge, ten sam
    agent przez `SendMessage` wciąga gałąź integracyjną do swojej i rozwiązuje
    konflikt skillem `resolving-merge-conflicts`, a plan dostaje poprawkę podziału.
+   Worktree i gałąź agenta żyją do mergu PR-a, w którym jest jego zadanie:
+   findingi recenzji, Codexa i `/code-review` wracają do tego samego agenta,
+   a agenta bez worktree `SendMessage` już nie wznowi (CRM fala C: dwa
+   worktree zdjęte po scaleniu, poprawki recenzji poszły do nowych
+   wykonawców od zera).
 4. Odbiór niezaliczony → poprawka u **tego samego** agenta przez
    `SendMessage` z dowodem (wynik komendy, `file:line`). Kontekst pierwszego
    przebiegu jest wart więcej niż świeży start.
