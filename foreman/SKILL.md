@@ -182,7 +182,12 @@ testami, tryby awarii, zakres poza pracą, **graf zadań**.
 Łączenie albo deduplikacja zdarzeń z kilku źródeł ma w planie jawną
 definicję tożsamości zdarzenia (co czyni dwa wejścia tym samym) i test każdej
 kolejności przybycia; reguła rozpisana na gałęzie per kolejność odsłania przy
-każdej poprawce następną kolejność (CRM B3).
+każdej poprawce następną kolejność (CRM B3). Kontrakt maszyny stanów
+(kolejka, wysyłka, synchronizacja) ma tabelę przejść: stan → zdarzenie →
+stan, kto zapisuje, które stany zajmują tożsamość, a które ją zwalniają;
+do tego listę wszystkich dróg w kodzie, które zmieniają stan wejściowy
+(grep po zapisie), nie tylko drogę z historyjki (CRM D1: dwie rundy
+poprawek w PR B i C, ok. 20 E, za brak obu).
 
 Zadanie, które pisze miernik odbioru z listą oczekiwanych różnic, ma
 w weryfikacji kontrolę czułości per pozycja listy: po jednym wstrzykniętym
@@ -242,7 +247,10 @@ wtapiasz w plan i przepisujesz go jako stan: plan wygląda, jakby powstał dziś
 
 ### 4. Przygotowanie gałęzi
 
-W głównym klonie: gałąź integracyjna z aktualnego `main`, checkout na nią.
+W głównym klonie: gałąź integracyjna z aktualnego `main`, checkout na nią;
+w repo, którego klon jest dzielony z innymi sesjami (AGENTS.md: każda sesja we
+własnym worktree), gałąź integracyjna żyje we własnym worktree, a scalenia
+z kroku 5.3 robisz tam (agenci i tak zaczynają od `merge --ff-only <SHA>`).
 Worktree agentów wyrastają z `HEAD`, więc repo potrzebuje w
 `.claude/settings.local.json` wpisu `{"worktree": {"baseRef": "head"}}`,
 a `.gitignore` wpisu `.claude/worktrees/`. Pliki gitignorowane, których
@@ -268,7 +276,9 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
 1. Każde zadanie frontu dostaje spawn: `Agent` z
    `subagent_type: "foreman-wykonawca"`, `model` z grafu,
    `run_in_background: true`, wszystkie w jednym komunikacie. Naraz żyje
-   najwyżej trzech agentów; reszta frontu czeka na wolne miejsce. SHA
+   najwyżej trzech pracujących agentów, licząc wznowionych `SendMessage`,
+   recenzentów i weryfikatorów (oczekujący miejsca nie zajmuje); reszta
+   frontu i rundy poprawek czeka na wolne miejsce. SHA
    gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta
    zapisujesz w pliku sesji w katalogu tymczasowym: to rejestr własności
    tego przelotu, z którego korzysta odbiór i sprzątanie. Ten sam plik
@@ -335,8 +345,10 @@ we wszystkich gałęziach kodu, które je produkują, **łącznie z pomocą „?
 i opisami ekranów, których dotyka diff** — pomoc leży poza diffem, więc
 recenzent dostaje jej ścieżki wprost, a zmiana zachowania ekranu poprawia
 jego pomoc w tym samym przelocie (fala 4 SEO/GEO: pomoc on-site dalej
-uczyła „Stwórz zadania” po jego usunięciu). Findingi weryfikujesz
-w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
+uczyła „Stwórz zadania” po jego usunięciu). Recenzenta i Codexa puszczasz
+na ten sam SHA, a ich findingi zbierasz razem i wysyłasz jedną rundą
+poprawek (CRM D1: dwie rundy u tych samych wykonawców, bo Codex skończył
+pierwszy). Findingi weryfikujesz w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
 dotyczą (krok 5.3); nowe zadanie dostaje tylko finding bez właściciela.
 
 Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z gałęzi

@@ -50,7 +50,10 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
 
 - konto, które będzie wołać narzędzia, ma rolę, którą przepuści bramka z planu;
   plan z bramką „tylko admin" przy koncie pracownika staje na pierwszym
-  wywołaniu;
+  wywołaniu; każde kryterium z funkcją albo przyciskiem za rolą ma przed
+  startem przypisane konto tej roli i wynik próbnego wywołania, albo linię
+  „odbiera człowiek z rolą X” (kryterium oczekujące, nie zaliczone; CRM D1:
+  „Zweryfikuj konfigurację” 403 na koncie sprzedaży);
 - każdy rodzaj danych schodzi na dysk drutem bez gestu człowieka
   (`supabase db query --linked … > plik` po `supabase link` w worktree);
   pobranie z przeglądarki i każdy krok kończący się dialogiem to w przelocie
