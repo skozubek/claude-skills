@@ -183,6 +183,23 @@ pisze do systemu klienta. Plik mapy oznacza takie kroki. W każdym innym
 przypadku ścieżka kończy się przed akcją, a dowodem jest stan tuż przed nią
 plus odczyt, że akcja nie poszła.
 
+Pułapka: sygnał konwersji CRM (rekord leada i transakcji → Google Ads i Meta).
+Przebieg idzie tylko na marce w `signal_mode = 'validate'`: przed pierwszym
+krokiem czytasz `select signal_mode from crm_brand_settings where
+client_id='<marka>';`, a `live` oznacza stop (zdarzenie trafiłoby na konto
+reklamowe). Skutek czytasz z `crm_signal_queue` i `crm_signal_log` po
+`inquiry_id` (transakcja: `deal_id`), nie czekasz na wysyłkę: okno cofnięcia
+trwa 15 minut, więc „Sprawdzone (walidacja)” w krótkim przebiegu zostaje
+niedowiedzione i tak je raportujesz. Lead testowy z klucza TEST-VERIFY nie ma
+IP ani UA (klucz serwerowy), a zgodę i identyfikatory kliknięć dostaje tylko
+z wołania wejścia ze ścieżki D mapy; bez zgody wysyłka kończy jako `skipped`.
+Klasyfikator potrafi ustawić „Na temat” przed człowiekiem: wtedy w rekordzie
+stoi „Potwierdź temat”, a kolejka jest pusta do kliknięcia. Sprzątanie leada
+usuwa zadania kolejki, a wpisy `crm_signal_log` zostają bez leada: to
+normalne, log jest tylko do dopisywania. „Zweryfikuj konfigurację” przechodzi
+człowiek z kontem administratora (konto weryfikatora dostaje 403). Kroki:
+`crm-sciezki-przekrojowe.md`, ścieżka D.
+
 ## Dane testowe
 
 Kroki zapisu na produkcji idą tylko w cyklu: (1) identyfikator przebiegu
