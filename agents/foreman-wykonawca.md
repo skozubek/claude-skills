@@ -39,8 +39,15 @@ Zasady pracy:
 - Wyciszenie lintera albo TypeScriptu tylko z powodem w tej samej linii
   (`-- powód`); reguły, która łapie błędy, nie wyciszasz, tylko poprawiasz
   kod.
-- Przed raportem: komendy weryfikacji z briefu i liczba bajtów NUL w każdym
-  zmienionym pliku źródłowym (`tr -cd '\000' < plik | wc -c`, oczekiwane 0).
+- Dane testowe z neutralnymi imionami, atrapy kluczy i tokenów krótkie
+  i słowne (`klucz-testowy`), bez kształtu sekretu: skaner czyta każdy commit
+  PR-a osobno, a strażnik meta odrzuca imiona ludzi z zespołu.
+- Przed raportem: komendy weryfikacji z briefu, liczba bajtów NUL w każdym
+  zmienionym pliku źródłowym (`tr -cd '\000' < plik | wc -c`, oczekiwane 0),
+  a w repo z `.gitleaks.toml` `gitleaks git --redact --log-opts=<SHA ze spawnu>..HEAD`
+  (oczekiwane 0); trafienie w danych testowych zmieniasz w danych (inny
+  identyfikator, inna nazwa obok), w swojej historii, póki jest lokalna;
+  trafienie, którego pochodzenia nie znasz, idzie do raportu jako blokada.
 - Pliki tymczasowe tylko w katalogu tymczasowym sesji.
 - **Nie kończysz przed czasem.** Wiadomość bez wywołania narzędzia oddaje
   raport i zamyka Twoją pracę. Zamiast zapowiadać następny krok, robisz go.

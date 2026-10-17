@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Czas zapytań ekranu: pięć najwolniejszych żądań do Supabase (/rest/v1, /functions/v1) od poprzedniego
+# wywołania, z performance resource timing karty; bufor czyszczony po odczycie, `goto` też go zeruje.
+# Wołasz raz na krok, po stanie końcowym. Dopisuje wiersz do <katalog>/czasy.tsv: ID, czas UTC, HEAD, adres, wynik.
+# Użycie: bin/czasy <katalog-dowodów> <ID-kroku>   np. bin/czasy ~/Coding/MOL/Panel/dowody/2026-10-17-crm LEAD-01
+set -euo pipefail
+source "$(dirname "$0")/_wspolne.sh"
+cd "$REPO"
+CEL="${1:?katalog dowodów}"; ID="${2:?id kroku}"
+mkdir -p "$CEL"
+W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
+printf '%s' "(() => { const r = performance.getEntriesByType('resource').filter(e => /\/(rest|functions)\/v1\//.test(e.name)).sort((a, b) => b.duration - a.duration).slice(0, 5).map(e => new URL(e.name).pathname + ' ' + Math.round(e.duration) + 'ms'); performance.clearResourceTimings(); return r.join(' | ') || 'brak zapytań'; })()" > "$W/czasy.js"
+WYNIK="$("$B" eval "$W/czasy.js" | tail -1)"
+printf '%s\t%s\t%s\t%s\t%s\n' "$ID" "$(date -u +%FT%TZ)" "$(git rev-parse --short HEAD)" "$("$B" url | tail -1)" "$WYNIK" >> "$CEL/czasy.tsv"
+echo "$WYNIK" | cut -d'|' -f1-3

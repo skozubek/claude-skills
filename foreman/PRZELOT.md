@@ -66,7 +66,7 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
 
 - odbiór ekranu nie zależy od przeglądarki człowieka: rozszerzenie w Brave
   pada razem z siecią i wraca dopiero po jego ruchu. Sesję zalogowaną dla
-  gstack mintuje się bez klikania (przepis w [PULAPKI.md](PULAPKI.md)), ale
+  gstack mintuje się bez klikania (`verify-admotiv/bin/sesja`), ale
   dev serwer na localhost czyta ten sam projekt Supabase co produkcja, więc
   Granice wymieniają projekt, konto, dozwolone zapisy i sposób zdjęcia
   dostępu po odbiorze; konto spoza Granic odbiera człowiek po przelocie;
@@ -95,10 +95,7 @@ i miejsce odczytu.
   dwóch odcięciach z rzędu się poddaje, a po ponad 30 minutach snu Maca
   czeka na Enter. Po podniesieniu: `git status` w worktree z rejestru,
   agenty floty wznawiasz `SendMessage` (worktree trzyma niezacommitowaną
-  robotę), czas awarii nie liczy się do czasu zadania
-  (MOL/Panel/meta/LEKCJE.md 2026-10-11). Tryb `claude -p` na reset nie
-  czeka wcale; wznawia go skrypt startowy (wzór:
-  `campaign-builder/scripts/night-loop.sh`).
+  robotę; MOL/Panel/meta/LEKCJE.md 2026-10-11).
 - **Sędzia próbki** tam, gdzie próg mówi „ocena człowieka”. Procedura,
   ustalona przed pierwszą rundą (LC-093, MOL/Panel/meta/LEKCJE.md
   2026-10-11):
@@ -118,10 +115,8 @@ i miejsce odczytu.
      w której kontrola przechodzi, jest nieważna;
   3. punktacja per rodzaj pola: pole z akcją ocenia „wiem, co zrobić”,
      pole bez akcji ocenia się po słowach (zrozumiałość bez żargonu);
-  4. sędzia z innej rodziny niż wykonawca (Codex, model z `~/.codex/config.toml`,
-     bez `-m`), z tym samym przydziałem i kontekstem, który miał autor;
+  4. sędzia z innej rodziny niż wykonawca (Codex), z tym samym przydziałem i kontekstem, który miał autor;
   5. druga runda: te same elementy plus świeża próbka wylosowana przed
      poprawką, żeby poprawka nie uczyła się pod test; skrypt sprawdzający
      słowa nie zastępuje czytania pola po polu.
-- **Progi ogłaszane przed liczbami.** Kryterium zaliczenia stoi w planie przed
-  pierwszym wynikiem; próg dopisany po zobaczeniu liczb to opis.
+

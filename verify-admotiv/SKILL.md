@@ -102,7 +102,9 @@ zamiast liczyć na szczęście.
 
 Przeglądarka to gstack browse w trybie headless:
 `B=~/.claude/skills/gstack/browse/dist/browse`, komendy z katalogu
-testowanego checkoutu (daemon jest per repo). `$B --help` jest kanoniczne.
+testowanego checkoutu (daemon jest per repo). `$B --help` jest kanoniczne. Po aktualizacji
+gstacka daemon bywa bez swojej wersji Chromium: `npx playwright install
+chromium` z katalogu gstacka.
 Najczęściej: `goto`, `snapshot -i` (drzewo z referencjami `@eN`), `click`,
 `fill`, `press`, `wait`, `text`, `js`, `eval <plik>`, `console --errors`,
 `network`, `screenshot <ścieżka>`.
@@ -145,6 +147,10 @@ który przyjąłby sceptyczny recenzent. Zrzut „otwiera się” nie jest dowod
 - Pokaż akcję i stabilny stan końcowy, nie sam ekran końcowy.
 - Skutki, nie piksele: wiersz w bazie, wartość pola po przeładowaniu, żądanie
   w `network`, plik. Napis w toaście bez zapisu w bazie niczego nie dowodzi.
+- Czas: po stanie końcowym każdego kroku ekranu `bin/czasy <katalog> <ID>`.
+  Zapytanie o połowę wolniejsze niż w poprzednim przejściu tego kroku
+  (`czasy.tsv` poprzedniego katalogu), a przy kroku bez poprzednika ponad
+  1000 ms, to znalezisko w meldunku z nazwą widoku albo funkcji, nie blokada.
 - Atrapa liczy się tylko za tą samą granicą, którą produkcja izoluje system
   zewnętrzny. Nie liczy się, gdy omija ekran, funkcję edge, RLS albo zapis.
 - Gdy bezpieczna droga to tryb próbny, sprawdzasz obserwacją, co naprawdę

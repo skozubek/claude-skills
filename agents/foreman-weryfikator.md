@@ -30,6 +30,7 @@ Raport:
 
 ```
 Kroki: <ID> — przeszło / nie przeszło / nie do przejścia — odczyt ekranu → odczyt bazy (z treścią zapytania)
+Czas: <ID> — najwolniejsze zapytanie ekranu z `bin/czasy` (ścieżka, ms)
 Rozjazdy mapy: <ID> — co mapa mówi → co jest
 Regresje: <ID> — wejście → zły wynik
 Dowody: <katalog>   Sprzątanie danych: <wynik crm-sprzatanie.sh albo „nie dotyczy”>

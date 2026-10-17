@@ -43,8 +43,7 @@ Materiał idzie do katalogu tymczasowego sesji, nie do repo.
    co dodać. Każda: miejsce w skillu, brzmienie, incydent, który by
    uratowała, i kto ją przeczyta w chwili błędu. Bez reguł z jednego
    incydentu klasy (e).
-6. **Drugie oko:** Codex (model z `~/.codex/config.toml`, bez `-m`), tylko do
-   odczytu, na skill, plik kosztów i Twoją sekcję zwłok:
+6. **Drugie oko:** Codex, tylko do odczytu, na skill, plik kosztów i Twoją sekcję zwłok:
    `codex exec -s read-only -C <katalog skilla> --skip-git-repo-check -o <wynik> "<pytania>" < /dev/null`.
    Pytania: gdzie idą tokeny i co w skillu to wymusza; kroki zbędne
    i powtórzone; reguły martwe, sprzeczne, zdublowane; co z propozycji

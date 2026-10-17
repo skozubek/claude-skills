@@ -46,7 +46,6 @@ Model wykonawcy dobierasz per zadanie parametrem `model` w wywołaniu `Agent`:
 | `fable` | wyłącznie na wyraźne słowo Serge'a przed spawnem |
 
 Domyślny `opus` sprawia, że pominięty parametr kosztuje tokeny, a nie jakość.
-`haiku` nie jest opcją.
 
 ## Przebieg
 
@@ -75,10 +74,17 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
 - **kryteria odbioru**, od dwóch do pięciu. Każde mówi, co odczytać (komenda,
   zapytanie, liczba na ekranie) i jaki wynik ma wyjść. „Testy zielone” to nie
   kryterium, bo mówi o kodzie, a nie o tym, co widzi użytkownik.
-  Kryterium, które potrzebuje zdarzeń spoza przelotu (ruch użytkowników
-  w systemie źródłowym), dostaje w planie okno i próg przed pierwszym wynikiem;
-  bez zdarzeń w oknie jest „niezweryfikowane”, nie zaliczone, i zostaje
-  blokadą z zadaniem;
+  Kryterium, które potrzebuje zdarzeń (wejście leada, przebieg joba, upływ
+  progu), dostaje je wywołane w przelocie: rekord testowy wejściem produkcji,
+  ręczne uruchomienie joba, który i tak chodzi z crona, zegar przesunięty
+  w teście. Wywołanie, które tworzy albo zmienia dane widoczne dla ludzi
+  spoza Granic albo może im coś wysłać, idzie tylko z Granic. Okno ruchu
+  (próg przed pierwszym wynikiem, bez zdarzeń „niezweryfikowane”) zostaje
+  dla kryterium, które mierzy rozkład prawdziwego ruchu: okno użyteczności
+  biegnie w tle i nie trzyma przelotu otwartego, okno bezpieczeństwa
+  (wyciek, zły adresat, prawdziwy lead w spamie) blokuje (CRM C: odbiór stał
+  tydzień na oknach użyteczności, a dostawę przypomnień na leadzie ręcznym
+  odłożono razem z nimi);
   kryterium wejścia danych (synchronizacja, import, podłączenie źródła)
   odczytuje rozkład wszystkiego, co weszło w pierwszym przebiegu, nie tylko
   rekord testowy (CRM B: obok jednego spotkania testowego kalendarz wciągnął
@@ -122,10 +128,15 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   co jest materiałem pomiaru, kto go odświeża i czy użytkownik ma ten krok na
   ekranie (LC-111);
 - **czytelników**: gdy zmiana czyści albo przelicza pole, każdy, kto je czyta,
-  i co robił z brudem; pierwsi ci, którzy na słabym sygnale tworzą dane
+  i co robił z brudem, na próbce przed i po; pierwsi ci, którzy na słabym
+  sygnale tworzą dane
   (LC-104);
-- **wspólnych zasobów**: baza, port, karta przeglądarki; ograniczenie dostaje
-  każdy żyjący piszący, nie tylko następny spawn (LC-029).
+- **wspólnych zasobów**: baza, port, karta przeglądarki, limit i kolejka
+  funkcji produkcyjnej; ograniczenie dostaje każdy żyjący piszący, nie tylko
+  następny spawn (LC-029). Przebieg pomiarowy na funkcji produkcyjnej dzieli
+  jej dobowy limit i kolejkę z ruchem użytkowników, więc plan liczy jego
+  zużycie wobec limitu (CRM: pomiar klasyfikatora na 333 zgłoszeniach
+  wyczerpał limit dnia, a zadania prawdziwych leadów stały w kolejce).
 - **danych przenoszonych**: zmiana, która kopiuje dane z obcego systemu
   (import, lustro), ma w planie odpowiedź, co przenosi (treść notatek, maili,
   załączników) i kto zobaczy to po stronie docelowej i w raportach; dane
@@ -173,9 +184,17 @@ definicję tożsamości zdarzenia (co czyni dwa wejścia tym samym) i test każd
 kolejności przybycia; reguła rozpisana na gałęzie per kolejność odsłania przy
 każdej poprawce następną kolejność (CRM B3).
 
+Zadanie, które pisze miernik odbioru z listą oczekiwanych różnic, ma
+w weryfikacji kontrolę czułości per pozycja listy: po jednym wstrzykniętym
+defekcie w kategorii każdej pozycji (rekord, który pasuje do kanału albo pola
+pozycji, a jest usterką: spam, zły kierunek, brak dowodu), i każdy wychodzi
+jako nieoczekiwany. Kanarek spoza listy tego nie sprawdza: lista tłumaczy
+usterkę, która wpada w jej kategorię (CRM C: dwa razy, ostatnio 25
+leadów-spamu jako „lead tylko w CRM”).
+
 Zadanie w grafie to lista plików z jednym właścicielem, model wykonawcy
-z uzasadnieniem w pół zdania, zadania, od których zależy, spodziewany czas,
-komenda weryfikacji i **czytelnicy** jego pól poza jego plikami (komponent
+z uzasadnieniem w pół zdania, zadania, od których zależy, komenda
+weryfikacji i **czytelnicy** jego pól poza jego plikami (komponent
 renderujący, eksport, drugi dom tej samej reguły). Każde zadanie po scaleniu
 zostawia gałąź integracyjną zieloną; zmiany zielone dopiero razem (schemat
 i jego konsument) są jednym zadaniem. Dwa zadania równoległe w jednym pliku
@@ -187,8 +206,7 @@ PR-ze / przychodzi później”, a brief ją niesie; zależy od każdego zadania
 które opisywane zachowanie zmienia, nie tylko od tego, które je buduje (CRM
 B2: dokumenty równolegle z wpięciem list opisały plan zamiast kodu).
 
-Model dobierasz do ciężaru zadania, nie do wagi tematu. Wątpliwość rozstrzyga
-koszt pomyłki: tania i głośna → `sonnet`, droga albo cicha → `opus`. Masowa
+Masowa
 zmiana oceniana sędzią (setki tekstów) zaczyna od próbki: wynik poniżej
 progu na próbce przenosi zadanie na `opus`, zanim tańszy model przerobi
 całość.
@@ -199,12 +217,14 @@ dostaje recenzenta świeżym okiem zaraz po scaleniu, nie dopiero na końcu.
 
 ### 3. Recenzja planu innym modelem
 
-Plan zmieniający wygląd albo układ ekranów ma w kryteriach odbioru wzorzec
+Plan, który zmienia albo dodaje ekran, ma w kryteriach odbioru wzorzec
 z repo (klocek tabeli, panelu, filtrów) i sąsiednie ekrany, z którymi ma być
-spójny; „jak w systemie X” bez tego nie jest kryterium. Przegląd inżynierski
+spójny, a ekran przenoszony z innego systemu także jego okresy, filtry
+i układ; „jak w systemie X” bez tego nie jest kryterium (CRM C: Raporty bez
+okresów Hubiego). Przegląd inżynierski
 właściwy dla repo, potem Codex:
 `codex exec -s read-only -c 'model_reasoning_effort="high"' "<pytania>" < plan.md`.
-Model idzie z `~/.codex/config.toml`, jedynego miejsca jego wyboru; `high`, bo
+`high`, bo
 recenzja jest adwersarialna, a `xhigh` na długim kontekście wisi dziesiątki
 minut. Plan idzie na stdin, bo sandbox nie zawsze widzi pliki spoza repo,
 a treść wklejona w cudzysłów psuje się na cudzysłowach i limicie argumentów.
@@ -228,16 +248,14 @@ Worktree agentów wyrastają z `HEAD`, więc repo potrzebuje w
 a `.gitignore` wpisu `.claude/worktrees/`. Pliki gitignorowane, których
 wymagają testy, wchodzą przez `.worktreeinclude`, wyłącznie w wersji lokalnej
 albo testowej: sekrety produkcji zostają u Ciebie, bo strażnik komend łapie
-pomyłki, a nie każdą drogę do zdalnej zmiany. Zależności instaluje agent
-w swoim worktree komendą instalacji repo.
+pomyłki, a nie każdą drogę do zdalnej zmiany.
 
 Zadania równoległe, które dzielą typy albo komponent, dostają kontrakt
-w kodzie: przed spawnem wstawiasz na gałąź integracyjną typy (np. funkcji
-bazy) i szkielet komponentu z sygnaturą z planu, osobnym commitem; właściciel
+w kodzie: przed spawnem wstawiasz na gałąź integracyjną typy i słowniki wartości
+(np. funkcji bazy, kody z CHECK) i szkielet komponentu z sygnaturą z planu,
+osobnym commitem; właściciel
 szkieletu go wypełnia, reszta kompiluje się na nim od pierwszej minuty (CRM
-B2: baza, środek i rekord ruszyły razem). Recenzent świeżym okiem idzie zaraz
-po scaleniu pierwszych implementacji kontraktu, przed zadaniami, które z nich
-biorą.
+B2: baza, środek i rekord ruszyły razem).
 
 Porównaj cwd sesji z katalogiem repo planu i powiedz wynik na głos: sesja
 spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
@@ -268,9 +286,7 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    Raport agenta to hipoteza (LC-077); dowodem jest Twój przebieg komend,
    zapisany jako komenda, SHA i wynik. Ten sam dowód na tym samym SHA nie
    biegnie drugi raz.
-   Agent, który przekroczył swój limit tur albo pracuje dłużej niż dwukrotność
-   czasu z grafu (bez przerw sieci i limitu), dostaje `TaskStop` i liczy się
-   jako niezaliczony odbiór.
+   Agent, który przekroczył swój limit tur, liczy się jako niezaliczony odbiór.
 3. Odbiór zaliczony → `git merge --no-ff <gałąź agenta>` w głównym klonie,
    przeliczenie frontu, spawn. Pełna weryfikacja integracji biegnie po
    zamknięciu frontu i przed PR-em, a po pojedynczym scaleniu tylko wtedy,
@@ -279,10 +295,12 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    agent przez `SendMessage` wciąga gałąź integracyjną do swojej i rozwiązuje
    konflikt skillem `resolving-merge-conflicts`, a plan dostaje poprawkę podziału.
    Worktree i gałąź agenta żyją do mergu PR-a, w którym jest jego zadanie:
-   findingi recenzji, Codexa i `/code-review` wracają do tego samego agenta,
-   a agenta bez worktree `SendMessage` już nie wznowi (CRM fala C: dwa
-   worktree zdjęte po scaleniu, poprawki recenzji poszły do nowych
-   wykonawców od zera).
+   findingi recenzji, Codexa i `/code-review` wracają do tego samego agenta.
+   `SendMessage` nie wznowi agenta bez worktree ani agenta innej sesji (nowej,
+   nie wznowionej `--resume`), więc sesję przekazujesz po rundzie poprawek
+   zadań w niej skończonych; inaczej przekazanie wymienia ich worktree jako
+   wejście nowego wykonawcy (CRM C: trzy rundy poprawek od zera, ok. 3,7 E
+   straty).
 4. Odbiór niezaliczony → poprawka u **tego samego** agenta przez
    `SendMessage` z dowodem (wynik komendy, `file:line`). Kontekst pierwszego
    przebiegu jest wart więcej niż świeży start.
@@ -302,8 +320,8 @@ przekraczająca dwukrotność zapowiedzi wraca po decyzję (LC-036).
 Pętla kończy się, gdy każde zadanie grafu jest scalone albo opisane jako
 blokada, a pełna weryfikacja na gałęzi integracyjnej przechodzi.
 
-Twój kontekst to największa pozycja kosztu przelotu: każda odpowiedź czyta
-go od nowa. Wyniki komend idą drutem do pliku, a do rozmowy liczby; raport
+Twój kontekst rośnie przez cały przelot, a każda odpowiedź czyta go od nowa.
+Wyniki komend idą drutem do pliku, a do rozmowy liczby; raport
 agenta czytasz, transkryptu nie.
 
 ### 6. Odbiór świeżym okiem
@@ -318,12 +336,16 @@ i opisami ekranów, których dotyka diff** — pomoc leży poza diffem, więc
 recenzent dostaje jej ścieżki wprost, a zmiana zachowania ekranu poprawia
 jego pomoc w tym samym przelocie (fala 4 SEO/GEO: pomoc on-site dalej
 uczyła „Stwórz zadania” po jego usunięciu). Findingi weryfikujesz
-w kodzie jak findingi Codexa; przyjęte wracają do pętli frontu jako nowe
-zadania.
+w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
+dotyczą (krok 5.3); nowe zadanie dostaje tylko finding bez właściciela.
 
 Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z gałęzi
 integracyjnej, dane z tego samego źródła co produkcja, kryteria odczytane
-z DOM-u liczbami. W AdMotiv odbiór robi agent `foreman-weryfikator`, nie wykonawca:
+z DOM-u liczbami, a czas ekranu z raportu weryfikatora i czas wywołania ze
+smoke: wolne zapytanie idzie do meldunku jako decyzja Serge'a z liczbą, nie
+na listę „później” (CRM B: lista Leadów 2,6 s przeszła odbiór; CRM C: raport
+4,6 s odłożony bez progu). W AdMotiv odbiór robi agent `foreman-weryfikator`,
+nie wykonawca:
 skill `verify-admotiv` na krokach mapy z obszarów, które wskazuje
 `bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
 ten sam krok przechodzi smoke na produkcji. Weryfikator mapy nie edytuje:
@@ -342,7 +364,9 @@ rozjazd pojęć, nie styl.
 ### 7. Brama i wdrożenie
 
 Brama repo w kolejności, którą repo definiuje: jego `verify` albo bramki
-z `AGENTS.md`/`CLAUDE.md`, przegląd diffu, `/codex challenge` na diffie gałęzi
+z `AGENTS.md`/`CLAUDE.md`, a bez `verify` kroki jego CI z `.github/workflows/`
+z tymi samymi parametrami, nie wybór z pamięci (CRM C PR 3: pominięty
+`check:mail-subject`), przegląd diffu, `/codex challenge` na diffie gałęzi
 integracyjnej jako drugie oko z innej rodziny modeli. Przed PR-em, po
 wciągnięciu `main`, nadajesz ostateczne numery migracji i wpisów decyzji
 (wyższe niż na `main`) i poprawiasz ich odsyłacze. Flota, która
@@ -361,10 +385,17 @@ i tym, co czeka na decyzję.
 Smoke idzie drogą produkcji (ekran AdMotiv: `verify-admotiv/bin/sesja --prod`
 na opublikowanym froncie): ten sam starter, ładunek z tego samego źródła,
 odczyt wyniku z miejsca, w którym zapisuje go produkcja. Dowodem wdrożenia
-jest odczyt żywego stanu (wersja funkcji, wiersz w bazie).
+jest odczyt żywego stanu (wersja funkcji, wiersz w bazie), a „`main`
+zielony” to zielony przebieg na commicie mergu każdego workflowu, który
+`.github/workflows/` puszcza na push do `main` (`gh run list --commit <sha>
+--limit 50`); brak przebiegu to nie zieleń (CRM C: audyt uprawnień czerwony
+na `main` prawie 6 h przy meldunku „CI zielone”).
 
 Meldunek idzie po kryteriach odbioru: przy każdym odczyt, który je
-potwierdził, albo powód, dla którego nie przeszło.
+potwierdził, albo powód, dla którego nie przeszło. Werdykt miernika „zgodne”
+przy dużej różnicy liczb uznajesz po obejrzeniu rozkładu rekordów różnicy po
+pozycjach listy, nie po werdykcie skryptu (CRM C: 29 nowych leadów wobec 4
+w Hubim „zgodne”, 25 z nich to spam).
 
 ### 8. Sekcja zwłok i sprzątanie
 
@@ -394,9 +425,7 @@ komentarze, zakazy) niesie definicja typu agenta; brief niesie tylko to:
 
 ```
 Zadanie <nazwa z grafu> z planu <ścieżka>, sekcja <nagłówek>. Zacznij od
-`git merge --ff-only <SHA ze spawnu>`. Przed pierwszą linijką kodu przeczytaj
-w planie: Granice, kontrakt, swoje zadanie i zadania, od których zależysz.
-Resztę planu czytasz, gdy jej potrzebujesz.
+`git merge --ff-only <SHA ze spawnu>`.
 
 Twoje pliki: <lista>. Pozostałe pliki należą do innych zadań.
 Czytelnicy Twoich pól poza Twoimi plikami: <lista z grafu>.
@@ -418,7 +447,8 @@ w częściową czystość" przetrwa. Komendy weryfikacji są dokładne, nie
 
 Gdy przy bramkach nie stoi człowiek albo sesja biegnie w trybie bypass lub
 auto (hooki odmawiają wtedy zamiast pytać, także przy człowieku obok), przed
-pierwszym spawnem przeczytaj [PRZELOT.md](PRZELOT.md): granice w planie,
+pierwszym spawnem, także w sesji wznawiającej przelot, przeczytaj
+[PRZELOT.md](PRZELOT.md): granice w planie,
 droga odbioru sprawdzona jako operator, liczniki i budziki. Bez sekcji „Granice” w planie przelot się nie
 zaczyna.
 
@@ -434,6 +464,6 @@ nazwij dowód, którego wtedy brakło.
 
 ## Kiedy nie używać
 
-Robota spoza kryteriów kroku 0: zrób ją sam. Zakres mglisty: najpierw doprecyzuj,
+Zakres mglisty: najpierw doprecyzuj,
 bo flota na mgłę daje trzy interpretacje równolegle. Robota wymagająca
 rozmowy z Serge'em w trakcie: subagent nie ma z kim rozmawiać.

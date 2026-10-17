@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Zużycie przelotu foremana per agent, z zapisów sesji Claude Code.
 
-Użycie: koszty.py <sesja.jsonl> [<sesja.jsonl> ...]  > koszty.txt
+Użycie: koszty.py [--od=ISO] [--do=ISO] <sesja.jsonl> [<sesja.jsonl> ...]  > koszty.txt
+--od/--do (UTC, np. 2026-10-16T07:51) liczą tylko odpowiedzi w oknie: sesja niosąca
+dwa przeloty.
 Katalog `<sesja>/subagents/` obok każdego zapisu wchodzi sam.
 
 Liczy ostatni `usage` każdej unikalnej odpowiedzi (`message.id`): ta sama
@@ -16,6 +18,8 @@ import json
 import os
 import sys
 
+OD = next((a[5:] for a in sys.argv if a.startswith("--od=")), "")
+DO = next((a[5:] for a in sys.argv if a.startswith("--do=")), "~")
 POLA = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens")
 
 
@@ -30,7 +34,8 @@ def zuzycie(sciezka):
             if d.get("timestamp"):
                 czasy.append(d["timestamp"])
             m = d.get("message") if isinstance(d.get("message"), dict) else {}
-            if d.get("type") == "assistant" and m.get("id") and m.get("model") != "<synthetic>":
+            if (d.get("type") == "assistant" and m.get("id") and m.get("model") != "<synthetic>"
+                    and OD <= d.get("timestamp", "") < DO):
                 ostatni[m["id"]] = m.get("usage") or {}
                 modele.add(m.get("model", "?"))
             if not opis and d.get("type") == "user":
@@ -46,7 +51,7 @@ def zuzycie(sciezka):
 
 
 razem = collections.defaultdict(float)
-for sesja in sys.argv[1:]:
+for sesja in [a for a in sys.argv[1:] if not a.startswith("--")]:
     print(f"=== {os.path.basename(sesja)}")
     pliki = [("BRYGADZISTA", sesja)] + [
         (os.path.basename(p)[:-6], p)
