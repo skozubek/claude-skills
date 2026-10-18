@@ -208,6 +208,13 @@ jako nieoczekiwany. Kanarek spoza listy tego nie sprawdza: lista tłumaczy
 usterkę, która wpada w jej kategorię (CRM C: dwa razy, ostatnio 25
 leadów-spamu jako „lead tylko w CRM”).
 
+Zadanie, którego poprawność wymaga atomowości w bazie (odczyt stanu i zapis
+w osobnych krokach, warunek zależny od cudzych zdarzeń, ponowienie po
+błędzie), przy Granicach bez zmian SQL nie wchodzi do grafu jako zadanie:
+to decyzja Serge'a przed startem (poszerzyć Granice albo wyciąć). Wariant
+obok bazy przechodzi testy i pada na recenzji (CRM UI: automat etapu po
+rezerwacji w funkcji edge, revert przed mergem).
+
 Zadanie w grafie to lista plików z jednym właścicielem, model wykonawcy
 z uzasadnieniem w pół zdania, zadania, od których zależy, komenda
 weryfikacji i **czytelnicy** jego pól poza jego plikami (komponent
@@ -359,7 +366,10 @@ jego pomoc w tym samym przelocie (fala 4 SEO/GEO: pomoc on-site dalej
 uczyła „Stwórz zadania” po jego usunięciu). Recenzenta i Codexa puszczasz
 na ten sam SHA, a ich findingi zbierasz razem i wysyłasz jedną rundą
 poprawek (CRM D1: dwie rundy u tych samych wykonawców, bo Codex skończył
-pierwszy). Findingi weryfikujesz w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
+pierwszy). Teksty widoczne dla użytkownika (pomoc, opisy, zdania skutku) mają dwie
+rundy poprawek; trzecia niczego nie dokłada, tylko ścina twierdzenia do
+tego, co kod gwarantuje w każdej gałęzi (CRM UI: po cztery rundy na dwóch
+ekranach, 29% kosztu przelotu). Findingi weryfikujesz w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
 dotyczą (krok 5.3); nowe zadanie dostaje tylko finding bez właściciela.
 
 Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z gałęzi

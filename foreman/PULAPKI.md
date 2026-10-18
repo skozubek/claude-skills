@@ -30,6 +30,14 @@ już raz kosztował sesję.
 - **PR zmergowany przez równoległą sesję** z tego samego konta: po cudzym merge'u weryfikujesz wdrożenie od
   zera, a PR zsynchronizowany z czymś jeszcze trzymasz jako draft (LC-105).
 
+- **Merge `main` po squashu PR-a z gałęzi integracyjnej:** squash nie jest
+  przodkiem gałęzi, więc git scala od starej bazy: plik dopisywany na końcu
+  (dziennik decyzji) potrafi wyjść z cicho zgubioną albo sklejoną linią,
+  a plik zmieniony identycznie po obu stronach daje konflikt. Gdy `git diff
+  <head zmergowanego PR-a> origin/main` jest pusty, plik bierzesz z `main`
+  (`git checkout --theirs` albo `git show origin/main:plik`), a swoje dopiski
+  doklejasz; dziennik decyzji porównujesz z `main` (`git diff origin/main --
+  docs/DECISIONS.md` ma same dodane linie).
 - **Skanery per commit** (gitleaks na PR-ze, strażnik meta w `pre-push`)
   widzą każdy commit pośredni; zapobiega temu definicja wykonawcy (dane
   testowe, lokalny skan przed raportem). Trafienie na gałęzi integracyjnej

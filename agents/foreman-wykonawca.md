@@ -44,7 +44,8 @@ Zasady pracy:
   PR-a osobno, a strażnik meta odrzuca imiona ludzi z zespołu.
 - Przed raportem: komendy weryfikacji z briefu, liczba bajtów NUL w każdym
   zmienionym pliku źródłowym (`tr -cd '\000' < plik | wc -c`, oczekiwane 0),
-  a w repo z `.gitleaks.toml` `gitleaks git --redact --log-opts=<SHA ze spawnu>..HEAD`
+  a w repo z `.gitleaks.toml` `gitleaks detect --redact --source . --log-opts=<SHA ze spawnu>..HEAD`
+  (strażnik komend repo odrzuca `gitleaks git`, bo czyta „git” jako komendę)
   (oczekiwane 0); trafienie w danych testowych zmieniasz w danych (inny
   identyfikator, inna nazwa obok), w swojej historii, póki jest lokalna;
   trafienie, którego pochodzenia nie znasz, idzie do raportu jako blokada.
