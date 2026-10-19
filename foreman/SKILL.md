@@ -210,10 +210,12 @@ leadów-spamu jako „lead tylko w CRM”).
 
 Zadanie, którego poprawność wymaga atomowości w bazie (odczyt stanu i zapis
 w osobnych krokach, warunek zależny od cudzych zdarzeń, ponowienie po
-błędzie), przy Granicach bez zmian SQL nie wchodzi do grafu jako zadanie:
-to decyzja Serge'a przed startem (poszerzyć Granice albo wyciąć). Wariant
-obok bazy przechodzi testy i pada na recenzji (CRM UI: automat etapu po
-rezerwacji w funkcji edge, revert przed mergem).
+błędzie), wskazuje w grafie istniejący mechanizm, który ją daje (funkcja
+transakcyjna, zapis warunkowy), i test współbieżności albo ponowienia. Gdy
+mechanizmu brak, a jego dodanie przekracza Granice, zadanie nie wchodzi do
+grafu: decyzja Serge'a przed startem (poszerzyć Granice albo wyciąć).
+Wariant obok bazy przechodzi testy i pada na recenzji (CRM UI: automat
+etapu po rezerwacji w funkcji edge, revert przed mergem).
 
 Zadanie w grafie to lista plików z jednym właścicielem, model wykonawcy
 z uzasadnieniem w pół zdania, zadania, od których zależy, komenda
@@ -226,8 +228,11 @@ pliku rozdziela zależność. Numery migracji i wpisów decyzji w grafie są
 robocze: ostateczne nadajesz w kroku 7, po wciągnięciu `main`. Zadanie, które
 pisze pomoc, opisy ekranów albo komunikaty, ma w grafie listę „działa po tym
 PR-ze / przychodzi później”, a brief ją niesie; zależy od każdego zadania,
-które opisywane zachowanie zmienia, nie tylko od tego, które je buduje (CRM
-B2: dokumenty równolegle z wpięciem list opisały plan zamiast kodu).
+które opisywane zachowanie zmienia, nie tylko od tego, które je buduje, i
+startuje po scaleniu ich implementacji razem z otwartymi poprawkami; późniejsza
+zmiana zachowania otwiera je na nowo (CRM B2: dokumenty równolegle z wpięciem
+list opisały plan zamiast kodu; CRM C2: teksty puszczone obok rund kodu
+wróciły trzy razy).
 
 Masowa
 zmiana oceniana sędzią (setki tekstów) zaczyna od próbki: wynik poniżej
@@ -296,7 +301,8 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    `run_in_background: true`, wszystkie w jednym komunikacie. Naraz żyje
    najwyżej trzech pracujących agentów, licząc wznowionych `SendMessage`,
    recenzentów i weryfikatorów (oczekujący miejsca nie zajmuje); reszta
-   frontu i rundy poprawek czeka na wolne miejsce. SHA
+   frontu i rundy poprawek czeka na wolne miejsce. Zadanie tekstów wchodzi do
+   frontu według zależności z kroku 2 (po poprawkach zadań, które opisuje). SHA
    gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta
    zapisujesz w pliku sesji w katalogu tymczasowym: to rejestr własności
    tego przelotu, z którego korzysta odbiór i sprzątanie. Ten sam plik
@@ -331,7 +337,14 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    straty).
 4. Odbiór niezaliczony → poprawka u **tego samego** agenta przez
    `SendMessage` z dowodem (wynik komendy, `file:line`). Kontekst pierwszego
-   przebiegu jest wart więcej niż świeży start.
+   przebiegu jest wart więcej niż świeży start. Osobno liczysz wznowienia
+   po zaliczonym odbiorze (findingi recenzji, Codexa, odbioru na żywo):
+   trzecie wznowienie tego samego agenta jest ostatnie, kolejną poprawkę
+   bierze nowy wykonawca z aktualnym SHA, raportem i dowodami poprzednika,
+   bo każda odpowiedź czyta cały kontekst od nowa; zmiana wykonawcy nie zeruje
+   licznika niezaliczonych odbiorów z drabiny niżej. Próg trzech to limit
+   organizacyjny bez pomiaru (LC-115: siedem wznowień, najdroższe zadanie
+   przelotu). <!-- LC-115 -->
 5. **Drabina modelu:** zadanie na `sonnet` po dwóch niezaliczonych odbiorach
    idzie do nowego wykonawcy na `opus` z oboma raportami i dowodami. Na `opus`
    po dwóch niezaliczonych kończy zadanie jako **blokadę**: wpis w planie „czego
@@ -367,13 +380,20 @@ uczyła „Stwórz zadania” po jego usunięciu). Recenzenta i Codexa puszczasz
 na ten sam SHA, a ich findingi zbierasz razem i wysyłasz jedną rundą
 poprawek (CRM D1: dwie rundy u tych samych wykonawców, bo Codex skończył
 pierwszy). Teksty widoczne dla użytkownika (pomoc, opisy, zdania skutku) mają dwie
-rundy poprawek; trzecia niczego nie dokłada, tylko ścina twierdzenia do
-tego, co kod gwarantuje w każdej gałęzi (CRM UI: po cztery rundy na dwóch
-ekranach, 29% kosztu przelotu). Findingi weryfikujesz w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
+rundy poprawek, potem redagowanie staje: dla każdego pozostałego findingu
+wskazujesz zdanie, gałąź kodu i niespełnioną obietnicę, zdanie bez pokrycia
+wylatuje, a gdy jego brak łamie kryterium odbioru, to blokada; tekst
+zmieniony po stopie przechodzi weryfikację prawdziwości jeszcze raz (CRM
+UI: po cztery rundy na dwóch ekranach, blisko trzecia część kosztu). Findingi weryfikujesz w kodzie jak findingi Codexa; przyjęte wracają do agenta zadania, którego
 dotyczą (krok 5.3); nowe zadanie dostaje tylko finding bez właściciela.
 
-Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z gałęzi
-integracyjnej, dane z tego samego źródła co produkcja, kryteria odczytane
+Zmiana dotykająca ekranu dostaje odbiór na żywo: dev serwer z osobnego
+checkoutu przypiętego SHA gałęzi integracyjnej (`git worktree add <katalog
+sesji>/odbior <SHA>`), nie z worktree, do którego w trakcie scalasz
+poprawki, bo weryfikator nie wie wtedy, który punkt sprawdził na którym
+kodzie (LC-116) <!-- LC-116 -->; poprawka scalona po tym SHA powtarza kroki,
+których dotknęła; dane
+z tego samego źródła co produkcja, kryteria odczytane
 z DOM-u liczbami, a czas ekranu z raportu weryfikatora i czas wywołania ze
 smoke: wolne zapytanie idzie do meldunku jako decyzja Serge'a z liczbą, nie
 na listę „później” (CRM B: lista Leadów 2,6 s przeszła odbiór; CRM C: raport
@@ -442,6 +462,11 @@ więc rejestr własności wymienia każdą, a sprzątanie odhacza je po kolei:
 - worktree i gałęzie agentów, gałąź integracyjna i gałęzie PR-ów, lokalnie
   i na zdalnym (merge z `--delete-branch`), po sprawdzeniu, że nie mają
   niezacommitowanej pracy; cudzych nie ruszasz, także w klonie dzielonym;
+  materiał zachowany po przelocie (wariant wycięty przed mergem) commitujesz
+  na gałęzi `material/<temat>`, która sprzątaniu nie podlega (jej worktree
+  schodzi po sprawdzeniu czystego stanu), a rejestr i meldunek podają nazwę,
+  SHA i powód; gałąź z nazwą agenta ginie przy sprzątaniu po wzorcu (LC-117);
+  <!-- LC-117 -->
 - budziki `CronCreate` usunięte (`CronDelete`): sesja zostaje otwarta i budzik
   odpalony po przelocie wznawia robotę, której już nie ma;
 - `/coffee off`: zadanie launchd trzyma Maca bez snu po końcu sesji;

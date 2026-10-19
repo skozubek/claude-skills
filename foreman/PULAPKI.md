@@ -31,13 +31,13 @@ już raz kosztował sesję.
   zera, a PR zsynchronizowany z czymś jeszcze trzymasz jako draft (LC-105).
 
 - **Merge `main` po squashu PR-a z gałęzi integracyjnej:** squash nie jest
-  przodkiem gałęzi, więc git scala od starej bazy: plik dopisywany na końcu
-  (dziennik decyzji) potrafi wyjść z cicho zgubioną albo sklejoną linią,
-  a plik zmieniony identycznie po obu stronach daje konflikt. Gdy `git diff
-  <head zmergowanego PR-a> origin/main` jest pusty, plik bierzesz z `main`
-  (`git checkout --theirs` albo `git show origin/main:plik`), a swoje dopiski
-  doklejasz; dziennik decyzji porównujesz z `main` (`git diff origin/main --
-  docs/DECISIONS.md` ma same dodane linie).
+  przodkiem gałęzi, więc git scala od starej bazy i plik dopisywany na końcu
+  (dziennik decyzji) potrafi wyjść ze zgubioną albo sklejoną linią. Wynik
+  merge'a porównujesz z zapisaną głową zmergowanego PR-a i z `origin/main`;
+  konflikt rozstrzygasz per plik, zachowując późniejsze zmiany obu stron,
+  a wersję całego pliku z `main` bierzesz tylko wtedy, gdy jedyne zmiany
+  integracji względem niej to Twoje jawnie wskazane dopiski. Po rozwiązaniu
+  `git diff origin/main -- docs/DECISIONS.md` ma same dodane linie.
 - **Skanery per commit** (gitleaks na PR-ze, strażnik meta w `pre-push`)
   widzą każdy commit pośredni; zapobiega temu definicja wykonawcy (dane
   testowe, lokalny skan przed raportem). Trafienie na gałęzi integracyjnej
@@ -65,6 +65,14 @@ już raz kosztował sesję.
 - **Pomiar i `/code-review` w jednym klonie:** review na chwilę podmienia pliki,
   więc pomiar traci ważność. Rozdziel katalogi albo czas (LC-100).
 
+- **Strażnik dokumentów w AdMotiv liczy każdy commit osobno:** commit
+  ruszający kod bez swojego dokumentu naprawia późniejszy commit z linią
+  `Dokumenty: uzupełnia <sha>` (zalicza dokumenty, które ten commit zmienia,
+  więc rusza wszystkich brakujących właścicieli) albo, gdy żadne zdanie nie
+  przestało być prawdą, jeden commit `Dokumenty: bez zmian <sha>` (pusty
+  wystarczy, obejmuje wszystkich właścicieli); linia bez sha nie liczy się.
+  Na gałęzi z ponad stu commitami przebieg trwa minuty: ten sam SHA
+  sprawdzasz raz, wykonawca nie czeka na niego w pętli.
 - **Migracja po mergu w AdMotiv:** `migration-drift` na pushu do `main` czeka
   10 minut na zastosowanie migracji, więc workflow „Zastosuj migrację” idzie
   zaraz po mergu, a czerwony po tym czasie to dryf. Audyt uprawnień porównuje

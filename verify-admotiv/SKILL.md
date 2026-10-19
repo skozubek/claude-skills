@@ -193,8 +193,8 @@ trwa 15 minut, więc „Sprawdzone (walidacja)” w krótkim przebiegu zostaje
 niedowiedzione i tak je raportujesz. Lead testowy z klucza TEST-VERIFY nie ma
 IP ani UA (klucz serwerowy), a zgodę i identyfikatory kliknięć dostaje tylko
 z wołania wejścia ze ścieżki D mapy; bez zgody wysyłka kończy jako `skipped`.
-Klasyfikator potrafi ustawić „Na temat” przed człowiekiem: wtedy w rekordzie
-stoi „Potwierdź temat”, a kolejka jest pusta do kliknięcia. Sprzątanie leada
+Klasyfikator nie ustawia „Na temat”: lead czeka w „Nowy” (w „Dziś” w sekcji
+„Do oceny”), a kolejka jest pusta do „Na temat” człowieka. Sprzątanie leada
 usuwa zadania kolejki, a wpisy `crm_signal_log` zostają bez leada: to
 normalne, log jest tylko do dopisywania. „Zweryfikuj konfigurację” przechodzi
 człowiek z kontem administratora (konto weryfikatora dostaje 403). Kroki:

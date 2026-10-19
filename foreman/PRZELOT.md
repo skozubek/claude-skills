@@ -91,6 +91,15 @@ i miejsce odczytu.
   limit z trzech miejsc. Limit z granic sumujesz z całym planem briefu przed
   pierwszym wywołaniem: plan potrafi go przekroczyć, choć każdy etap z osobna
   się mieści (LC-099).
+- **Codex w nocy.** Równoległe przeloty z tego konta dzielą jeden limit
+  Codexa (LC-118). Przed startem potwierdzasz dostępność jednym wywołaniem;
+  wyczerpanie limitu poznajesz po jawnym komunikacie narzędzia, inny błąd
+  diagnozujesz osobno. Plan wymienia recenzje Codexa (plan, PR), nie każdą
+  rundę, a równoległe przeloty wpisują wykorzystanie do wspólnego rejestru
+  w katalogu sesji. Brak Codexa w trakcie: recenzent Claude na delcie, PR
+  otwarty z linią „bez Codexa od <SHA>”, merge dopiero po recenzji Codexa
+  na aktualnym SHA PR-a; bez czekania na kredyty w pętli. Limit kosztu
+  z Granic zatrzymuje cały przelot niezależnie od tego. <!-- LC-118 -->
 - **Sieć i limit.** Sieć pada częściej niż limit, a sesja po awarii sieci nie
   wraca sama. Przelot startuje od `/coffee` (LC-038) i budzika zapasowego
   (`CronCreate`) postawionego od razu, na porę, o której Serge wstaje; drugi
