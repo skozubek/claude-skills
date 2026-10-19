@@ -73,6 +73,14 @@ już raz kosztował sesję.
   wystarczy, obejmuje wszystkich właścicieli); linia bez sha nie liczy się.
   Na gałęzi z ponad stu commitami przebieg trwa minuty: ten sam SHA
   sprawdzasz raz, wykonawca nie czeka na niego w pętli.
+- **Zmiana pod zadaniem cyklicznym** (lustro, cron, checker): wdrożenie
+  w kilku krokach (migracja, funkcja, migracja) idzie jednym ciągiem między
+  przebiegami, z odczytem przebiegów przed pierwszym krokiem i po ostatnim.
+  Kolejności, które powstają tylko wtedy, gdy przebieg wpadnie między kroki,
+  zamyka okno; kod piszesz na kolejności możliwe także poza oknem
+  (ponowienie, ruch użytkownika, opóźniony job) (zerowe wizyty CRM: trzy
+  rundy gonienia kolejności lustra, okno 2 minut między przebiegami je
+  zamknęło).
 - **Migracja po mergu w AdMotiv:** `migration-drift` na pushu do `main` czeka
   10 minut na zastosowanie migracji, więc workflow „Zastosuj migrację” idzie
   zaraz po mergu, a czerwony po tym czasie to dryf. Audyt uprawnień porównuje

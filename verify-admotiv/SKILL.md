@@ -196,8 +196,10 @@ z wołania wejścia ze ścieżki D mapy; bez zgody wysyłka kończy jako `skippe
 Klasyfikator nie ustawia „Na temat”: lead czeka w „Nowy” (w „Dziś” w sekcji
 „Do oceny”), a kolejka jest pusta do „Na temat” człowieka. Sprzątanie leada
 usuwa zadania kolejki, a wpisy `crm_signal_log` zostają bez leada: to
-normalne, log jest tylko do dopisywania. „Zweryfikuj konfigurację” przechodzi
-człowiek z kontem administratora (konto weryfikatora dostaje 403). Kroki:
+normalne, log jest tylko do dopisywania. „Zweryfikuj konfigurację” woła platformy
+reklamowe i przenosi wstrzymane wysyłki, więc agent go nie klika (konto
+weryfikatora ma od 19.10 flagę administratora CRM i widzi przycisk); przechodzi
+to człowiek. Kroki:
 `crm-sciezki-przekrojowe.md`, ścieżka D.
 
 ## Dane testowe

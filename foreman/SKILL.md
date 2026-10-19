@@ -85,6 +85,10 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
 - **kryteria odbioru**, od dwóch do pięciu. Każde mówi, co odczytać (komenda,
   zapytanie, liczba na ekranie) i jaki wynik ma wyjść. „Testy zielone” to nie
   kryterium, bo mówi o kodzie, a nie o tym, co widzi użytkownik.
+  Próg czasu mierzysz tym samym narzędziem i kontem, którym odbiór go
+  odczyta (przeglądarka, rola z kryterium); pomiar kluczem serwisowym albo
+  curl-em to dolna granica, nie próg (przelot po odbiorze CRM: Leady
+  „< 0,8 s” z pomiaru kluczem, w przeglądarce 1,5–2,7 s).
   Kryterium, które potrzebuje zdarzeń (wejście leada, przebieg joba, upływ
   progu), dostaje je wywołane w przelocie: rekord testowy wejściem produkcji,
   ręczne uruchomienie joba, który i tak chodzi z crona, zegar przesunięty
@@ -124,6 +128,10 @@ linii, dane przenoszone drutem do pliku. Szukasz:
   przekierowanie), sprawdzasz odczytem skutku na żywo (wiersz w bazie,
   szerokość na docelowym ekranie), nie lekturą: klocek w repo bywa martwy od
   miesięcy (CRM B1: zapis wyborów tabel bez wysłania żądania, 0 wierszy).
+  Zmianę sposobu wywołania z przeglądarki (nagłówek, region, adres funkcji)
+  dowodzi zapytanie wstępne `OPTIONS` z nagłówkami, które wyśle SDK; curl
+  POST i atrapa `invoke` tego nie widzą (czasy CRM: `x-region` poza CORS
+  zablokowałby Raporty, złapała dopiero recenzja).
   Pole z obcego systemu, na którym plan opiera regułę (czas, status,
   identyfikator z synchronizacji), czytasz w kodzie, który je wylicza, i cytujesz
   `file:line`: nazwa pola to hipoteza (CRM B3: „wejście leada” z HubSpota to
@@ -225,7 +233,11 @@ zostawia gałąź integracyjną zieloną; zmiany zielone dopiero razem (schemat
 i jego konsument) są jednym zadaniem. Dwa zadania równoległe w jednym pliku
 to konflikt przy scaleniu: dziel po właścicielu pliku; kolejne w tym samym
 pliku rozdziela zależność. Numery migracji i wpisów decyzji w grafie są
-robocze: ostateczne nadajesz w kroku 7, po wciągnięciu `main`. Zadanie, które
+robocze: ostateczne nadajesz w kroku 7, po wciągnięciu `main`, także gdy
+kilka PR-ów przelotu leci naraz (każdy merge przesuwa numery reszty). Plik
+generowany z innego (kopia pomocy, typy) przy konflikcie scalenia
+regenerujesz generatorem, nie scalasz; wspólne rejestry (konsumenci,
+manifesty portu) mają w grafie właściciela w każdym PR-ze. Zadanie, które
 pisze pomoc, opisy ekranów albo komunikaty, ma w grafie listę „działa po tym
 PR-ze / przychodzi później”, a brief ją niesie; zależy od każdego zadania,
 które opisywane zachowanie zmienia, nie tylko od tego, które je buduje, i
@@ -379,7 +391,11 @@ jego pomoc w tym samym przelocie (fala 4 SEO/GEO: pomoc on-site dalej
 uczyła „Stwórz zadania” po jego usunięciu). Recenzenta i Codexa puszczasz
 na ten sam SHA, a ich findingi zbierasz razem i wysyłasz jedną rundą
 poprawek (CRM D1: dwie rundy u tych samych wykonawców, bo Codex skończył
-pierwszy). Teksty widoczne dla użytkownika (pomoc, opisy, zdania skutku) mają dwie
+pierwszy). Ta recenzja jest drugim okiem z kroku 7: delta rundy poprawek
+nie dostaje drugiego Codexa, chyba że zmienia migrację albo uprawnienia,
+albo Codex nie widział aktualnego SHA (PRZELOT.md, „Codex w nocy”)
+(przelot po odbiorze CRM: Codex na deltach trzech PR-ów dał same rzadkie
+uwagi za ok. 4 E i godzinę). Teksty widoczne dla użytkownika (pomoc, opisy, zdania skutku) mają dwie
 rundy poprawek, potem redagowanie staje: dla każdego pozostałego findingu
 wskazujesz zdanie, gałąź kodu i niespełnioną obietnicę, zdanie bez pokrycia
 wylatuje, a gdy jego brak łamie kryterium odbioru, to blokada; tekst
@@ -419,8 +435,8 @@ rozjazd pojęć, nie styl.
 Brama repo w kolejności, którą repo definiuje: jego `verify` albo bramki
 z `AGENTS.md`/`CLAUDE.md`, a bez `verify` kroki jego CI z `.github/workflows/`
 z tymi samymi parametrami, nie wybór z pamięci (CRM C PR 3: pominięty
-`check:mail-subject`), przegląd diffu, `/codex challenge` na diffie gałęzi
-integracyjnej jako drugie oko z innej rodziny modeli. Przed PR-em, po
+`check:mail-subject`), przegląd diffu, Codex jako drugie oko z innej
+rodziny modeli (recenzja z kroku 6 na SHA gałęzi integracyjnej). Przed PR-em, po
 wciągnięciu `main`, nadajesz ostateczne numery migracji i wpisów decyzji
 (wyższe niż na `main`) i poprawiasz ich odsyłacze. Flota, która
 raportowała sukces, nie widziała kodu pozostałych zadań, więc brama biegnie
@@ -500,6 +516,13 @@ Każdy warunek niesie powód: „parser strict" agent obejdzie przy pierwszym
 błędzie, „parser strict, bo domyślny domyka urwany JSON i zamienia urwanie
 w częściową czystość" przetrwa. Komendy weryfikacji są dokładne, nie
 „uruchom testy". Treść planu przekazujesz wskaźnikiem, nie kopią.
+
+Zadanie z dowodem na ekranie zbiera dowody jednym skryptem (`$B js`
+z kompletem odczytów), nie klik po kliku: limit tur jest twardy (przelot po
+odbiorze CRM: wykonawca panelu leada stanął na 200 turach w środku
+scenariusza, ok. 70 min). Zadanie na tekstach (mapa, dokumenty) dostaje
+listę plików i fragmentów kodu do przeczytania, nie całe repo (mapa po
+paczce UI: 6 E na sonnecie, trzy czwarte to odczyt kontekstu).
 
 ## Przelot bez nadzoru
 
