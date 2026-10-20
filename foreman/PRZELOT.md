@@ -43,7 +43,12 @@ Przejdź ją jako operator, odczytem, nie z pamięci:
 - sesja biegnie w trybie uprawnień, który nie pyta (bypass albo `auto`);
   agent w tle przekazuje pytanie o zgodę do głównej sesji, gdzie bez człowieka
   wisi do rana; próbny wykonawca puszcza raz każdą klasę komend z planu
-  (instalacja, testy, commit) i wraca bez pytania; każdy krok „Kolejności
+  (instalacja, testy, commit) i wraca bez pytania; środowisko próby zadania,
+  które ma coś założyć (`supabase start` w świeżym worktree, staging, konto
+  testowe), brygadzista uruchamia raz przed spawnem, a gdy nie wstaje,
+  zadanie startuje jako raport „z kodu, bez próby”, który kryterium
+  wymagającego działania nie zalicza (zamknięcie budowy CRM: lokalny stos nie
+  wstaje z migracji repo, wykonawca stracił ok. 15 min na dwóch próbach); każdy krok „Kolejności
   wdrożenia” z planu brygadzista sprawdza pod hookami sesji bez człowieka
   (zapis na żywej bazie poza migracją hook odrzuca), a krok bez drogi dostaje
   przed startem linię „do zrobienia po przelocie” i zastępczy odbiór;

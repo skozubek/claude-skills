@@ -41,7 +41,7 @@ Model wykonawcy dobierasz per zadanie parametrem `model` w wywołaniu `Agent`:
 
 | Model | Zadanie |
 |---|---|
-| `sonnet` | jednoznaczne, sprawdzalne kryterium i istniejący wzorzec w repo: dokumentacja techniczna, przeniesienia, predykaty, asercje, powtórzenie kształtu, który już stoi |
+| `sonnet` | jednoznaczne, sprawdzalne kryterium i istniejący wzorzec w repo: dokumentacja techniczna, przeniesienia, predykaty, asercje, powtórzenie kształtu, który już stoi; kryterium, które rozstrzyga zgodność sensu (wniosek a reguła, obietnica a ekran), a nie trafienie grepa, idzie na `opus` |
 | `opus` (domyślny w definicji) | ścieżka krytyczna: schemat, autoryzacja, prompty LLM, nowy kształt; tekst, który czyta klient albo ocenia sędzia; każde zadanie, w którym zły wybór jest drogi i cichy |
 | `fable` | wyłącznie na wyraźne słowo Serge'a przed spawnem |
 
@@ -333,7 +333,7 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    zapisany jako komenda, SHA i wynik. Ten sam dowód na tym samym SHA nie
    biegnie drugi raz.
    Agent, który przekroczył swój limit tur, liczy się jako niezaliczony odbiór.
-3. Odbiór zaliczony → `git merge --no-ff <gałąź agenta>` w głównym klonie,
+3. Odbiór zaliczony → `git merge --no-ff <gałąź agenta>` na gałęzi integracyjnej (w jej worktree z kroku 4),
    przeliczenie frontu, spawn. Pełna weryfikacja integracji biegnie po
    zamknięciu frontu i przed PR-em, a po pojedynczym scaleniu tylko wtedy,
    gdy zadanie dotknęło plików albo kontraktu innego scalonego zadania.
@@ -523,6 +523,16 @@ odbiorze CRM: wykonawca panelu leada stanął na 200 turach w środku
 scenariusza, ok. 70 min). Zadanie na tekstach (mapa, dokumenty) dostaje
 listę plików i fragmentów kodu do przeczytania, nie całe repo (mapa po
 paczce UI: 6 E na sonnecie, trzy czwarte to odczyt kontekstu).
+
+Przebieg odczytu (triaż notatek, różnica wobec odczytu bazowego, inwentarz)
+nie pisze kodu, więc nie dostaje worktree: agent ogólny zapisuje tylko raport
+w katalogu sesji, a wciela go brygadzista jako jedyny piszący. Strażnik
+komend floty go nie chroni, więc brief wymienia zakazy z PULAPKI.md wprost.
+Brief nie każe redagować poprawek w plikach, których mandat przelotu nie
+pozwala zmienić: taki rozjazd idzie wierszem do zadań (zamknięcie budowy CRM:
+ok. 2,6 E na gotowe zdania pomocy „?”, której PR dokumentacyjny nie mógł
+ruszyć). Werdykt „kasuj” wymaga grepa nazwy pliku w całym katalogu notatek
+i w skillach (tamże: plik SQL czytany przez krok mapy oznaczony do kasacji).
 
 ## Przelot bez nadzoru
 
