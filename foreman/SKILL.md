@@ -37,15 +37,27 @@ Brygadzista to sesja na `opus`. Jego kontekst rośnie przez cały przelot
 i każda odpowiedź płaci za całość, więc najdroższy model w tej roli mnoży
 koszt bez dowodu lepszej orkiestracji; `fable` tylko na słowo Serge'a.
 
-Model wykonawcy dobierasz per zadanie parametrem `model` w wywołaniu `Agent`:
+Wariant wykonawcy (model i effort) dobierasz per zadanie parametrami `model`
+i `effort` w wywołaniu `Agent`; definicja niesie `opus` z effortem `medium`:
 
-| Model | Zadanie |
-|---|---|
-| `sonnet` | jednoznaczne, sprawdzalne kryterium i istniejący wzorzec w repo: dokumentacja techniczna, przeniesienia, predykaty, asercje, powtórzenie kształtu, który już stoi; kryterium, które rozstrzyga zgodność sensu (wniosek a reguła, obietnica a ekran), a nie trafienie grepa, idzie na `opus` |
-| `opus` (domyślny w definicji) | ścieżka krytyczna: schemat, autoryzacja, prompty LLM, nowy kształt; tekst, który czyta klient albo ocenia sędzia; każde zadanie, w którym zły wybór jest drogi i cichy |
-| `fable` | wyłącznie na wyraźne słowo Serge'a przed spawnem |
+| Wariant | Parametry | Zadanie |
+|---|---|---|
+| sonnet | `model: "sonnet"` | jednoznaczne, sprawdzalne kryterium i istniejący wzorzec w repo: dokumentacja techniczna, przeniesienia, predykaty, asercje, powtórzenie kształtu, który już stoi |
+| opus medium | bez parametrów | domyślny: logika w istniejącym kształcie, komponent wg kontraktu, testy, poprawki z recenzji |
+| opus high | `effort: "high"` | schemat, RLS i uprawnienia, prompty LLM, nowy kontrakt, logika stanu albo współbieżności; tekst, który czyta klient albo ocenia sędzia; kryterium, które rozstrzyga zgodność sensu (wniosek a reguła, obietnica a ekran), a nie trafienie grepa; każde zadanie, w którym zły wybór jest drogi i cichy |
+| fable | `model: "fable"` | wyłącznie na wyraźne słowo Serge'a przed spawnem |
 
-Domyślny `opus` sprawia, że pominięty parametr kosztuje tokeny, a nie jakość.
+Tańszy wariant, który kręci się w kółko, kosztuje więcej niż mocniejszy,
+który kończy, więc wariant ocenia rejestr przelotu, nie intuicja: każde
+zadanie zapisuje wariant, liczbę rund poprawek (niezaliczone odbiory
+i wznowienia po odbiorze), liczbę findingów recenzji i E całego zadania
+z `koszty.py` (wszyscy jego wykonawcy). Reguła ustalona przed pierwszym
+wynikiem, oceniana od trzech zadań wariantu w kategorii (schemat, logika,
+ekran, teksty, dokumentacja): kategoria, w której opus medium ma wyższe
+średnie E zadania albo więcej findingów recenzji niż opus high, wraca na
+high; kategoria, w której sonnet kosztuje średnio więcej dolarów na zadanie
+niż opus medium (E razy cena za mln wejścia: sonnet 3, opus 5) albo ma
+więcej findingów, wraca na opus. Wnioski idą do tej tabeli.
 
 ## Przebieg
 
@@ -120,8 +132,14 @@ Jeśli rozpoznanie zmieni warunek, meldunek mówi, co się zmieniło i dlaczego.
 ### 1. Rozpoznanie (osobiście)
 
 Plan zbudowany na cudzym streszczeniu dziedziczy cudze przeoczenia, więc kod,
-którego dotyczy zmiana, czytasz sam: `grep` po nazwach, zakresy po kilkanaście
-linii, dane przenoszone drutem do pliku. Szukasz:
+na którym stoi kontrakt (schemat, sygnatury, miejsca zapisu stanu), czytasz
+sam: `grep` po nazwach, zakresy po kilkanaście linii, dane przenoszone
+drutem do pliku. Przegląd wszerz (kto czyta pole, gdzie stoi precedens, które
+ekrany dotyka zmiana) zlecasz agentowi `Explore` z `model: "sonnet"`, który
+oddaje wnioski z `file:line`, nie treść plików; osobiście sprawdzasz tylko te
+trafienia, na których opierasz kontrakt. Własne odczyty to ok. 55% kontekstu
+brygadzisty (pomiar 12–20.10), a ten kontekst czyta każda jego następna
+odpowiedź. Szukasz:
 
 - **precedensu**: czy repo już robi to samo gdzie indziej; sprawdzony kształt
   bije nowy. Klocek, na którym stawiasz kontrakt (zapis ustawień, panel,
@@ -225,7 +243,12 @@ grafu: decyzja Serge'a przed startem (poszerzyć Granice albo wyciąć).
 Wariant obok bazy przechodzi testy i pada na recenzji (CRM UI: automat
 etapu po rezerwacji w funkcji edge, revert przed mergem).
 
-Zadanie w grafie to lista plików z jednym właścicielem, model wykonawcy
+Zadanie w grafie to jedna warstwa i kilka plików (zwykle 3–5) na około
+100 tur wykonawcy. Koszt zadania to tury razy kontekst, więc rośnie
+z kwadratem długości: zadania po 220–280 tur dochodziły do 300–450 tys.
+kontekstu i ok. 23 $ każde (pomiar 12–20.10). Większe dzielisz po
+właścicielu pliku albo po kroku (schemat, logika, ekran). Zadanie to lista
+plików z jednym właścicielem, wariant wykonawcy
 z uzasadnieniem w pół zdania, zadania, od których zależy, komenda
 weryfikacji i **czytelnicy** jego pól poza jego plikami (komponent
 renderujący, eksport, drugi dom tej samej reguły). Każde zadanie po scaleniu
@@ -248,7 +271,7 @@ wróciły trzy razy).
 
 Masowa
 zmiana oceniana sędzią (setki tekstów) zaczyna od próbki: wynik poniżej
-progu na próbce przenosi zadanie na `opus`, zanim tańszy model przerobi
+progu na próbce przenosi zadanie na opus high, zanim tańszy wariant przerobi
 całość.
 
 Plan ustala też **granice PR-ów** (zadanie, front albo całość) i zależności
@@ -309,13 +332,17 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
 **Front** to zadania, których zależności są scalone. Pętla:
 
 1. Każde zadanie frontu dostaje spawn: `Agent` z
-   `subagent_type: "foreman-wykonawca"`, `model` z grafu,
-   `run_in_background: true`, wszystkie w jednym komunikacie. Naraz żyje
+   `subagent_type: "foreman-wykonawca"`, `model` i `effort` z wariantu
+   w grafie, `run_in_background: true`, wszystkie w jednym komunikacie.
+   Brief podaje zakresy do przeczytania (plik i funkcja z rozpoznania), nie
+   każe szukać: przeszukiwanie repo robi wykonawca na Twój koszt w każdej
+   następnej turze. Naraz żyje
    najwyżej trzech pracujących agentów, licząc wznowionych `SendMessage`,
    recenzentów i weryfikatorów (oczekujący miejsca nie zajmuje); reszta
    frontu i rundy poprawek czeka na wolne miejsce. Zadanie tekstów wchodzi do
    frontu według zależności z kroku 2 (po poprawkach zadań, które opisuje). SHA
-   gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta
+   gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta,
+   wariant oraz (na bieżąco) rundy poprawek i findingi recenzji
    zapisujesz w pliku sesji w katalogu tymczasowym: to rejestr własności
    tego przelotu, z którego korzysta odbiór i sprzątanie. Ten sam plik
    dostaje każdą inną rzecz, którą przelot stawia (budzik, `/coffee`,
@@ -354,12 +381,17 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    trzecie wznowienie tego samego agenta jest ostatnie, kolejną poprawkę
    bierze nowy wykonawca z aktualnym SHA, raportem i dowodami poprzednika,
    bo każda odpowiedź czyta cały kontekst od nowa; zmiana wykonawcy nie zeruje
-   licznika niezaliczonych odbiorów z drabiny niżej. Próg trzech to limit
-   organizacyjny bez pomiaru (LC-115: siedem wznowień, najdroższe zadanie
-   przelotu). <!-- LC-115 -->
-5. **Drabina modelu:** zadanie na `sonnet` po dwóch niezaliczonych odbiorach
-   idzie do nowego wykonawcy na `opus` z oboma raportami i dowodami. Na `opus`
-   po dwóch niezaliczonych kończy zadanie jako **blokadę**: wpis w planie „czego
+   licznika niezaliczonych odbiorów z drabiny niżej. Nowego wykonawcę
+   dostaje poprawka także wtedy, gdy kontekst agenta przekroczył ok. 200 tys.
+   (`python3 <katalog skilla>/koszty.py --kontekst=<id agenta>`): wznowienie powyżej tego progu
+   kosztuje więcej niż świeży start z raportem poprzednika. Próg trzech
+   wznowień to limit organizacyjny bez pomiaru (LC-115: siedem wznowień,
+   najdroższe zadanie przelotu). <!-- LC-115 -->
+5. **Drabina wariantu:** zadanie na sonnet albo opus medium po dwóch
+   niezaliczonych odbiorach idzie do nowego wykonawcy na opus high z oboma
+   raportami i dowodami; licznik niezaliczonych liczy się per wariant, więc
+   opus high zaczyna od zera. Opus high po dwóch niezaliczonych kończy zadanie
+   jako **blokadę**: wpis w planie „czego
    brakuje, co próbowano". Zadania zależne od zablokowanego też są blokadą,
    pozostałe gałęzie grafu idą dalej.
 
@@ -374,8 +406,14 @@ Pętla kończy się, gdy każde zadanie grafu jest scalone albo opisane jako
 blokada, a pełna weryfikacja na gałęzi integracyjnej przechodzi.
 
 Twój kontekst rośnie przez cały przelot, a każda odpowiedź czyta go od nowa.
-Wyniki komend idą drutem do pliku, a do rozmowy liczby; raport
-agenta czytasz, transkryptu nie.
+Wyniki komend (odbiór, testy, diff) idą drutem do pliku, a do rozmowy
+liczby; raport agenta czytasz, transkryptu nie. Od ok. 250 tys. kontekstu
+nie spawnujesz nowego frontu: domykasz rundę poprawek zadań skończonych
+w tej sesji (krok 5.3) i przekazujesz przelot nowej sesji (PRZELOT.md): sesje brygadzisty dochodziły do 770 tys.,
+a 65% ich kosztu przypadało na tury powyżej 300 tys. (pomiar 12–20.10).
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW` w ustawieniach to tylko siatka: kompakcja
+streszcza, gubi dokładne błędy i powody decyzji, więc przekazanie robisz
+sam, zanim ona przyjdzie.
 
 ### 6. Odbiór świeżym okiem
 
@@ -414,8 +452,13 @@ z DOM-u liczbami, a czas ekranu z raportu weryfikatora i czas wywołania ze
 smoke: wolne zapytanie idzie do meldunku jako decyzja Serge'a z liczbą, nie
 na listę „później” (CRM B: lista Leadów 2,6 s przeszła odbiór; CRM C: raport
 4,6 s odłożony bez progu). W AdMotiv odbiór robi agent `foreman-weryfikator`,
-nie wykonawca:
-skill `verify-admotiv` na krokach mapy z obszarów, które wskazuje
+nie wykonawca, raz na PR, który zmienia ekran albo to, co ekran czyta
+(uprawnienia, funkcja, schemat); PR bez wpływu na żaden scenariusz mapy ma
+smoke, nie weryfikatora. Przed spawnem sprawdzasz sam, tanio, że logowanie
+(`verify-admotiv/bin/sesja` na docelowym hoście) i Supabase odpowiadają: weryfikator bez
+nich pali przebieg na niczym (2 z 26 przebiegów 12–20.10).
+Weryfikator przechodzi
+skillem `verify-admotiv` kroki mapy z obszarów, które wskazuje
 `bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
 ten sam krok przechodzi smoke na produkcji. Weryfikator mapy nie edytuje:
 dopiski „przeszło na żywo” i wiersz `przejscia.tsv` wpisuje się z jego raportu
@@ -472,7 +515,9 @@ Przed sprzątaniem, póki przelot jest w kontekście: [POSTMORTEM.md](POSTMORTEM
 Wynik wchodzi do skilla jednym commitem i do meldunku sekcją „Skill”.
 
 Robota kończy się meldunkiem według reguły globalnej i sprzątniętym
-stanowiskiem. Przelot zostawia rzeczy, które przeżyją sesję albo ją obudzą,
+stanowiskiem. Meldunek niesie linię kosztu z `koszty.py` (E per model,
+najdroższe zadanie z liczbą odpowiedzi i kontekstem) i warianty zadań
+z rundami poprawek: to materiał reguły wariantów z tabeli floty. Przelot zostawia rzeczy, które przeżyją sesję albo ją obudzą,
 więc rejestr własności wymienia każdą, a sprzątanie odhacza je po kolei:
 
 - worktree i gałęzie agentów, gałąź integracyjna i gałęzie PR-ów, lokalnie
