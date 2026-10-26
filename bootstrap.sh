@@ -34,6 +34,7 @@ link "$REPO/reflect"         "$SKILLS/reflect"
 link "$REPO/transcribe"      "$SKILLS/transcribe"
 link "$REPO/verify-admotiv"  "$SKILLS/verify-admotiv"
 link "$REPO/foreman"         "$SKILLS/foreman"
+link "$REPO/audyt-wygladu"   "$SKILLS/audyt-wygladu"
 
 echo "== git-synced agents =="
 link "$REPO/agents"          "$HOME/.claude/agents"

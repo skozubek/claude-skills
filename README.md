@@ -16,6 +16,7 @@ claude-skills/
 ├── devils-advocate/      # anti-sycophancy diagnostic — force the opposite argument
 ├── reflect/              # abstract a recurring mistake into a persisted learning
 ├── transcribe/           # Obsidian audio → structured meeting note (mlx_whisper, Apple Silicon)
+├── audyt-wygladu/        # visual consistency audit: surfaces + dimensions population, live computed-style measurement
 └── commands/
     └── debrief.md        # /debrief — drill on work just done (sister to /teach)
 ```
