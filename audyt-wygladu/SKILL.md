@@ -55,7 +55,8 @@ wchodzą liczby i wycinki.
    co najmniej 390 i 1440, przy układzie z punktami łamania także ich
    granice. Za logowaniem: sesja z logowania drogą repo (AdMotiv:
    `verify-admotiv`) zapisana jako `storageState`; tekst nie trafia do
-   wyniku. `bin/analiza.py pomiar.json` daje liczby kontrolne. Gotowe:
+   wyniku. `bin/analiza.py pomiar.json` daje liczby kontrolne, a przy
+   odbiorze `bin/progi.py` sześć progów przed i po (nagłówek pliku). Gotowe:
    pomiar każdej powierzchni z kroku 2, która ma ekran, i liczby kontrolne
    w notatce (to kontrola dla przyszłego odbioru).
 
