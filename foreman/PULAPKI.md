@@ -88,3 +88,9 @@ już raz kosztował sesję.
   zarejestrowany obiekt poprawia jego wpis w tym samym PR-ze (check na PR-ze to
   wymusza), a nowa wartość zapisana przez cudzy moduł zapala audyt na main
   bez żadnego PR-a.
+- **`gh pr create --body-file` osobnym wywołaniem:** w łańcuchu `;` z innym
+  poleceniem hook strażnika meta nie czyta pliku opisu i odmawia.
+- **Worktree weryfikatora AdMotiv nie ma `supabase link`**
+  (`LegacyProjectNotLinkedError`): odczyty bazy idą z głównego klonu
+  (`supabase db query --linked`, tylko `select`), co brief weryfikatora mówi
+  wprost; połączenie sprawdzasz przed spawnem razem z logowaniem.

@@ -352,7 +352,10 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    - `git merge-base --is-ancestor <SHA ze spawnu> HEAD`: worktree wyrósł
      z integracji, nie z `main` (brief każe agentowi zacząć od
      `git merge --ff-only <SHA ze spawnu>`, bo worktree potrafi wyrosnąć ze
-     starszego commita niż zapisany SHA);
+     starszego commita niż zapisany SHA); worktree wyrasta z HEAD katalogu,
+     w którym stoi sesja, a ff-only nie cofa nowszego, więc przed spawnem cwd
+     stoi tam, gdzie HEAD to SHA z briefu (sesja w worktree gałęzi E dała
+     wykonawcy B jej commit);
    - `git diff --name-only <SHA ze spawnu>...HEAD` mieści się w liście plików
      zadania; plik spoza listy oblewa odbiór;
    - komenda weryfikacji z grafu i sekcja odejść od planu.
@@ -462,8 +465,12 @@ skillem `verify-admotiv` kroki mapy z obszarów, które wskazuje
 `bin/doctor` dla gałęzi integracyjnej (tylko one, budżet idzie za diffem);
 ten sam krok przechodzi smoke na produkcji. Weryfikator mapy nie edytuje:
 dopiski „przeszło na żywo” i wiersz `przejscia.tsv` wpisuje się z jego raportu
-(treść kroków mapy może z kodu napisać osobny agent po scaleniu ostatniego
-zadania ekranu). Gdy zmiana ma migrację, a dev serwer czyta produkcyjną bazę,
+(wpis mapy nowego zachowania pisze wykonawca zadania ekranu w raporcie,
+blokiem „Wpis mapy” z `file:line` przy każdym zdaniu; brygadzista wkleja go
+po sprawdzeniu, że wpisy pokrywają kryteria odbioru i obietnice planu, bo
+wykonawca opisuje tylko to, co zbudował. Osobny agent przepisujący mapę po
+scaleniu dopisywał zachowania z planu, których kod nie ma: CRM rekord HS,
+226 odpowiedzi i 4,8 E, ok. 20 rozjazdów, jedna fałszywa regresja). Gdy zmiana ma migrację, a dev serwer czyta produkcyjną bazę,
 migracja trafia tam dopiero po mergu: przed nim odbiór na żywo przechodzi
 kroki odczytu, a zapis dowodzą testy SQL na kopii; kroki zapisu przechodzą
 po mergu i migracji na rekordach testowych z Granic, a niezaliczony krok to
