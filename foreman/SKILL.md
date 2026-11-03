@@ -539,7 +539,9 @@ więc rejestr własności wymienia każdą, a sprzątanie odhacza je po kolei:
   odpalony po przelocie wznawia robotę, której już nie ma;
 - `/coffee off`: zadanie launchd trzyma Maca bez snu po końcu sesji;
 - procesy uruchomione przez przelot (dev serwer, daemon przeglądarki),
-  sesje i dostępy nadane na czas odbioru;
+  sesje i dostępy nadane na czas odbioru; daemon `browse` zatrzymujesz
+  (`browse stop` z katalogu worktree) przed `git worktree remove`, bo żywy
+  odtwarza w usuniętej ścieżce katalog `.gstack/` i zostawia pusty katalog;
 - plan skasowany albo przepisany w dokumentację stanu, materiał sekcji zwłok
   i pliki w katalogu tymczasowym skasowane.
 
