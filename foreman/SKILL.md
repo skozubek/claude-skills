@@ -543,7 +543,11 @@ więc rejestr własności wymienia każdą, a sprzątanie odhacza je po kolei:
   (`browse stop` z katalogu worktree) przed `git worktree remove`, bo żywy
   odtwarza w usuniętej ścieżce katalog `.gstack/` i zostawia pusty katalog;
 - plan skasowany albo przepisany w dokumentację stanu, materiał sekcji zwłok
-  i pliki w katalogu tymczasowym skasowane.
+  i pliki w katalogu tymczasowym skasowane;
+- repo notatek, w którym przelot odhaczał postęp (np. `MOL/Panel/meta/`):
+  commit i push, `git status -sb` bez „ahead”. Następna sesja i monitor
+  czytają stan ze zdalnego, więc niewypchnięty commit to nieodhaczona
+  pozycja.
 
 ## Brief
 
