@@ -91,7 +91,10 @@ piszesz go od razu i pokazujesz Serge'owi. Ma trzy części:
   (zakładki, kontrolki, drill, podpisy) i kryterium „każdy klocek jest albo
   celowo inaczej”; liczby to osobne kryterium. (CRM C: plan fali przepisał
   „ekran 1:1” na „te same liczby”, pięć obietnic planu budowy zniknęło bez
-  śladu, a każdy strażnik niżej pilnował już zawężonego zakresu.) <!-- LC-114 -->
+  śladu, a każdy strażnik niżej pilnował już zawężonego zakresu.)
+  Obietnica nazwana modułem („klient ma CRM”) rozpisuje się w księdze na
+  ekrany modułu z menu wzorca, każdy z werdyktem (fala RASC: droga „biuro
+  otwiera Leady” zostawiła bez werdyktu Dziś, Raporty i Ustawienia). <!-- LC-114 -->
 
 - **droga użytkownika** jednym zdaniem: kto, co robi, co widzi na końcu;
 - **kryteria odbioru**, od dwóch do pięciu. Każde mówi, co odczytać (komenda,
