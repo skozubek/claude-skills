@@ -68,13 +68,20 @@ if KONTEKST:
 
 
 razem = collections.defaultdict(float)
+widziane = set()  # zapis subagenta podany obok sesji liczyłby się dwa razy
 for sesja in [a for a in sys.argv[1:] if not a.startswith("--")]:
+    if not os.path.isfile(sesja) or os.sep + "subagents" + os.sep in sesja:
+        print(f"pomijam {sesja}: podaj zapis sesji, subagenci wchodzą sami", file=sys.stderr)
+        continue
     print(f"=== {os.path.basename(sesja)}")
     pliki = [("BRYGADZISTA", sesja)] + [
         (os.path.basename(p)[:-6], p)
         for p in sorted(glob.glob(os.path.join(sesja[:-6], "subagents", "*.jsonl")))
     ]
     for nazwa, p in pliki:
+        if os.path.realpath(p) in widziane:
+            continue
+        widziane.add(os.path.realpath(p))
         n, model, e, s, czasy, opis, (ost, maks) = zuzycie(p)
         razem[model] += e
         od, do = (czasy[0][11:16], czasy[-1][11:16]) if czasy else ("", "")

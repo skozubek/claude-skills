@@ -259,7 +259,10 @@ pliku rozdziela zależność. Numery migracji i wpisów decyzji w grafie są
 robocze: ostateczne nadajesz w kroku 7, po wciągnięciu `main`, także gdy
 kilka PR-ów przelotu leci naraz (każdy merge przesuwa numery reszty). Plik
 generowany z innego (kopia pomocy, typy) przy konflikcie scalenia
-regenerujesz generatorem, nie scalasz; wspólne rejestry (konsumenci,
+regenerujesz generatorem, nie scalasz, a zadanie zmieniające źródło takiej
+kopii ma w weryfikacji generator i `git diff` kopii, w grafie zaś wdrożenie
+funkcji, które ją importują (fala RASC: czerwone CI i dwie funkcje spoza
+planu); wspólne rejestry (konsumenci,
 manifesty portu) mają w grafie właściciela w każdym PR-ze. Zadanie, które
 pisze pomoc, opisy ekranów albo komunikaty, ma w grafie listę „działa po tym
 PR-ze / przychodzi później”, a brief ją niesie; zależy od każdego zadania,
@@ -341,7 +344,7 @@ spoza repo nie ma jego hooków (LC-084). Pułapki worktree i środowiska:
    recenzentów i weryfikatorów (oczekujący miejsca nie zajmuje); reszta
    frontu i rundy poprawek czeka na wolne miejsce. Zadanie tekstów wchodzi do
    frontu według zależności z kroku 2 (po poprawkach zadań, które opisuje). SHA
-   gałęzi integracyjnej przy spawnie, nazwę gałęzi i worktree agenta,
+   gałęzi integracyjnej przy spawnie, ID agenta, nazwę jego gałęzi i worktree,
    wariant oraz (na bieżąco) rundy poprawek i findingi recenzji
    zapisujesz w pliku sesji w katalogu tymczasowym: to rejestr własności
    tego przelotu, z którego korzysta odbiór i sprzątanie. Ten sam plik
@@ -454,7 +457,10 @@ z tego samego źródła co produkcja, kryteria odczytane
 z DOM-u liczbami, a czas ekranu z raportu weryfikatora i czas wywołania ze
 smoke: wolne zapytanie idzie do meldunku jako decyzja Serge'a z liczbą, nie
 na listę „później” (CRM B: lista Leadów 2,6 s przeszła odbiór; CRM C: raport
-4,6 s odłożony bez progu). W AdMotiv odbiór robi agent `foreman-weryfikator`,
+4,6 s odłożony bez progu). Próg czasu ocenia pomiar opublikowanej wersji;
+przed publikacją kryterium czasu czeka jako niezweryfikowane, bo dev serwer
+nie daje ani wyniku, ani porażki (fala RASC: 3,5 s na dev serwerze,
+1,0–1,7 s na produkcji). W AdMotiv odbiór robi agent `foreman-weryfikator`,
 nie wykonawca, raz na PR, który zmienia ekran albo to, co ekran czyta
 (uprawnienia, funkcja, schemat); PR bez wpływu na żaden scenariusz mapy ma
 smoke, nie weryfikatora. Przed spawnem sprawdzasz sam, tanio, że logowanie
@@ -535,6 +541,8 @@ więc rejestr własności wymienia każdą, a sprzątanie odhacza je po kolei:
   schodzi po sprawdzeniu czystego stanu), a rejestr i meldunek podają nazwę,
   SHA i powód; gałąź z nazwą agenta ginie przy sprzątaniu po wzorcu (LC-117);
   <!-- LC-117 -->
+  worktree bez wpisu w rejestrze nazywasz cudzym dopiero, gdy jego ścieżki
+  nie ma w zapisach subagentów przelotu (`<sesja>/subagents/agent-*.jsonl`);
 - budziki `CronCreate` usunięte (`CronDelete`): sesja zostaje otwarta i budzik
   odpalony po przelocie wznawia robotę, której już nie ma;
 - `/coffee off`: zadanie launchd trzyma Maca bez snu po końcu sesji;
