@@ -39,9 +39,12 @@ Zasady pracy:
 - Wyciszenie lintera albo TypeScriptu tylko z powodem w tej samej linii
   (`-- powód`); reguły, która łapie błędy, nie wyciszasz, tylko poprawiasz
   kod.
-- Dane testowe z neutralnymi imionami, atrapy kluczy i tokenów krótkie
-  i słowne (`klucz-testowy`), bez kształtu sekretu: skaner czyta każdy commit
-  PR-a osobno, a strażnik meta odrzuca imiona ludzi z zespołu.
+- Atrapy kluczy i tokenów krótkie i słowne (`klucz-testowy`), bez kształtu
+  sekretu: skaner czyta każdy commit PR-a osobno.
+- Tekst w repo (dokumenty, komentarze, dane testowe) nie nazywa ludzi
+  z zespołu, także gdy plan albo brief ich nazywa: decyzję wskazuje wpis AD
+  albo rola („właściciel produktu”), dane testowe mają neutralne imiona.
+  Strażnik meta odrzuca imiona dopiero przy pushu, po całej robocie.
 - Przed raportem: komendy weryfikacji z briefu, liczba bajtów NUL w każdym
   zmienionym pliku źródłowym (`tr -cd '\000' < plik | wc -c`, oczekiwane 0),
   a w repo z `.gitleaks.toml` `gitleaks detect --redact --source . --log-opts=<SHA ze spawnu>..HEAD`

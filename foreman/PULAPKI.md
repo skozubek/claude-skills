@@ -90,7 +90,10 @@ już raz kosztował sesję.
   bez żadnego PR-a.
 - **`gh pr create --body-file` osobnym wywołaniem:** w łańcuchu `;` z innym
   poleceniem hook strażnika meta nie czyta pliku opisu i odmawia.
-- **Worktree weryfikatora AdMotiv nie ma `supabase link`**
+- **Świeży worktree AdMotiv (weryfikatora, deployu) nie ma `supabase link`**
   (`LegacyProjectNotLinkedError`): odczyty bazy idą z głównego klonu
   (`supabase db query --linked`, tylko `select`), co brief weryfikatora mówi
   wprost; połączenie sprawdzasz przed spawnem razem z logowaniem.
+  `supabase functions list -o json` oddaje tam pusty wynik bez błędu, więc
+  flagi `verify_jwt` czytasz z głównego klonu, a deploy z worktree idzie
+  z `--project-ref`.
