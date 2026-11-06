@@ -13,6 +13,11 @@ już raz kosztował sesję.
 - **Turbopack w worktree** z dowiązanym `node_modules` pada na „points out of
   the filesystem root". Agent instaluje zależności we własnym worktree; dev
   serwer na dowiązaniu startuje z `--webpack` (LC-076).
+- **Worktree integracyjny bez `node_modules`:** `bun <skrypt>` sam dociąga
+  brakujące pakiety w najnowszej wersji, nie z lockfile'a, więc generator
+  pada na błędzie, którego w repo nie ma (uwagi Bartka: `lucide-react`
+  bez eksportu `Linkedin`). Przed pierwszym skryptem w worktree
+  `bun install --frozen-lockfile`.
 - **Skrypt importujący kod ze ścieżki worktree** umiera razem z nim. Importuj
   z głównego klonu albo z kopii `git show <ref>:ścieżka` z zapisanym `ref`
   (LC-108).
