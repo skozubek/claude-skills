@@ -9,7 +9,7 @@ hooks:
         - type: command
           command: python3 -I "$HOME/.claude/skills/foreman2/bin/foreman2" stop-check
   PreToolUse:
-    - matcher: Bash|Agent
+    - matcher: Bash|Agent|Write|Edit|MultiEdit|NotebookEdit
       hooks:
         - type: command
           command: python3 -I "$HOME/.claude/skills/foreman2/bin/foreman2" straz
@@ -41,8 +41,10 @@ do `log.tsv` (czas, faza, decyzja, powód, dowód, wynik). `$F2 <komenda> -h` da
 
 Hook Stop tego skilla blokuje koniec tury, gdy front ma gotowe zadania i wolne
 miejsca, gdy zadania są `running` bez agentów w tle albo etap skończył się bez `close`.
-Hook PreToolUse odmawia odpowiedzi `--by human` i zapisu plików stanu z sesji modelu;
-po `cancel` także spawnu, pushu i deployu. Człowiek odpowiada ze swojego terminala.
+Hook PreToolUse odmawia zapisu plików stanu z sesji modelu, bez nadzoru także odpowiedzi
+`--by human`; po `cancel` spawnu, pushu i deployu. Pod nadzorem decyzję `approval` zadajesz
+w czacie (AskUserQuestion) i zapisujesz odpowiedź `--by human:<imię>`; bez nadzoru człowiek
+odpowiada ze swojego terminala, a Ty czekasz albo kończysz `partial`.
 
 ## Pliki czytane na żądanie
 
@@ -183,7 +185,9 @@ bez nadzoru, zadziałała drabina albo była blokada.
 | zakres, biznes, nieodwracalne, dane produkcyjne, wysyłki, uprawnienia, pieniądze | człowiek | `--kind approval --rec <opcja> --blocks <zadania> --unblock-on <opcje>`; reszta frontu idzie; bez odpowiedzi przelot kończy się `partial` |
 
 Zgoda modeli (Codex, recenzent, drugi Claude) nic nie autoryzuje: odpowiedź na
-`approval` przyjmuje tylko `--by human`.
+`approval` przyjmuje tylko `--by human`. Pod nadzorem pytasz w czacie i zapisujesz
+odpowiedź człowieka; bez nadzoru odpowiada on ze swojego terminala (strażnik odmawia
+zapisu z sesji).
 
 ## Warianty wykonawcy
 

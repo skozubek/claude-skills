@@ -86,7 +86,7 @@ class Baza(unittest.TestCase):
         return rid
 
     def hook(self, tool, command=None, cwd=None, **extra):
-        wej = {"tool_name": tool, "cwd": cwd or self.repo, "tool_input": ({"command": command} if command is not None else {}), **extra}
+        wej = {"tool_name": tool, "cwd": cwd or self.repo, "tool_input": {**({"command": command} if command is not None else {}), **extra}}
         return self.f2("straz", stdin=json.dumps(wej)).stdout.strip()
 
 
@@ -308,11 +308,13 @@ class TestPrzelot(Baza):
         self.assertEqual(self.hook("Bash", "git status"), "", "odczyt po cancel wolny")
         self.assertNotEqual(subprocess.run([sys.executable, "-I", RUN, "--resume", rid, "--dry"], capture_output=True, text=True, env=self.env).returncode, 0, "runner nie wznawia anulowanego")
 
-    def test_straz_odmawia_odpowiedzi_jako_czlowiek_i_zapisu_stanu(self):
-        self.nowy()
+    ODPOWIEDZI_CZLOWIEKA = ("foreman2 decide answer D1 rec --by human", "python3 -I /x/bin/foreman2 --run r decide answer D1 tak --by=human:serge",
+                            "cd /tmp && $F2 decide answer D1 rec --by 'human'")
+
+    def test_straz_odmawia_odpowiedzi_jako_czlowiek_bez_nadzoru_i_zapisu_stanu(self):
+        self.nowy("--unattended")
         self.f2("state", "running")
-        for cmd in ("foreman2 decide answer D1 rec --by human", "python3 -I /x/bin/foreman2 --run r decide answer D1 tak --by=human:serge",
-                    "cd /tmp && $F2 decide answer D1 rec --by 'human'", "echo '{}' >> ~/.foreman2/runs/r/decisions.jsonl",
+        for cmd in self.ODPOWIEDZI_CZLOWIEKA + ("echo '{}' >> ~/.foreman2/runs/r/decisions.jsonl",
                     "sed -i '' 's/pending/approved/' /h/runs/r/decisions.jsonl", "python3 -c 'open(\"run.json\",\"w\")'"):
             self.assertIn('"deny"', self.hook("Bash", cmd), cmd)
         for cmd in ("foreman2 decide answer D1 rec --by codex", "foreman2 decide ask --kind approval --question q --options 'a | b' --rec a",
@@ -321,6 +323,33 @@ class TestPrzelot(Baza):
         self.assertEqual(self.hook("Agent"), "", "spawn w żywym przelocie wolny")
         self.assertIn('"deny"', self.hook("Bash", None), "komenda nieczytelna = odmowa")
         self.assertEqual(self.f2("straz", stdin="nie json").stdout.strip(), "", "śmieciowe stdin bez narzędzia przepuszcza")
+
+    def test_straz_bez_nadzoru_nie_da_sie_obejsc_innym_przelotem_ani_edytorem(self):
+        u = self.nowy("--unattended")
+        self.f2("state", "running")
+        for cmd in ("foreman2 create --slug inny --repo .", "$F2 create --slug 'Test przelotu' --repo . --force"):
+            self.assertIn('"deny"', self.hook("Bash", cmd), cmd)
+        self.assertIn('"deny"', self.hook("Write", file_path=os.path.join(self.home, "runs", u, "run.json")), "Write w run.json odmówiony")
+        self.assertIn('"deny"', self.hook("Edit", file_path=os.path.join(self.home, "profiles", "x.json")), "Edit profilu odmówiony")
+        self.assertEqual(self.hook("Write", file_path=os.path.join(self.repo, "a.ts")), "", "Write w repo wolny")
+        drugi = self.git_repo("drugi")
+        s = self.f2("create", "--slug", "Nadzorowany", "--repo", drugi, cwd=drugi).stdout.strip()
+        self.assertIn('"deny"', self.hook("Bash", f"foreman2 --run {u} decide answer D1 rec --by human:serge", cwd=drugi), "cel --run bez nadzoru odmówiony mimo nadzorowanego aktywnego")
+        self.assertEqual(self.hook("Bash", f"foreman2 --run {s} decide answer D1 rec --by human:serge", cwd=drugi), "", "nadzorowany cel z nadzorowanego cwd wolny")
+        self.f2("close", "--note", "koniec", ok=False)
+        self.f2("cancel", "--note", "stop")
+        self.assertEqual(self.hook("Bash", "foreman2 create --slug nowy --repo ."), "", "po zakończeniu przelotu bez nadzoru create wolny")
+
+    def test_straz_pod_nadzorem_przepuszcza_odpowiedz_z_czatu(self):
+        self.nowy()
+        self.f2("state", "running")
+        for cmd in self.ODPOWIEDZI_CZLOWIEKA + ("foreman2 create --slug inny --repo .",):
+            self.assertEqual(self.hook("Bash", cmd), "", cmd)
+        self.assertIn('"deny"', self.hook("Bash", "echo '{}' >> ~/.foreman2/runs/r/decisions.jsonl"), "zapis stanu nadal odmówiony")
+        did = self.f2("decide", "ask", "--kind", "approval", "--question", "czytać prod?", "--options", "tak | nie", "--rec", "nie").stdout.strip()
+        self.assertIn("approval", self.f2("decide", "answer", did, "rec", "--by", "codex", ok=False).stderr, "agent nie autoryzuje także pod nadzorem")
+        self.f2("decide", "answer", did, "rec", "--by", "human:serge")
+        self.assertEqual([x for x in self.f2("decisions", "--json").stdout.splitlines() if did in x and "approved" in x] != [], True)
 
     @unittest.skipUnless(shutil.which("jq"), "bramka-floty.sh wymaga jq")
     def test_bramka_floty_czulosc(self):

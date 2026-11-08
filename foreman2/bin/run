@@ -123,7 +123,7 @@ def main():
     if not skill_zainstalowany:  # zainstalowany skill rejestruje te same hooki z frontmatter; dubel liczyłby blokady podwójnie
         hak = lambda sub: [{"hooks": [{"type": "command", "command": f"FOREMAN2_HOME={HOME} python3 -I {F2} {sub}"}]}]
         ustawienia["hooks"] = {"Stop": hak("stop-check"),
-                               "PreToolUse": [{"matcher": "Bash|Agent", **hak("straz")[0]}]}
+                               "PreToolUse": [{"matcher": "Bash|Agent|Write|Edit|MultiEdit|NotebookEdit", **hak("straz")[0]}]}
     with open(settings, "w") as f:
         json.dump(ustawienia, f, indent=1)
 

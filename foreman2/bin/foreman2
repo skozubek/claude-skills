@@ -565,7 +565,7 @@ def cmd_decide(a):
             return
         kto = a.by or ""
         if d["kind"] == "approval" and not CZLOWIEK.match(kto):
-            sys.exit(f"decyzja {d['id']} jest approval: odpowiada człowiek (`--by human[:imię]`) ze swojego terminala; agent nie autoryzuje")
+            sys.exit(f"decyzja {d['id']} jest approval: odpowiada człowiek (`--by human[:imię]`: w czacie przy nadzorze, ze swojego terminala bez nadzoru); agent nie autoryzuje")
         odp = (a.reply or "").strip()
         if odp in ("rec", "rekomendacja"):
             if not d.get("rec"):
@@ -771,9 +771,12 @@ def segmenty(cmd):
 
 
 def cmd_straz(a):
-    """Hook PreToolUse brygadzisty (Bash i Agent). Odmawia z sesji modelu: odpowiedzi na decyzję
-    jako człowiek, ręcznego zapisu plików stanu; po `cancel` także spawnu, powrotu zadań do
-    running i ruchów zakazanych flocie (bramka-floty.sh). Komenda Bash nieczytelna = odmowa."""
+    """Hook PreToolUse brygadzisty (Bash, Agent, Write/Edit). Odmawia z sesji modelu: ręcznego
+    zapisu plików stanu (Bash i edytory); w przelocie bez nadzoru także odpowiedzi na decyzję jako
+    człowiek (dla przelotu aktywnego i wskazanego `--run`) i `create` (zmiana aktywnego przelotu
+    albo `--force` zdjęłyby flagę); w nadzorowanym człowiek odpowiada w czacie i brygadzista
+    zapisuje `--by human:<imię>`. Po `cancel` także spawnu, powrotu zadań do running i ruchów
+    zakazanych flocie (bramka-floty.sh). Komenda Bash nieczytelna = odmowa."""
     def odmowa(powod):
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                                  "permissionDecisionReason": powod}}, ensure_ascii=False))
@@ -783,20 +786,35 @@ def cmd_straz(a):
     except Exception:
         wej = {}
     narzedzie = wej.get("tool_name")
+    wejscie = wej.get("tool_input") or {}
     rid = aktywne().get(repo_root(wej.get("cwd") or os.getcwd()))
-    stan = (czytaj_json(os.path.join(HOME, "runs", rid, "run.json"), {}) or {}).get("state") if rid else None
+    def przelot(r):
+        return (czytaj_json(os.path.join(HOME, "runs", r, "run.json"), {}) or {}) if r else {}
+    run = przelot(rid)
+    stan, bez_nadzoru = run.get("state"), bool(run.get("unattended"))
+    zywy_bez_nadzoru = bez_nadzoru and stan not in ("done", "partial", "cancelled")
     if narzedzie == "Agent":
         if stan == "cancelled":
             odmowa(f"Przelot {rid} anulowany: bez nowych agentów. Nowy przelot: `foreman2 create`.")
         return
+    if narzedzie in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
+        sciezka = wejscie.get("file_path") or wejscie.get("notebook_path") or ""
+        if isinstance(sciezka, str) and sciezka and os.path.realpath(os.path.expanduser(sciezka)).startswith(os.path.realpath(HOME) + os.sep):
+            odmowa("Pliki stanu i profile foremana zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
+        return
     if narzedzie != "Bash":
         return
-    cmd = (wej.get("tool_input") or {}).get("command")
+    cmd = wejscie.get("command")
     if not isinstance(cmd, str):
         odmowa("Strażnik brygadzisty nie odczytał komendy; przepisz ją prościej.")
     for seg in segmenty(cmd):
         if re.search(r"\bdecide +answer\b", seg) and re.search(r"--by[ =]+[\"']?human", seg):
-            odmowa("Odpowiedź `--by human` należy do człowieka z jego terminala; sesja modelu nie autoryzuje decyzji approval.")
+            m = re.search(r"--run[ =]+[\"']?([\w.-]+)", seg)
+            cel = przelot(m.group(1)) if m else run
+            if bez_nadzoru or cel.get("unattended"):
+                odmowa("Przelot bez nadzoru: odpowiedź `--by human` wpisuje człowiek ze swojego terminala, sesja modelu nie autoryzuje decyzji approval.")
+        if zywy_bez_nadzoru and re.search(r"(foreman2|\$F2)\b.*\bcreate\b", seg):
+            odmowa(f"Przelot {rid} biegnie bez nadzoru: `create` (nowy przelot albo `--force`) należy do runnera i człowieka, nie do sesji modelu.")
         if re.search(r"(run\.json|decisions\.jsonl|log\.tsv|evidence/E\d+\.json)\b", seg) and re.search(r">|\bsed +-i|\btee\b|\bmv\b|\bcp\b|\bpython3?\b|\bnode\b|\bperl\b|\bprintf\b|\becho\b", seg):
             odmowa("Pliki stanu przelotu zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
         if stan == "cancelled" and re.search(r"\btask +set\b.*--status[ =]+[\"']?(running|fixing)", seg):

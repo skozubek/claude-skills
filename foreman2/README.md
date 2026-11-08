@@ -31,9 +31,10 @@ buduje `--agents` z `foreman2/agents/`); świeża sesja widzi sześć typów age
 trzy 1.x i trzy 2.0. Hooki skilla i agentów oczekują `~/.claude/skills/foreman2/bin/`
 (foreman2, bramka-floty.sh).
 
-Decyzje `approval` człowiek odpowiada ze swojego terminala
-(`foreman2 --run <id> decide answer <D> rec --by human`), nie z sesji
-brygadzisty: jej hook PreToolUse odmawia `--by human`.
+Decyzje `approval` pod nadzorem: brygadzista pyta w czacie i zapisuje odpowiedź
+`--by human:<imię>`. Bez nadzoru człowiek odpowiada ze swojego terminala
+(`foreman2 --run <id> decide answer <D> rec --by human`), a hook PreToolUse
+sesji brygadzisty odmawia `--by human`.
 
 Rollback: usunięcie dowiązania skilla, trzech dowiązań w `agents/` i katalogu
 `~/.foreman2` (stan przelotów i profile). Foreman 1.x nie jest przez 2.0 dotykany.
