@@ -518,6 +518,11 @@ zielony” to zielony przebieg na commicie mergu każdego workflowu, który
 `.github/workflows/` puszcza na push do `main` (`gh run list --commit <sha>
 --limit 50`); brak przebiegu to nie zieleń (CRM C: audyt uprawnień czerwony
 na `main` prawie 6 h przy meldunku „CI zielone”).
+Workflow, który puszczasz ręcznie (`gh workflow run`), czytasz przed
+wywołaniem po krokach wyjścia (mail, Slack, webhook, `if: failure()`):
+alarm wysłany ludziom spoza Granic jest zapłacony z chwilą startu,
+anulowanie przychodzi za późno (kontakty CRM: ręczny audyt RLS na
+zastanej czerwieni wysłał mail do właściciela repo mimo „żadnych wiadomości”). <!-- LC-121 -->
 
 Meldunek idzie po kryteriach odbioru: przy każdym odczyt, który je
 potwierdził, albo powód, dla którego nie przeszło. Werdykt miernika „zgodne”

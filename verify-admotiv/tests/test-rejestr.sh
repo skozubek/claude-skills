@@ -66,13 +66,13 @@ git checkout -q -- src/pages/B.tsx
 sprawdz "nieznany obszar: odmowa" "$T/o6" 'obszar „nic” nie ma wiersza'
 
 echo "# 5. cudzy commit w module importowanym spoza wiersza, własny commit w wierszu"
-git clone -q "$T/origin.git" "$T/piotr" && cd "$T/piotr" && git config user.name "Piotr" && git config user.email "piotr@przyklad.test"
+git clone -q "$T/origin.git" "$T/cudzy" && cd "$T/cudzy" && git config user.name "Cudzy" && git config user.email "cudzy@przyklad.test"
 echo "export const x = 2;" > src/lib/wspolny.ts && echo "export const y = 2;" > src/pages/B.tsx && git commit -q -am "feat: zmiana wspólna i B" && git push -q origin main 2>/dev/null
 cd "$T/repo" && echo "// własna" >> src/pages/A.tsx && git commit -q -am "fix(A): własna poprawka" && git pull -q --rebase origin main 2>/dev/null && git push -q origin main 2>/dev/null && git fetch -q origin
 "$BIN/doctor" aaa > "$T/d1" 2>&1
 sprawdz "doctor: własny commit jedną liczbą, bez cudzych w wierszu" "$T/d1" 'aaa: bez cudzych zmian od pełnego przejścia [0-9-]+ \([0-9a-f]{8}\), własnych commitów: 1'
 sprawdz "doctor: cudzy commit w module importowanym spoza wiersza" "$T/d1" 'aaa: cudze commity w modułach, które ekran importuje spoza wiersza mapy \(1\)'
-sprawdz "doctor: autor, temat i plik modułu" "$T/d1" 'Piotr: feat: zmiana wspólna i B \[src/lib/wspolny.ts\]'
+sprawdz "doctor: autor, temat i plik modułu" "$T/d1" 'Cudzy: feat: zmiana wspólna i B \[src/lib/wspolny.ts\]'
 sprawdz "doctor: kroki przeszłe po pełnym przejściu" "$T/d1" 'aaa: kroki przeszłe po pełnym przejściu: AAA-03'
 "$BIN/doctor" bbb > "$T/d2" 2>&1
 sprawdz "doctor: obszar bez przejść" "$T/d2" 'bbb: nigdy nie przeszedł na żywo'
