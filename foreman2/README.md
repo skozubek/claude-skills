@@ -66,8 +66,8 @@ bin/run --repo <dir> --slug <nazwa> --plan <plan.md> --budget 40 --unattended [-
 bin/run --resume <run-id>
 ```
 
-Runner tworzy przelot, pisze `agents.json` i `settings.json` (hook Stop) do katalogu
-przelotu, odpala `claude -p` pod `caffeinate`, zapisuje pełny wynik do
+Runner tworzy przelot, pisze `agents.json` i `settings.json` (hooki Stop
+i PreToolUse brygadzisty, gdy skill nie jest zainstalowany) do katalogu przelotu, odpala `claude -p` pod `caffeinate`, zapisuje pełny wynik do
 `sessions/<ts>.json`, dopisuje koszt i drukuje `foreman2 status`. Gdy skill nie jest
 zainstalowany w `~/.claude/skills`, treść `SKILL.md` idzie w promptcie: przelot
 działa w dowolnym repo bez instalacji.
@@ -89,3 +89,18 @@ Autoryzacja: sterownik, który nie reprezentuje człowieka, nie odpowiada na
 `approval`. Ślad audytu: `log.tsv` i `decisions.jsonl` (kto, kiedy, co). Wznowienie
 przelotu po odpowiedzi: `bin/run --resume <id>`. Interfejs głosowy czyta `report`
 i pisze `decide answer`; to warstwa UX poza tym katalogiem.
+
+## Czego jeszcze nie ma
+
+- Profil użytkownika dla AdMotiv (`~/.foreman2/profiles/<klucz>.json`
+  z `profiles/admotiv.example.json`) i wpis o mapie funkcji w AGENTS.md AdMotiv:
+  do zrobienia przy pierwszym nadzorowanym przelocie na tym repo.
+- Most dla Mii, ChatGPT i głosu: proces, który czyta `status --json`
+  i `decisions --pending`, pisze `decide answer` jako człowiek po jego słowie
+  i woła `bin/run --resume`. Kontrakt wyżej jest kompletny, brakuje transportu
+  (Remote Control, Channels albo cron na VM).
+- Pilnowanie PR-a po przelocie (`/loop` z `gh pr checks`): po pomiarze, jak
+  długo PR czeka na merge.
+- Pamięć weryfikatora (`memory` agenta) dla powtarzalnych ścieżek odbioru.
+- Hook Stop skilla w sesji interaktywnej (`/foreman2`): zmierzony tylko
+  w `claude -p` przez runner.
