@@ -13,6 +13,26 @@ BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 
 BRAMKA = os.path.join(os.path.dirname(BIN), "bramka-floty.sh")
 RUN = os.path.join(os.path.dirname(BIN), "run")
 
+PLAN_OK = """# Eksport listy do CSV
+
+Ścieżka użytkownika: handlowiec na liście rekordów klika „Eksport” i dostaje plik CSV z kolumnami jak na ekranie.
+
+## Kryteria odbioru
+- ekran listy po kliknięciu „Eksport” → pobrany plik `lista-<data>.csv`, nagłówek = kolumny widoczne na ekranie
+- wiersz w tabeli `eksporty` po pobraniu → 1 nowy wiersz z liczbą rekordów równą licznikowi na ekranie
+- czas od kliknięcia do pobrania, mierzony tym samym narzędziem i kontem → poniżej 3 s dla 500 rekordów
+
+## Poza zakresem
+- eksport XLSX, harmonogram eksportów
+
+## Granice
+- Zakres: zadania i pliki z grafu; poza grafem nic.
+- Dane: czytasz projekt dev, piszesz tylko na koncie testowym; po przelocie usuwasz wiersze `eksporty` konta testowego.
+- Tożsamość obiektów po nazwie i miejscu, nie po ID; odbiór zastępczy, gdy brak.
+- Koszt: budżet 20 USD, bez wywołań płatnych per obiekt.
+- Kroki tylko-ludzkie: żadne.
+"""
+
 
 class Baza(unittest.TestCase):
     def setUp(self):
@@ -327,7 +347,7 @@ class TestPrzelot(Baza):
     def test_runner_dry_i_reszta_budzetu(self):
         plan = os.path.join(self.tmp, "plan.md")
         with open(plan, "w") as f:
-            f.write("# plan\n")
+            f.write(PLAN_OK)
         r = subprocess.run([sys.executable, "-I", RUN, "--repo", self.repo, "--slug", "lab", "--plan", plan, "--budget", "10", "--dry"],
                            capture_output=True, text=True, env=self.env)
         self.assertEqual(r.returncode, 0, r.stderr)
@@ -367,3 +387,54 @@ class TestPrzelot(Baza):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Plan(Baza):
+    """`plan check` i `create --plan`: wzór przechodzi, każdy znany brak zapala."""
+
+    def plan(self, tekst, nazwa="plan.md"):
+        p = os.path.join(self.tmp, nazwa)
+        with open(p, "w") as f:
+            f.write(tekst)
+        return p
+
+    def check(self, tekst, *extra):
+        return self.f2("plan", "check", self.plan(tekst), *extra, ok=False)
+
+    def test_wzor_przechodzi_takze_bez_nadzoru(self):
+        r = self.check(PLAN_OK)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("plan OK: kryteria 3, Granice", r.stdout)
+        self.assertEqual(self.check(PLAN_OK, "--unattended").returncode, 0)
+
+    def test_znane_braki_zapalaja(self):
+        bez_granic = PLAN_OK.split("## Granice")[0]
+        przypadki = [
+            (PLAN_OK.replace("Ścieżka użytkownika: handlowiec na liście rekordów klika „Eksport” i dostaje plik CSV z kolumnami jak na ekranie.", ""), "ścieżki użytkownika", ()),
+            (PLAN_OK.replace("## Poza zakresem\n- eksport XLSX, harmonogram eksportów\n", ""), "Poza zakresem", ()),
+            (PLAN_OK.replace("- wiersz w tabeli `eksporty` po pobraniu → 1 nowy wiersz z liczbą rekordów równą licznikowi na ekranie\n", "")
+                    .replace("- czas od kliknięcia do pobrania, mierzony tym samym narzędziem i kontem → poniżej 3 s dla 500 rekordów\n", ""), "kryteriów 1", ()),
+            (PLAN_OK.replace("## Poza zakresem", "- a → b\n- c → d\n- e → f\n\n## Poza zakresem"), "kryteriów 6", ()),
+            (PLAN_OK.replace("## Poza zakresem", "- testy zielone → CI zielone\n\n## Poza zakresem"), "nie jest kryterium", ()),
+            (PLAN_OK.replace("→ pobrany plik", "pobrany plik"), "bez „→”", ()),
+            (bez_granic, "brak sekcji „## Granice”", ("--unattended",)),
+            (PLAN_OK.replace("- Koszt: budżet 20 USD, bez wywołań płatnych per obiekt.\n", ""), "Granice bez: koszt/budżet", ("--unattended",)),
+        ]
+        for tekst, oczekiwane, extra in przypadki:
+            r = self.check(tekst, *extra)
+            self.assertNotEqual(r.returncode, 0, f"brak nie zapalił: {oczekiwane}")
+            self.assertIn(oczekiwane, r.stderr)
+        self.assertEqual(self.check(bez_granic).returncode, 0, "bez --unattended Granice nie są wymagane")
+
+    def test_create_odmawia_planu_z_brakami_i_przyjmuje_wzor(self):
+        zly = self.plan("# plan\n", "zly.md")
+        r = self.f2("create", "--slug", "Zly plan", "--repo", self.repo, "--plan", zly, ok=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("plan check", r.stderr)
+        self.assertFalse(os.path.exists(os.path.join(self.home, "active.json")), "odmowa nie tworzy przelotu")
+        dobry = self.plan(PLAN_OK, "dobry.md")
+        rid = self.f2("create", "--slug", "Dobry plan", "--repo", self.repo, "--plan", dobry).stdout.strip()
+        self.assertEqual(self.run_json()["plan"], dobry)
+        self.assertTrue(rid)
+        r = self.f2("create", "--slug", "Bez granic", "--repo", self.repo, "--plan", self.plan(PLAN_OK.split("## Granice")[0], "bg.md"), "--unattended", ok=False)
+        self.assertNotEqual(r.returncode, 0, "bez nadzoru bez Granic nie startuje")

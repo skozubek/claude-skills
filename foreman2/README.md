@@ -11,6 +11,7 @@ foremana 1.x (`../foreman`), który zostaje punktem powrotu.
 | `SKILL.md` | rdzeń: etapy z warunkami „gotowe, gdy”, tabela komend stanu, drabina decyzji |
 | `BRIEF.md` | szablon briefu wykonawcy, pułapki środowiska, protokół odbioru |
 | `BEZ-NADZORU.md` | przelot bez człowieka: Granice, ścieżka odbioru, zatrzymanie, rachuba |
+| `PLAN.md` | szablon planu; `bin/foreman2 plan check <plik> [--unattended]` wylicza braki, `create --plan` odmawia z brakami |
 | `POSTMORTEM.md` | sekcja zwłok przelotu |
 | `agents/` | definicje floty: wykonawca, recenzent, weryfikator |
 | `bin/bramka-floty.sh` | strażnik komend floty (hook PreToolUse wykonawcy i weryfikatora; po `cancel` także brygadzisty) |

@@ -223,7 +223,83 @@ def znajdz(args):
 
 
 # ---------------------------------------------------------------- podkomendy
+def punkty_planu(linie):
+    """Punkty listy w sekcji planu; linia bez znacznika po punkcie jest jego ciągiem dalszym."""
+    out = []
+    for l in linie:
+        if re.match(r"^\s*([-*+]|\d+[.)])\s+", l):
+            out.append(re.sub(r"^\s*([-*+]|\d+[.)])\s+", "", l).strip())
+        elif l.strip() and out:
+            out[-1] += " " + l.strip()
+    return out
+
+
+def sprawdz_plan(sciezka, unattended=False):
+    """Plan pod create: ścieżka użytkownika jednym zdaniem, 2–5 kryteriów „odczyt → wynik”,
+    „Poza zakresem”, a przy --unattended Granice z pięcioma punktami BEZ-NADZORU.md.
+    Zwraca (błędy, info). Szablon: PLAN.md w katalogu skilla."""
+    txt = czytaj_txt(sciezka)
+    if txt is None:
+        return [f"brak pliku {sciezka}"], {}
+    bledy, sekcje, biezaca = [], {}, None
+    for l in txt.splitlines():
+        m = re.match(r"^#{1,3}\s+(.*)", l)
+        if m:
+            naglowek, biezaca = m.group(1).strip().lower(), None
+            for k, rx in (("kryteria", r"kryteri"), ("poza", r"poza\s+zakresem"), ("granice", r"granice"), ("sciezka", r"ścieżka\s+użytkownika")):
+                if re.search(rx, naglowek):
+                    biezaca = k
+                    sekcje.setdefault(k, [])
+                    break
+            continue
+        if biezaca:
+            sekcje[biezaca].append(l)
+    m = re.search(r"ścieżka\s+użytkownika\**\s*:\s*(.+)", txt, re.I)
+    sciezka_uz = m.group(1).strip(" *") if m else " ".join(x.strip() for x in sekcje.get("sciezka", []) if x.strip())
+    if len(sciezka_uz) < 15:
+        bledy.append("brak ścieżki użytkownika (jedno zdanie po „Ścieżka użytkownika:”: kto, na jakim ekranie, co robi, co widzi)")
+    kryteria = []
+    if "kryteria" not in sekcje:
+        bledy.append("brak sekcji „## Kryteria odbioru”")
+    else:
+        kryteria = punkty_planu(sekcje["kryteria"])
+        if not 2 <= len(kryteria) <= 5:
+            bledy.append(f"kryteriów {len(kryteria)}, ma być 2–5 (większy plan dzielisz na fale, reszta do „## Otwarte”)")
+        for k in kryteria:
+            if not re.search(r"→|->", k):
+                bledy.append(f"kryterium bez „→” (co odczytać → jaki wynik): {k[:70]}")
+            if re.search(r"testy?\s+(są\s+|przechodz)?zielon|zielone\s+testy|tests?\s+(are\s+)?green|green\s+tests|\bci\b\s+zielon|lint\s+zielon", k, re.I):
+                bledy.append(f"„testy zielone” nie jest kryterium (kryterium mówi, co widzi użytkownik): {k[:70]}")
+    if not any(x.strip() for x in sekcje.get("poza", [])):
+        bledy.append("brak sekcji „## Poza zakresem” (co najmniej jeden punkt)")
+    granice = "granice" in sekcje
+    if unattended:
+        if not granice:
+            bledy.append("--unattended: brak sekcji „## Granice” (BEZ-NADZORU.md)")
+        else:
+            g = "\n".join(sekcje["granice"]).lower()
+            brak = [n for n, rx in (("zakres", r"zakres"), ("dane", r"\bdane\b|projekt|konto"), ("tożsamość obiektów", r"tożsamo"),
+                                    ("koszt/budżet", r"koszt|budżet"), ("kroki tylko-ludzkie", r"tylko-ludzk|człowiek")) if not re.search(rx, g)]
+            if brak:
+                bledy.append("Granice bez: " + ", ".join(brak))
+    return bledy, {"kryteria": len(kryteria), "granice": granice, "sciezka": sciezka_uz}
+
+
+def cmd_plan(a):
+    bledy, info = sprawdz_plan(a.plik, a.unattended)
+    for b in bledy:
+        print(f"plan {a.plik}: {b}", file=sys.stderr)
+    if bledy:
+        print(f"plan {a.plik}: braków {len(bledy)}; szablon: {os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'PLAN.md')}", file=sys.stderr)
+        sys.exit(1)
+    print(f"plan OK: kryteria {info['kryteria']}" + (", Granice" if info["granice"] else ""))
+
+
 def cmd_create(a):
+    if a.plan:
+        bledy, _ = sprawdz_plan(a.plan, a.unattended)
+        if bledy:
+            sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman2 plan check`, szablon PLAN.md")
     repo = repo_root(a.repo)
     slug = re.sub(r"[^a-z0-9]+", "-", a.slug.lower()).strip("-")[:40]
     rid = f"{dt.date.today().isoformat()}-{slug}"
@@ -850,6 +926,8 @@ def main():
     ap = argparse.ArgumentParser(prog="foreman2", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", help="id przelotu (domyślnie aktywny dla repo w cwd)")
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    s = sub.add_parser("plan", help="check <plik> [--unattended]: braki planu przed create (PLAN.md)"); s.add_argument("op", choices=["check"]); s.add_argument("plik"); s.add_argument("--unattended", action="store_true"); s.set_defaults(f=cmd_plan)
 
     s = sub.add_parser("create", help="nowy przelot (create_task)")
     s.add_argument("--repo", default=".")

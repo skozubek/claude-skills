@@ -6,7 +6,7 @@ założenie (`decide ask --kind auto`), decyzję w kolejce (`approval`, reszta f
 idzie) albo krok tylko-ludzki (`human add`). Przelot bez człowieka kończy się
 `partial` z listą braków częściej niż `done`, i to jest poprawny wynik.
 
-## Granice (sekcja planu; bez niej przelot nie startuje)
+## Granice (sekcja planu; bez niej `create --unattended` odmawia, `plan check --unattended` wylicza braki)
 
 - Zakres: zadania i pliki z grafu; poza grafem nic.
 - Dane: które projekty, konta i marki wolno czytać, w które wolno pisać. Dev serwer

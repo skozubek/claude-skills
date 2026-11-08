@@ -49,6 +49,7 @@ po `cancel` także spawnu, pushu i deployu. Człowiek odpowiada ze swojego termi
 - `BRIEF.md`: szablon briefu, pułapki środowiska, protokół odbioru, agenci tylko do odczytu, weryfikator. Przed pierwszym spawnem.
 - `BEZ-NADZORU.md`: Granice planu, ścieżka odbioru, zatrzymanie, rachuba. Przed pierwszym spawnem, gdy `--unattended` albo sesja idzie bez pytań o zgodę (bypass/auto).
 - `POSTMORTEM.md`: po przelocie bez nadzoru, po drabinie wariantów, po blokadzie.
+- `PLAN.md`: szablon planu i co jest czym. Gdy `plan check` zgłasza braki albo człowiek pyta, jak napisać plan.
 - `$F2 profile`: konwencje repo (instalacja, bramki, CI, baza worktree, skill weryfikacji na żywo) z repo i profilu użytkownika. W rekonesansie.
 
 ## Kiedy nie foreman2
@@ -62,15 +63,17 @@ Etap kończy się, gdy spełnia swoje „Gotowe, gdy”; wtedy `$F2 state <etap>
 
 ### 0. Kontrakt (`planning`)
 
-`$F2 create`. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
+`$F2 create --plan <plik>`; plan z brakami odrzuca (`$F2 plan check <plik>` mówi,
+czego; szablon `PLAN.md`), braki domykasz z człowiekiem i dopisujesz do planu, nie
+obchodzisz. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
 w bazie, czas mierzony tym samym narzędziem i kontem) i jaki wynik ma wyjść. „Testy
 zielone” nie jest kryterium. Plan ma ścieżkę użytkownika jednym zdaniem i „poza
 zakresem”. Fala większego planu: kryteria tej fali, pozostałe obietnice w planie
 jako otwarte. To jedyna rozmowa o zakresie: wątpliwość techniczna w zakresie idzie
 w założenie (`decide ask --kind auto`); dane produkcyjne, wysyłki, pieniądze,
 uprawnienia w decyzję `approval`.
-Gotowe, gdy: `$F2 criteria list` ma komplet; plan ma ścieżkę użytkownika; przy
-`--unattended` plan ma sekcję Granice (BEZ-NADZORU.md).
+Gotowe, gdy: `$F2 plan check <plik>` czysto (przy `--unattended` z Granicami,
+BEZ-NADZORU.md); `$F2 criteria list` ma komplet zgodny z planem.
 
 ### 1. Rekonesans
 
