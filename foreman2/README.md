@@ -12,9 +12,10 @@ foremana 1.x (`../foreman`), który zostaje punktem powrotu.
 | `BRIEF.md` | szablon briefu wykonawcy, pułapki środowiska, protokół odbioru |
 | `BEZ-NADZORU.md` | przelot bez człowieka: Granice, ścieżka odbioru, zatrzymanie, rachuba |
 | `POSTMORTEM.md` | sekcja zwłok przelotu |
-| `agents/` | definicje floty: wykonawca, recenzent, weryfikator (strażnik komend `../agents/bramka-floty.sh`) |
+| `agents/` | definicje floty: wykonawca, recenzent, weryfikator |
+| `bin/bramka-floty.sh` | strażnik komend floty (hook PreToolUse wykonawcy i weryfikatora; po `cancel` także brygadzisty) |
 | `bin/foreman2` | stan przelotu (python3, bez zależności) |
-| `bin/run` | przelot bez terminala: `claude -p` z agentami, hookiem Stop, budżetem |
+| `bin/run` | przelot bez terminala: `claude -p` z agentami, hookami brygadzisty (Stop, PreToolUse), budżetem; preflight (`claude`, `jq`, strażnik) |
 | `bin/agents-json` | `agents/*.md` → JSON dla `claude --agents` |
 | `tests/` | `python3 -I -m unittest discover -s foreman2/tests` z katalogu repo |
 | `DECYZJE.md` | macierz źródeł: co wołamy z zewnątrz, co trzymamy, co odrzucamy |
@@ -29,10 +30,14 @@ ln -s ~/Coding/claude-skills/foreman2/agents/foreman2-weryfikator.md ~/.claude/a
 ```
 
 `~/.claude/agents` jest dowiązaniem do `../agents` tego repo, więc równoważnie:
-`git mv foreman2/agents/*.md agents/` w commicie wdrożenia. Hook Stop skilla
-oczekuje `~/.claude/skills/foreman2/bin/foreman2`.
+`git mv foreman2/agents/*.md agents/` w commicie wdrożenia. Hooki skilla i agentów
+oczekują `~/.claude/skills/foreman2/bin/` (foreman2, bramka-floty.sh).
 
-Rollback: usunięcie trzech dowiązań i katalogu `~/.foreman2` (stan przelotów).
+Decyzje `approval` człowiek odpowiada ze swojego terminala
+(`foreman2 --run <id> decide answer <D> rec --by human`), nie z sesji
+brygadzisty: jej hook PreToolUse odmawia `--by human`.
+
+Rollback: usunięcie czterech dowiązań i katalogu `~/.foreman2` (stan przelotów).
 Foreman 1.x nie jest przez 2.0 dotykany. Narzędzie kosztu `koszty.py` zostaje
 w `../foreman/` i jest wołane stamtąd; przy zdjęciu 1.x przechodzi do `bin/`.
 

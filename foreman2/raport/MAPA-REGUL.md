@@ -55,7 +55,12 @@ użytkownika/AGENTS.md repo; **−** celowo usunięte (powód w kolumnie).
 | sieć i limit: `/coffee`, budzik `CronCreate` po resecie, po powrocie `git status` worktree i SendMessage | LC-038 | BEZ-NADZORU; runner `caffeinate` | = (jeden budzik zamiast dwóch) |
 | sędzia próbki: etykiety z ludzkiego śladu, stałe ziarno, kontrole, punktacja per pole, Codex z tym samym przydziałem, druga runda | LC-101 | BEZ-NADZORU „Sędzia” | = |
 | wykonawca: tylko pliki briefu; commit per zielony wycinek; warunki niespełnione w raporcie; komentarze; lint z powodem; klucze słownikowe; bez imion; NUL i gitleaks; pliki tymczasowe; kontekst to koszt; nie kończy wcześnie; kształt raportu | LC-016 LC-039 | agents/foreman2-wykonawca.md | = |
-| strażnik komend floty (push, PR, deploy, kill, claude, codex) | LC-062 | ten sam `bramka-floty.sh` na wykonawcy **i weryfikatorze** | + |
+| strażnik komend floty (push, PR, deploy, kill, claude, codex) | LC-062 | `bin/bramka-floty.sh` na wykonawcy **i weryfikatorze**: także opcje git przed `push`, `gh api`/`workflow run`, `npm run deploy`, zdalna baza, zapis HTTP poza localhost; test czułości | + |
+| zgoda modeli nie autoryzuje; odpowiedź approval tylko od człowieka | brief | `decide answer` wymaga `--by human`; hook PreToolUse `straz` odmawia `--by human` i ręcznego zapisu plików stanu z sesji modelu | + (nowe) |
+| odmowa człowieka zatrzymuje zadanie, nie odblokowuje go | Codex (recenzja 2.0) | `decide ask --blocks` wymaga `--unblock-on`; inna odpowiedź → zadania `blocked` z notą | + (nowe) |
+| DONE tylko z dowodem na ostatnim SHA | LC-009 LC-015 | `close` liczy najnowszy pomiar `pass` per kryterium na HEAD integracji; `criteria set --status` zakazane | + |
+| po `cancel` nic nie rusza | brief | `state`/`task set running` odmawiają; hook `straz` odmawia spawnu, pushu, deployu (te same wzorce co flota) | + (nowe) |
+| cisza zamiast końca przelotu | LC-033 | hook Stop blokuje też zadania `running` bez agentów w tle i etap bez `close`; każde wywołanie w `log.tsv` | + |
 | recenzent: trzy osie; finding = miejsce + scenariusz | — | agents/foreman2-recenzent.md (funkcja zamiast linii) | = |
 | weryfikator AdMotiv (start, sesja, doctor, kroki, sprzątanie) | — | generyczny weryfikator + skill z profilu | profil |
 | PULAPKI: pre-push z `GIT_DIR` worktree; klon dzielony; agent zabija procesy; PR zmergowany równolegle; merge po squashu gubi linie dziennika; skanery per commit; kopia bez `auth.users`; NUL; keydown; pomiar vs `/code-review`; skrypt z ścieżki worktree | LC-058 LC-095 LC-062 LC-105 LC-016 LC-039 LC-103 LC-100 LC-108 | BRIEF „Pułapki środowiska” | = |

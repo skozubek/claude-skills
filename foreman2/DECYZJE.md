@@ -34,7 +34,7 @@ Codex CLI 0.159.3 (model z `~/.codex/config.toml`).
 | pamięć agenta (`memory`) | Claude Code | trwała pamięć subagenta | **odłożone** | wykonawca ma być świeży per zadanie; kandydat dla weryfikatora | odłożone |
 | `codex exec -s read-only` | Codex CLI | druga opinia planu, diffu, postmortemu | **wołamy** | inna rodzina modeli; model z konfiguracji, bez `-m` | obowiązuje |
 | `verify-admotiv` | to repo | przejście AdMotiv ścieżką użytkownika | **wołamy przez profil** (`live_verify_skill`), rdzeń nie zna produktu | uniwersalność | obowiązuje |
-| `bramka-floty.sh` | 1.x | odmowa push/PR/deploy/kill/claude/codex w Bash floty | **zachowane**, jedna kopia współdzielona z 1.x | sprawdzony strażnik przed ruchem; teraz także na weryfikatorze | obowiązuje |
+| `bramka-floty.sh` | 1.x | odmowa push/PR/deploy/kill/claude/codex w Bash floty | **adaptacja**: własna kopia `bin/bramka-floty.sh` na wykonawcy i weryfikatorze, po `cancel` także na brygadziście | wzorce 1.x przepuszczały `git --no-pager push`, `npm run deploy`, zapis do zdalnej bazy i obcego API; test czułości w `tests/`; 1.x nietknięty | obowiązuje |
 | `koszty.py` | 1.x | koszt sesji i kontekst agenta | **zachowane**, wołane z `../foreman/` | przenosiny przy zdjęciu 1.x | obowiązuje |
 | PULAPKI.md produktowe (strażnik dokumentów, migration-drift, `supabase link`, Turbopack, okno crona) | 1.x | pułapki AdMotiv | **przeniesione** do profilu użytkownika (`profiles/admotiv.example.json`) i AGENTS.md repo | rdzeń bez produktu | obowiązuje |
 | reguła „wariant oceniany od trzech zadań w kategorii” | 1.x | pomiar wariantów | **usunięte** | nigdy nie zmierzona; dziennik przelotów (`run.json` per wariant) da pomiar, gdy będzie populacja | obowiązuje |
