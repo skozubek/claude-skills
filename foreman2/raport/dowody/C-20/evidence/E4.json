@@ -1,0 +1,10 @@
+{
+ "id": "E4",
+ "ts": "2026-11-08T14:36:21Z",
+ "for": "T5",
+ "cmd": "blok sh z README wykonany dosłownie w mktemp z kopią src",
+ "sha": "f560a3e",
+ "result": "wyjście 5, 0; exit 0; diff tylko README.md",
+ "file": null,
+ "verdict": "pass"
+}

@@ -1,0 +1,10 @@
+{
+ "id": "E5",
+ "ts": "2026-11-08T14:09:06Z",
+ "for": "C1",
+ "cmd": "cd $(mktemp -d) (pusty, 0 plików) && node <repo>/src/cli.js add 2 && add 3 && show",
+ "sha": "19509ae4baf21e2e4551f702119917ccdfc10ba9",
+ "result": "stdout: 5",
+ "file": null,
+ "verdict": "pass"
+}

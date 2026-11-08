@@ -17,7 +17,7 @@ użytkownika/AGENTS.md repo; **−** celowo usunięte (powód w kolumnie).
 | mapa funkcji AdMotiv + `bin/doctor` przed robotą w module | — | profil `live_verify_skill: verify-admotiv`; weryfikator woła skill, który sam zna mapę | profil |
 | glosariusz CONTEXT.md przez `domain-modeling` | — | odłożone (DECYZJE) | − (brak incydentu, który by łapał) |
 | sekcje planu: problem, architektura z odrzuconymi wariantami, ustalenia, kontrakt, mapa testów, tryby awarii, poza zakresem, graf | — | etap 1 „gotowe, gdy” | = (bez `plik:linia`, zgodnie z regułą dokumentów) |
-| zadanie = warstwa, 3–5 plików, ~100 tur; jeden właściciel pliku; tekst po zachowaniu; zmiana masowa od próbki; tożsamość zdarzeń; tabela stanów; wrażliwość per element; atomowość | — | etap 2; `task add --files` (właściciel w stanie) | = |
+| zadanie = warstwa, 3–5 plików, ~100 tur; jeden żywy właściciel pliku (runda poprawek po recenzji to nowe zadanie na plikach zadań scalonych); tekst po zachowaniu; zmiana masowa od próbki; tożsamość zdarzeń; tabela stanów; wrażliwość per element; atomowość | — | etap 2; `task add --files` (właściciel w stanie) | = |
 | recenzja planu Codexem (`-s read-only`, `high`, stdin), findingi odtwarzane, plan jako stan | LC-028 | etap 3 | = |
 | gałąź integracyjna z main; własny worktree przy klonie dzielonym; `baseRef: head`; `.gitignore` worktrees; `.worktreeinclude`; commit kontraktu przed spawnem | LC-084 LC-095 | etap 4; `profile` ostrzega o braku `baseRef`/`.gitignore` | + |
 | spawn naraz w tle; ≤3 żywych agentów (wliczając wznowienia, recenzentów, weryfikatorów) | — | etap 5; `task set --status running` odmawia czwartego (`max_live`) | + |

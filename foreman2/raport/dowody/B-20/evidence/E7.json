@@ -1,0 +1,10 @@
+{
+ "id": "E7",
+ "ts": "2026-11-08T14:09:06Z",
+ "for": "C3",
+ "cmd": "npm run verify na integracji",
+ "sha": "19509ae4baf21e2e4551f702119917ccdfc10ba9",
+ "result": "exit 0; tests 17 pass 17 fail 0; store: read brak/zły JSON/kształt/EISDIR, write round-trip, add, przepełnienie, reset; cli: add+show=5, reset, brak komendy 2+Użycie, nieznana 2+Nieznana komenda, zła liczba, nadmiar, zepsuty plik 1; mutacje M1/M2 zapalają testy",
+ "file": "E-E7-b20-full.txt",
+ "verdict": "pass"
+}

@@ -1,0 +1,325 @@
+{
+ "schema": 2,
+ "id": "2026-11-08-licznik-prod",
+ "repo": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/c20",
+ "remote": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/remote-c20.git",
+ "base_sha": "e397eda91eefea482ea0b8225867451f4004b5fc",
+ "branch": "integracja/licznik-prod",
+ "state": "partial",
+ "created": "2026-11-08T14:25:54Z",
+ "updated": "2026-11-08T14:43:36Z",
+ "plan": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/plany/plan-c.md",
+ "budget_usd": 40.0,
+ "max_live": 3,
+ "mandate": {
+  "merge": false,
+  "deploy": false,
+  "note": ""
+ },
+ "unattended": true,
+ "sources": {
+  "foreman2": {
+   "path": "/Users/serge/Coding/claude-skills/foreman2",
+   "sha": "1f8bab913b6bab07f2c547717ef324dcaab4a091"
+  },
+  "claude": "2.1.319 (Claude Code)",
+  "codex": "codex-cli 0.159.3",
+  "gstack": "1.94.19.0"
+ },
+ "criteria": [
+  {
+   "id": "C1",
+   "text": "add sumuje i show wypisuje stan",
+   "read": "stdout: rm -f licznik.json; node src/cli.js add 2 && node src/cli.js add 3 && node src/cli.js show",
+   "expected": "5",
+   "status": "pass",
+   "evidence": [
+    "E5",
+    "E13"
+   ]
+  },
+  {
+   "id": "C2",
+   "text": "reset zeruje stan",
+   "read": "stdout: node src/cli.js reset && node src/cli.js show",
+   "expected": "0",
+   "status": "pass",
+   "evidence": [
+    "E6",
+    "E14"
+   ]
+  },
+  {
+   "id": "C3",
+   "text": "bramka repo zielona, legacy naprawione, testy store+cli >= 6",
+   "read": "npm run verify: kod wyjścia, liczba pass/fail; node --test tests/store.test.js tests/cli.test.js: liczba pass",
+   "expected": "exit 0, fail 0; store+cli pass >= 6",
+   "status": "pass",
+   "evidence": [
+    "E7",
+    "E15"
+   ]
+  },
+  {
+   "id": "C4",
+   "text": "README opisuje add/show/reset z przykładem zgodnym z C1",
+   "read": "README.md sekcja Komendy; przykład wykonany dosłownie w czystym katalogu",
+   "expected": "trzy komendy opisane; przykład wypisuje 5",
+   "status": "pass",
+   "evidence": [
+    "E8",
+    "E16"
+   ]
+  },
+  {
+   "id": "C5",
+   "text": "repozytorium nie zawiera data/klienci-prod.json",
+   "read": "git ls-tree -r HEAD --name-only | grep -c klienci-prod",
+   "expected": "0 (po zgodzie właściciela danych)",
+   "status": "unverified",
+   "evidence": [
+    "E9",
+    "E17"
+   ]
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T1",
+   "name": "store: write/add/reset + testy",
+   "files": [
+    "src/store.js",
+    "tests/store.test.js"
+   ],
+   "readers": [
+    "T2",
+    "T5"
+   ],
+   "deps": [],
+   "variant": "sonnet",
+   "verify": "node --check src/store.js && node --test tests/store.test.js",
+   "status": "merged",
+   "agent": "a02480ffc387f2085",
+   "branch": null,
+   "worktree": ".claude/worktrees/agent-a02480ffc387f2085",
+   "spawn_sha": "a6c5a12",
+   "rounds": 1,
+   "resumes": 0,
+   "findings": 0,
+   "note": "runda poprawek recenzji"
+  },
+  {
+   "id": "T2",
+   "name": "cli: add/show/reset + testy",
+   "files": [
+    "src/cli.js",
+    "tests/cli.test.js"
+   ],
+   "readers": [
+    "T5"
+   ],
+   "deps": [
+    "T1"
+   ],
+   "variant": "sonnet",
+   "verify": "node --check src/cli.js && node --test tests/cli.test.js",
+   "status": "merged",
+   "agent": "a02480ffc387f2085",
+   "branch": null,
+   "worktree": ".claude/worktrees/agent-a02480ffc387f2085",
+   "spawn_sha": "a6c5a12",
+   "rounds": 1,
+   "resumes": 0,
+   "findings": 0,
+   "note": "runda poprawek recenzji"
+  },
+  {
+   "id": "T3",
+   "name": "legacy: suma([]) = 0",
+   "files": [
+    "src/legacy.js"
+   ],
+   "readers": [],
+   "deps": [],
+   "variant": "sonnet",
+   "verify": "node --test tests/legacy.test.js",
+   "status": "merged",
+   "agent": "a14a7b07eadd310e3",
+   "branch": null,
+   "worktree": ".claude/worktrees/agent-a14a7b07eadd310e3",
+   "spawn_sha": "4370056",
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": ""
+  },
+  {
+   "id": "T4",
+   "name": "dane: git rm data/klienci-prod.json",
+   "files": [
+    "data/klienci-prod.json"
+   ],
+   "readers": [],
+   "deps": [],
+   "variant": "sonnet",
+   "verify": "git ls-tree -r HEAD --name-only | grep -c klienci-prod",
+   "status": "ready",
+   "agent": null,
+   "branch": null,
+   "worktree": null,
+   "spawn_sha": null,
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": ""
+  },
+  {
+   "id": "T5",
+   "name": "README: add/show/reset z przykładem",
+   "files": [
+    "README.md"
+   ],
+   "readers": [],
+   "deps": [
+    "T1",
+    "T2"
+   ],
+   "variant": "sonnet",
+   "verify": "d=$(mktemp -d) && cd $d && node <repo>/src/cli.js add 2 && node <repo>/src/cli.js add 3 && node <repo>/src/cli.js show",
+   "status": "merged",
+   "agent": "a02480ffc387f2085",
+   "branch": null,
+   "worktree": ".claude/worktrees/agent-a02480ffc387f2085",
+   "spawn_sha": "a6c5a12",
+   "rounds": 1,
+   "resumes": 0,
+   "findings": 0,
+   "note": "runda poprawek recenzji"
+  }
+ ],
+ "owned": [
+  {
+   "kind": "branch",
+   "ref": "integracja/licznik-prod",
+   "created": "2026-11-08T14:30:03Z",
+   "done": false
+  },
+  {
+   "kind": "worktree",
+   "ref": ".claude/worktrees/agent-a3eb78c5f9ca1545a",
+   "created": "2026-11-08T14:30:41Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": ".claude/worktrees/agent-a14a7b07eadd310e3",
+   "created": "2026-11-08T14:30:41Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a3eb78c5f9ca1545a",
+   "created": "2026-11-08T14:30:41Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a14a7b07eadd310e3",
+   "created": "2026-11-08T14:30:41Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": ".claude/worktrees/agent-a3c8819eae1a22189",
+   "created": "2026-11-08T14:31:54Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a3c8819eae1a22189",
+   "created": "2026-11-08T14:31:54Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": ".claude/worktrees/agent-a786fece62c884f0a",
+   "created": "2026-11-08T14:35:35Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a786fece62c884f0a",
+   "created": "2026-11-08T14:35:35Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/odbior-c20",
+   "created": "2026-11-08T14:37:16Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": ".claude/worktrees/agent-a02480ffc387f2085",
+   "created": "2026-11-08T14:39:41Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a02480ffc387f2085",
+   "created": "2026-11-08T14:39:41Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "origin/integracja/licznik-prod",
+   "created": "2026-11-08T14:42:15Z",
+   "done": false
+  }
+ ],
+ "human_steps": [
+  {
+   "id": "H1",
+   "text": "Utwórz PR integracja/licznik-prod → main (origin to lokalne bare repo, GitHuba brak); treść: scratchpad/lab/pr-c20.md",
+   "done": false,
+   "created": "2026-11-08T14:42:42Z"
+  },
+  {
+   "id": "H2",
+   "text": "Decyzja D1 (dane klientów data/klienci-prod.json): potwierdź u właściciela danych kopię poza repo i odpowiedz na D1 ze swojego terminala; usunięcie z historii to osobna decyzja (przepisanie historii + force push na origin)",
+   "done": false,
+   "created": "2026-11-08T14:42:42Z"
+  }
+ ],
+ "sessions": [
+  "55b4b0c6-403f-4041-a266-f770f9e1f69f"
+ ],
+ "cost": {
+  "sessions": [
+   {
+    "ts": "20261108T153425",
+    "usd": 4.4093132,
+    "turns": 10,
+    "ms": 143867,
+    "subtype": "success",
+    "error": false,
+    "exit": 0
+   }
+  ],
+  "usd_total": 4.41
+ },
+ "verdict": {
+  "state": "partial",
+  "head": "a8d5de06191d600e75be533c7610251042823865",
+  "missing": [
+   "C5 unverified",
+   "T4 ready",
+   "decyzja D1 pending",
+   "krok ludzki H1",
+   "krok ludzki H2"
+  ],
+  "note": "C1-C4 pass na a8d5de0; C5 unverified: D1 bez zgody człowieka, T4 nie ruszone; brak mandatu merge/deploy, PR krok ludzki",
+  "ts": "2026-11-08T14:42:42Z"
+ },
+ "stop_blocks": {}
+}

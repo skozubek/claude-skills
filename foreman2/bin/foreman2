@@ -152,6 +152,12 @@ class Przelot:
     def head(self, ref=None):
         return git(self.d["repo"], "rev-parse", ref or self.d["branch"], ok=False) or None
 
+    def pelny_sha(self, sha):
+        """Skrócony SHA rozwija do pełnego przez git repo; nieznany zostaje jak podany."""
+        if not sha:
+            return sha
+        return git(self.d["repo"], "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", ok=False) or sha
+
     def nieaktualne(self, head):
         """Kryteria bez ważnego dowodu: brak pomiaru, ostatni pomiar fail, albo pass na innym SHA."""
         dow = self.dowody()
@@ -160,7 +166,7 @@ class Przelot:
             e = self.ostatni_dowod(c["id"], dow)
             if e is None or e["verdict"] != "pass":
                 braki.append(f"{c['id']} {('bez dowodu' if e is None else e['verdict'])}")
-            elif head and e["sha"] != head:
+            elif head and not sha_rowne(e["sha"], head):
                 braki.append(f"{c['id']} dowód {e['id']} na {e['sha'][:12]}, HEAD {head[:12]}")
         return braki
 
@@ -341,7 +347,7 @@ def cmd_task(a):
         for dep in lista(a.deps):
             if not any(t["id"] == dep for t in p.d["tasks"]):
                 sys.exit(f"zależność {dep} nie istnieje")
-        zajete = {f: t["id"] for t in p.d["tasks"] for f in t["files"]}
+        zajete = {f: t["id"] for t in p.d["tasks"] if t["status"] not in ("merged", "dropped") for f in t["files"]}
         kolizje = [f"{f} ({zajete[f]})" for f in lista(a.files) if f in zajete]
         if kolizje:
             sys.exit("plik ma już właściciela: " + ", ".join(kolizje))
@@ -401,8 +407,9 @@ def cmd_evidence(a):
             sys.exit("evidence add --for <C|T> --cmd <komenda> --sha <sha> --result <wynik> --verdict <w>")
         if a.for_.startswith("C"):
             p.kryterium(a.for_)
+        a.sha = p.pelny_sha(a.sha)
         dow = p.dowody()
-        istn = next((e for e in dow if e["for"] == a.for_ and e["cmd"] == a.cmd and e["sha"] == a.sha and e["verdict"] == a.verdict), None)
+        istn = next((e for e in dow if e["for"] == a.for_ and e["cmd"] == a.cmd and sha_rowne(e["sha"], a.sha) and e["verdict"] == a.verdict), None)
         if istn:
             print(istn["id"])  # ten sam pomiar na tym samym SHA: bez powtórki
             return
@@ -425,7 +432,7 @@ def cmd_evidence(a):
                 return
         sys.exit(f"brak dowodu {a.id}")
     elif a.op == "check":
-        head = a.head or p.head(a.ref)
+        head = p.pelny_sha(a.head) if a.head else p.head(a.ref)
         braki = p.nieaktualne(head)
         for b in braki:
             print("brak:", b)
@@ -583,11 +590,17 @@ def werdykt(p, head):
     return ("blocked" if any(t["status"] == "blocked" for t in p.d["tasks"]) else "partial"), braki
 
 
+def sha_rowne(a, b):
+    """Ten sam commit także przy skróconym zapisie (co najmniej 7 znaków)."""
+    a, b = (a or "").strip(), (b or "").strip()
+    return bool(a and b) and min(len(a), len(b)) >= 7 and (a.startswith(b) or b.startswith(a))
+
+
 def cmd_close(a):
     p = znajdz(a)
     if p.d["state"] == "cancelled":
         sys.exit("przelot anulowany")
-    head = a.head or p.head()
+    head = p.pelny_sha(a.head) if a.head else p.head()
     stan, braki = werdykt(p, head)
     if a.state and a.state != stan:
         if a.state == "done":

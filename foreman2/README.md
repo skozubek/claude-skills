@@ -104,3 +104,6 @@ i pisze `decide answer`; to warstwa UX poza tym katalogiem.
 - Pamięć weryfikatora (`memory` agenta) dla powtarzalnych ścieżek odbioru.
 - Hook Stop skilla w sesji interaktywnej (`/foreman2`): zmierzony tylko
   w `claude -p` przez runner.
+- Koszt sesji zabitej w biegu: runner zapisuje koszt na końcu sesji, więc po
+  zabiciu `run --resume` bez `--budget` dostaje pełną resztę budżetu. Do czasu
+  liczenia kosztu z transkryptu podaje się `--budget` ręcznie.

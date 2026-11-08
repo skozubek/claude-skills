@@ -1,0 +1,10 @@
+{
+ "id": "E5",
+ "ts": "2026-11-08T14:28:05Z",
+ "for": "T1",
+ "cmd": "codex exec -s read-only < diff.patch (baza 1d3d68a...424250188d84347bcd8bf5204845b1bf856265a2)",
+ "sha": "424250188d84347bcd8bf5204845b1bf856265a2",
+ "result": "Codex: OK, diff robi dokładnie dwie zmiany",
+ "file": "E5-a20-codex.txt",
+ "verdict": "pass"
+}

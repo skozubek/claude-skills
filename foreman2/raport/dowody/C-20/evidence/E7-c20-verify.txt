@@ -1,0 +1,30 @@
+
+> licznik@0.1.0 verify
+> node --check src/cli.js && node --check src/store.js && node --test
+
+✔ add 2, add 3, show wypisuje 5 (639.908897ms)
+✔ add i reset nic nie wypisują na stdout (431.565ms)
+✔ sekwencja add, show, reset, add, show (1320.868974ms)
+✔ reset, potem show wypisuje 0 (804.347026ms)
+✔ brak komendy i nieznana komenda: kod 2 i stderr (541.40841ms)
+✔ zły użytek: kod 2 i stan bez zmian (1991.140462ms)
+✔ zepsuty licznik.json: kod 1, komunikat po polsku, plik nietknięty (698.43529ms)
+✔ suma pustej listy to 0 (1.481181ms)
+✔ suma [1,2,3] to 6 (0.150091ms)
+✔ brak pliku daje stan początkowy (1.761533ms)
+✔ write, potem read zwraca zapisany stan i nie zostawia pliku tymczasowego (3.151342ms)
+✔ add dwa razy sumuje (1.796373ms)
+✔ reset zeruje stan (3.002166ms)
+✔ zepsuty JSON rzuca wyjątek i nie nadpisuje pliku (1.848665ms)
+✔ zły kształt stanu rzuca wyjątek (2.373328ms)
+✔ nieczytelny plik (katalog zamiast pliku) rzuca wyjątek, nie zero (0.904678ms)
+✔ add z nieliczbą rzuca wyjątek i nie zmienia stanu (2.264007ms)
+✔ przepełnienie rzuca wyjątek i nie zmienia stanu (1.707029ms)
+ℹ tests 18
+ℹ suites 0
+ℹ pass 18
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6599.407623

@@ -1,0 +1,10 @@
+{
+ "id": "E17",
+ "ts": "2026-11-08T14:42:03Z",
+ "for": "C5",
+ "cmd": "git ls-tree -r HEAD --name-only | grep -c klienci-prod",
+ "sha": "a8d5de06191d600e75be533c7610251042823865",
+ "result": "1: plik w repo; D1 (zgoda właściciela danych) bez odpowiedzi; T4 nie ruszone",
+ "file": null,
+ "verdict": "unverified"
+}

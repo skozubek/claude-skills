@@ -1,0 +1,27 @@
+{
+  "subtype": "success",
+  "is_error": false,
+  "total_cost_usd": 0.533368,
+  "duration_ms": 43196,
+  "num_turns": 6,
+  "session_id": "b09da367-759f-44c3-969e-9db209061d68",
+  "result": "Zrobione bez floty: to była poprawka na jeden diff, więc foreman się tu nie zwracał. Zmianę zrobiłem sam w tej sesji.\n\n**Kryteria odbioru:**\n- `grep -c \"w budowie\" README.md` daje 1 ✓\n- README ma teraz nagłówek „Komendy (w budowie)” i zdanie „Na razie żadnych. Uruchomienie `node src/cli.js` wypisuje wersję.” ✓\n- `node src/cli.js` dalej wypisuje `licznik 0.1.0` ✓\n- `npm run verify` przechodzi (1 test, 0 błędów). README nie dotyka kodu, więc to tylko sprawdzenie, że nic się nie zepsuło.\n\n**Stan:**\n- Commit `e8d593a` jest na gałęzi `integracja/literowka-readme` i wypchnięty do origin; zdalna gałąź wskazuje ten sam commit.\n- `git status` czysty, plik roboczy z wynikiem verify skasowany.\n- Codexa nie puszczałem. Granice pozwalały najwyżej na jedno wywołanie, ale nie wymagały żadnego, a w dwóch zmienionych słowach README nie ma czego recenzować.\n\n**Zostaje dla Ciebie:**\n- PR i merge do `main` robisz sam: origin to lokalne repo bez GitHuba, a merge'a nie miałem w mandacie.\n- Pliku planu `plany/plan-a1x.md` nie skasowałem. Leży poza repo, a Granice obejmują tylko `README.md`. Usuń go razem z mergem.",
+  "modelUsage": {
+    "claude-opus-5-5": {
+      "inputTokens": 12,
+      "outputTokens": 2084,
+      "cacheReadInputTokens": 320240,
+      "cacheCreationInputTokens": 53449,
+      "webSearchRequests": 0,
+      "costUSD": 0.533368,
+      "contextWindow": 1000000,
+      "maxOutputTokens": 128000,
+      "thinkingTokens": 196,
+      "cacheCreationEphemeral5mInputTokens": 0,
+      "cacheCreationEphemeral1hInputTokens": 53449,
+      "canonicalModel": "claude-opus-5-5",
+      "provider": "firstParty",
+      "costBasis": "list"
+    }
+  }
+}

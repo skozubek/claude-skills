@@ -1,0 +1,126 @@
+{
+ "schema": 2,
+ "id": "2026-11-08-literowka-readme",
+ "repo": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/a20",
+ "remote": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/remote-a20.git",
+ "base_sha": "1d3d68ab577e6306dbf639042f69099151f3cafd",
+ "branch": "integracja/literowka-readme",
+ "state": "partial",
+ "created": "2026-11-08T14:26:05Z",
+ "updated": "2026-11-08T14:28:22Z",
+ "plan": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/plany/plan-a.md",
+ "budget_usd": 10.0,
+ "max_live": 3,
+ "mandate": {
+  "merge": false,
+  "deploy": false,
+  "note": ""
+ },
+ "unattended": true,
+ "sources": {
+  "foreman2": {
+   "path": "/Users/serge/Coding/claude-skills/foreman2",
+   "sha": "1f8bab913b6bab07f2c547717ef324dcaab4a091"
+  },
+  "claude": "2.1.319 (Claude Code)",
+  "codex": "codex-cli 0.159.3",
+  "gstack": "1.94.19.0"
+ },
+ "criteria": [
+  {
+   "id": "C1",
+   "text": "Nagłówek sekcji komend ma dopisek w budowie",
+   "read": "grep -c \"w budowie\" README.md",
+   "expected": "1",
+   "status": "pass",
+   "evidence": [
+    "E2"
+   ]
+  },
+  {
+   "id": "C2",
+   "text": "Zdanie o braku komend brzmi Na razie żadnych.",
+   "read": "grep -c \"Na razie żadnych.\" README.md; grep -c \"Jeszcze żadnych\" README.md",
+   "expected": "1 i 0",
+   "status": "pass",
+   "evidence": [
+    "E3"
+   ]
+  },
+  {
+   "id": "C3",
+   "text": "Przykład z README dalej działa",
+   "read": "node src/cli.js",
+   "expected": "licznik 0.1.0, kod 0",
+   "status": "pass",
+   "evidence": [
+    "E4"
+   ]
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T1",
+   "name": "README: nagłówek i zdanie o komendach",
+   "files": [
+    "README.md"
+   ],
+   "readers": [],
+   "deps": [],
+   "variant": "sonnet",
+   "verify": "grep -c \"w budowie\" README.md && grep -c \"Na razie żadnych.\" README.md && ! grep -q \"Jeszcze żadnych\" README.md && npm run verify",
+   "status": "merged",
+   "agent": "brygadzista",
+   "branch": null,
+   "worktree": null,
+   "spawn_sha": "1d3d68ab577e",
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": "wykonane przez brygadzistę, decyzja D1"
+  }
+ ],
+ "owned": [
+  {
+   "kind": "branch",
+   "ref": "integracja/literowka-readme",
+   "created": "2026-11-08T14:27:22Z",
+   "done": false
+  }
+ ],
+ "human_steps": [
+  {
+   "id": "H1",
+   "text": "Otworzyć PR z integracja/literowka-readme do main (remote to lokalne repo bare, bez GitHuba) i zmergować; brak mandatu na merge",
+   "done": false,
+   "created": "2026-11-08T14:28:05Z"
+  }
+ ],
+ "sessions": [
+  "8114ded9-c946-405b-9ea6-f281569c5def"
+ ],
+ "cost": {
+  "sessions": [
+   {
+    "ts": "20261108T152605",
+    "usd": 0.716529,
+    "turns": 15,
+    "ms": 133231,
+    "subtype": "success",
+    "error": false,
+    "exit": 0
+   }
+  ],
+  "usd_total": 0.72
+ },
+ "verdict": {
+  "state": "partial",
+  "head": "424250188d84347bcd8bf5204845b1bf856265a2",
+  "missing": [
+   "krok ludzki H1"
+  ],
+  "note": "Kryteria C1-C3 pass na 424250188d84347bcd8bf5204845b1bf856265a2; gałąź wypchnięta; PR i merge czekają na człowieka (brak GitHuba i mandatu)",
+  "ts": "2026-11-08T14:28:05Z"
+ },
+ "stop_blocks": {}
+}

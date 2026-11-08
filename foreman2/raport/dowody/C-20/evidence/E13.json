@@ -1,0 +1,10 @@
+{
+ "id": "E13",
+ "ts": "2026-11-08T14:42:02Z",
+ "for": "C1",
+ "cmd": "mktemp; node src/cli.js add 2 && add 3 && show",
+ "sha": "a8d5de06191d600e75be533c7610251042823865",
+ "result": "5",
+ "file": null,
+ "verdict": "pass"
+}

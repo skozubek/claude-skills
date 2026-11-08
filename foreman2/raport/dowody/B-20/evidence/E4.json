@@ -1,0 +1,10 @@
+{
+ "id": "E4",
+ "ts": "2026-11-08T14:08:42Z",
+ "for": "T3",
+ "cmd": "git archive worktree-agent-a9320384f8a4e6884 w mktemp -d; awk blok sh z Komendy; sh blok.sh",
+ "sha": "c69eb972d5b712e26f84cd32aca74ba1e5c0a98f",
+ "result": "blok = sekwencja C1, stdout 5, exit 0; tylko README.md w diffie; add/show/reset mają przykłady; komunikaty = src/cli.js",
+ "file": null,
+ "verdict": "pass"
+}

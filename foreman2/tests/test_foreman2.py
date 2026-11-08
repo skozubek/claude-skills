@@ -123,6 +123,19 @@ class TestPrzelot(Baza):
         self.assertNotEqual(r.returncode, 0)
         r = self.f2("task", "add", "--name", "z", "--files", "a.ts", ok=False)
         self.assertIn("właściciela", r.stderr)
+        self.f2("task", "set", "T1", "--status", "merged")
+        self.assertEqual(self.f2("task", "add", "--name", "poprawki recenzji", "--files", "a.ts").stdout.strip(), "T5",
+                         "plik zadania scalonego wolno dać nowemu zadaniu (runda poprawek)")
+
+    def test_skrocony_sha_liczy_sie_jak_pelny(self):
+        rid = self.nowy()
+        for t in ("T1", "T2", "T3", "T4"):
+            self.f2("task", "set", t, "--status", "merged")
+        e = self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head[:7], "--result", "2", "--verdict", "pass").stdout.strip()
+        self.assertEqual(json.loads(self.f2("evidence", "show", e).stdout)["sha"], self.head, "skrócony SHA rozwinięty do pełnego")
+        self.assertEqual(self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head, "--result", "2", "--verdict", "pass").stdout.strip(), e, "ten sam pomiar bez powtórki")
+        self.assertIn("każde kryterium", self.f2("evidence", "check", "--head", self.head[:8]).stdout)
+        self.assertEqual(self.f2("--run", rid, "close", "--head", self.head[:7]).stdout.strip(), "done")
 
     def test_dowod_ustawia_kryterium_z_najnowszego_pomiaru(self):
         self.nowy()

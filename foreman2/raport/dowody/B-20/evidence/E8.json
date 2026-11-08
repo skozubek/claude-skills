@@ -1,0 +1,10 @@
+{
+ "id": "E8",
+ "ts": "2026-11-08T14:09:06Z",
+ "for": "C4",
+ "cmd": "git archive (T3) w mktemp -d; blok sh z README Komendy uruchomiony dosłownie",
+ "sha": "19509ae4baf21e2e4551f702119917ccdfc10ba9",
+ "result": "blok = sekwencja C1, stdout 5; add/show/reset opisane z przykładami; README identyczny na 19509ae4baf21e2e4551f702119917ccdfc10ba9",
+ "file": null,
+ "verdict": "pass"
+}

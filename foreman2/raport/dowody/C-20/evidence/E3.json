@@ -1,0 +1,10 @@
+{
+ "id": "E3",
+ "ts": "2026-11-08T14:35:10Z",
+ "for": "T2",
+ "cmd": "node --check src/cli.js && node --test tests/cli.test.js; npm run verify",
+ "sha": "42043e0",
+ "result": "cli pass 7 fail 0; verify tests 18 pass 18 fail 0; diff tylko src/cli.js, tests/cli.test.js",
+ "file": null,
+ "verdict": "pass"
+}

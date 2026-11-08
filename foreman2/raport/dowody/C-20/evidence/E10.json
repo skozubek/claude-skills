@@ -1,0 +1,10 @@
+{
+ "id": "E10",
+ "ts": "2026-11-08T14:41:43Z",
+ "for": "T1",
+ "cmd": "npm run verify; reset na obcym pliku; add poza zakresem; EACCES; przykład README",
+ "sha": "10ea551",
+ "result": "22/22; kod 1 plik nietknięty; kod 2 komunikat o zakresie; '(brak uprawnień)' po polsku; 5, 0",
+ "file": null,
+ "verdict": "pass"
+}

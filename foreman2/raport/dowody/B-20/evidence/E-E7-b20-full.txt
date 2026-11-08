@@ -1,0 +1,29 @@
+
+> licznik@0.1.0 verify
+> node --check src/cli.js && node --check src/store.js && node --test
+
+✔ add 2, add 3, show daje 5 (344.785872ms)
+✔ reset zeruje licznik i milczy (353.941857ms)
+✔ brak komendy: kod 2 i użycie (120.987919ms)
+✔ nieznana komenda: kod 2 i komunikat (120.512039ms)
+✔ zła liczba: kod 2, stan bez zmian (809.349899ms)
+✔ nadmiar argumentów: kod 2, stan bez zmian (594.792664ms)
+✔ zepsuty plik stanu: show i add kończą kodem 1, plik nietknięty (229.137754ms)
+✔ zepsuty plik stanu: reset naprawia (221.797339ms)
+✔ brak pliku daje stan początkowy (1.786574ms)
+✔ read: zepsuty JSON rzuca (1.834549ms)
+✔ read: zły kształt rzuca (1.600438ms)
+✔ read: katalog zamiast pliku (EISDIR) rzuca (0.481322ms)
+✔ write i read: round-trip, bez pliku .tmp (0.961614ms)
+✔ write: zły stan rzuca i nie tworzy pliku (0.687946ms)
+✔ add: od zera i kumulacja, zwraca nowy stan (1.626575ms)
+✔ add: przepełnienie rzuca, plik bez zmian (0.787218ms)
+✔ reset: zeruje, także zepsuty plik (1.79206ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 17
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2944.577042

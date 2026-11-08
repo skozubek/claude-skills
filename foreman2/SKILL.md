@@ -139,10 +139,12 @@ integracji (`profile.verify`) zielona → dowód dla kryteriów, które pokrywa.
 `SHA=$(git rev-parse <integracja>)`; `git diff <baza>...$SHA > <tmp>/diff.patch`;
 katalog odbioru `git worktree add <tmp>/odbior $SHA` (`own add worktree`). Na tym
 samym SHA: `/code-review high`, Codex (`codex exec -s read-only … < diff.patch`),
-`foreman2-recenzent` (oś tekstu dla użytkownika, gdy zmiana ma napisy; bez Codexa
-także poprawność, a PR dostaje notkę „bez drugiego modelu”). Findingi
-łączysz w jedną rundę poprawek; delta dostaje drugą rundę Codexa tylko przy migracji
-albo uprawnieniach; findingi tekstu kończą się po dwóch rundach. Odbiór na żywo: `foreman2-weryfikator` ze skillem z profilu
+`foreman2-recenzent` bez parametru `model` (definicja agenta: opus; oś tekstu dla
+użytkownika, gdy zmiana ma napisy; bez Codexa także poprawność, a PR dostaje notkę
+„bez drugiego modelu”). Findingi łączysz w jedną rundę poprawek jako nowe zadanie
+(`task add --files` plikami zadań już scalonych), nie przez ponowne otwarcie starych;
+delta dostaje drugą rundę Codexa tylko przy migracji albo uprawnieniach; findingi
+tekstu kończą się po dwóch rundach. Odbiór na żywo: `foreman2-weryfikator` ze skillem z profilu
 (`live_verify_skill`), bez skilla gstack `/browse` na adresie z planu; bez obu
 kryterium ekranu zostaje `unverified`. Progi czasu na opublikowanej wersji.
 Każdy wynik → `$F2 evidence add --for <C>`.

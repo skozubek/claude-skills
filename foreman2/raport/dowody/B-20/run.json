@@ -1,0 +1,263 @@
+{
+ "schema": 1,
+ "id": "2026-11-08-licznik-komendy",
+ "repo": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20",
+ "remote": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/remote-b20.git",
+ "base_sha": "1d3d68ab577e6306dbf639042f69099151f3cafd",
+ "branch": "integracja/licznik-komendy",
+ "state": "partial",
+ "created": "2026-11-08T13:57:57Z",
+ "updated": "2026-11-08T14:17:03Z",
+ "plan": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/f2home/runs/2026-11-08-licznik-komendy/plan.md",
+ "budget_usd": 40.0,
+ "max_live": 3,
+ "mandate": {
+  "merge": false,
+  "deploy": false,
+  "note": ""
+ },
+ "unattended": true,
+ "sources": {
+  "foreman2": {
+   "path": "/Users/serge/Coding/claude-skills/foreman2",
+   "sha": "4abfca53d71867245b182f0d895d09fc7fab30d3"
+  },
+  "claude": "2.1.319 (Claude Code)",
+  "codex": "codex-cli 0.159.3",
+  "gstack": "1.94.19.0"
+ },
+ "criteria": [
+  {
+   "id": "C1",
+   "text": "add sumuje między uruchomieniami",
+   "read": "stdout: cd $(mktemp -d) && node <repo>/src/cli.js add 2 && node <repo>/src/cli.js add 3 && node <repo>/src/cli.js show",
+   "expected": "5",
+   "status": "pass",
+   "evidence": [
+    "E10",
+    "E5"
+   ]
+  },
+  {
+   "id": "C2",
+   "text": "reset zeruje",
+   "read": "stdout: node <repo>/src/cli.js reset && node <repo>/src/cli.js show w tym samym katalogu",
+   "expected": "0",
+   "status": "pass",
+   "evidence": [
+    "E11",
+    "E6"
+   ]
+  },
+  {
+   "id": "C3",
+   "text": "bramka i pokrycie testów",
+   "read": "npm run verify: kod wyjścia, liczniki pass/fail, nazwy testów",
+   "expected": "kod 0, fail 0, pass >= 6; testy store read/write/add/reset i cli add/show/reset/nieznana komenda (kod 2 + stderr)",
+   "status": "pass",
+   "evidence": [
+    "E12",
+    "E7"
+   ]
+  },
+  {
+   "id": "C4",
+   "text": "README zgodny z zachowaniem",
+   "read": "README.md sekcja Komendy: przykład uruchomiony dosłownie",
+   "expected": "add/show/reset opisane; przykład = sekwencja z C1 i wynik 5",
+   "status": "pass",
+   "evidence": [
+    "E13",
+    "E8"
+   ]
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T0",
+   "name": "kontrakt store w kodzie",
+   "files": [
+    "src/store.js"
+   ],
+   "readers": [
+    "T12"
+   ],
+   "deps": [],
+   "variant": "opus",
+   "verify": "npm run verify",
+   "status": "merged",
+   "agent": null,
+   "branch": null,
+   "worktree": null,
+   "spawn_sha": null,
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": "brygadzista, commit kontraktu"
+  },
+  {
+   "id": "T12",
+   "name": "store + cli z testami",
+   "files": [
+    "src/store.js",
+    "src/cli.js",
+    "tests/store.test.js",
+    "tests/cli.test.js"
+   ],
+   "readers": [
+    "T3"
+   ],
+   "deps": [
+    "T0"
+   ],
+   "variant": "sonnet",
+   "verify": "npm run verify && d=$(mktemp -d) && (cd $d && node $OLDPWD/src/cli.js add 2 && node $OLDPWD/src/cli.js add 3 && node $OLDPWD/src/cli.js show && node $OLDPWD/src/cli.js reset && node $OLDPWD/src/cli.js show)",
+   "status": "merged",
+   "agent": "a7b1e1e1e596429b0",
+   "branch": null,
+   "worktree": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20/.claude/worktrees/agent-a7b1e1e1e596429b0",
+   "spawn_sha": "43aaed1128e1ae19b839f4e1c2832ffd53117905",
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": ""
+  },
+  {
+   "id": "T3",
+   "name": "README komend",
+   "files": [
+    "README.md"
+   ],
+   "readers": [],
+   "deps": [
+    "T12"
+   ],
+   "variant": "sonnet",
+   "verify": "kopia git archive HEAD w mktemp -d; blok sh z README Komendy uruchomiony dosłownie -> stdout kończy się 5; przykłady add/show/reset; komunikaty = A8",
+   "status": "merged",
+   "agent": "a9320384f8a4e6884",
+   "branch": null,
+   "worktree": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20/.claude/worktrees/agent-a9320384f8a4e6884",
+   "spawn_sha": "a8641b56300bd9d9093b28c47a5761b51f327b78",
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": ""
+  },
+  {
+   "id": "T4",
+   "name": "poprawki recenzji: komunikaty, przepełnienie, wx, README",
+   "files": [
+    "src/store.js",
+    "src/cli.js",
+    "tests/store.test.js",
+    "tests/cli.test.js",
+    "README.md"
+   ],
+   "readers": [],
+   "deps": [
+    "T3"
+   ],
+   "variant": "sonnet",
+   "verify": "npm run verify + scenariusze z briefu w mktemp -d",
+   "status": "merged",
+   "agent": "a5d1ecfb3c52e1f79",
+   "branch": null,
+   "worktree": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20/.claude/worktrees/agent-a5d1ecfb3c52e1f79",
+   "spawn_sha": "19509ae4baf21e2e4551f702119917ccdfc10ba9",
+   "rounds": 0,
+   "resumes": 0,
+   "findings": 0,
+   "note": ""
+  }
+ ],
+ "owned": [
+  {
+   "kind": "branch",
+   "ref": "integracja/licznik-komendy",
+   "created": "2026-11-08T14:03:44Z",
+   "done": false
+  },
+  {
+   "kind": "worktree",
+   "ref": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20/.claude/worktrees/agent-a7b1e1e1e596429b0",
+   "created": "2026-11-08T14:04:27Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a7b1e1e1e596429b0",
+   "created": "2026-11-08T14:04:27Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20/.claude/worktrees/agent-a9320384f8a4e6884",
+   "created": "2026-11-08T14:07:36Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a9320384f8a4e6884",
+   "created": "2026-11-08T14:07:36Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/f2home/runs/2026-11-08-licznik-komendy/odbior",
+   "created": "2026-11-08T14:09:15Z",
+   "done": true
+  },
+  {
+   "kind": "worktree",
+   "ref": "/private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/lab/b20/.claude/worktrees/agent-a5d1ecfb3c52e1f79",
+   "created": "2026-11-08T14:12:01Z",
+   "done": true
+  },
+  {
+   "kind": "branch",
+   "ref": "worktree-agent-a5d1ecfb3c52e1f79",
+   "created": "2026-11-08T14:12:01Z",
+   "done": true
+  }
+ ],
+ "human_steps": [
+  {
+   "id": "H1",
+   "text": "PR z integracja/licznik-komendy (origin = lokalne bare repo, bez GitHuba) do main; treść: /private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/f2home/runs/2026-11-08-licznik-komendy/pr-body.md; merge po przeczytaniu",
+   "done": false,
+   "created": "2026-11-08T14:15:29Z"
+  },
+  {
+   "id": "H2",
+   "text": "Propozycje poprawek skilla foreman2 (P1-P5, opinia Codexa w środku): /private/tmp/claude-501/-Users-serge-Coding-claude-skills-foreman/bedcff57-cb28-44c1-bce7-dfa0c65aff89/scratchpad/f2home/runs/2026-11-08-licznik-komendy/postmortem.md — wdrożenie poza granicami tego przelotu",
+   "done": false,
+   "created": "2026-11-08T14:16:47Z"
+  }
+ ],
+ "sessions": [
+  "ea239e99-fce3-4396-bbc3-8f6a87ab7166"
+ ],
+ "cost": {
+  "sessions": [
+   {
+    "ts": "20261108T145836",
+    "usd": 4.503932399999999,
+    "turns": 14,
+    "ms": 189907,
+    "subtype": "success",
+    "error": false,
+    "exit": 0
+   }
+  ],
+  "usd_total": 4.5
+ },
+ "verdict": {
+  "state": "partial",
+  "missing": [
+   "krok ludzki H1"
+  ],
+  "note": "kod, testy i README gotowe na c8935cb, wypchnięte na origin; brak mandatu merge i brak GitHuba: PR to krok człowieka",
+  "ts": "2026-11-08T14:15:29Z"
+ }
+}

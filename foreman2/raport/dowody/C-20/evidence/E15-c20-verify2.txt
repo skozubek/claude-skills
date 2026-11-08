@@ -1,0 +1,34 @@
+
+> licznik@0.1.0 verify
+> node --check src/cli.js && node --check src/store.js && node --test
+
+✔ add 2, add 3, show wypisuje 5 (334.528209ms)
+✔ add i reset nic nie wypisują na stdout (217.456634ms)
+✔ sekwencja add, show, reset, add, show (555.427773ms)
+✔ reset, potem show wypisuje 0 (336.51628ms)
+✔ brak komendy i nieznana komenda: kod 2 i stderr (225.283167ms)
+✔ zły użytek: kod 2 i stan bez zmian (931.605528ms)
+✔ zepsuty licznik.json: kod 1, komunikat po polsku, plik nietknięty (331.380633ms)
+✔ reset na obcym kształcie pliku: kod 1, plik nietknięty (110.502255ms)
+✔ add poza zakresem: kod 2 i komunikat o zakresie, nie o całkowitości (109.954084ms)
+✔ suma pustej listy to 0 (0.783119ms)
+✔ suma [1,2,3] to 6 (0.138959ms)
+✔ brak pliku daje stan początkowy (2.967246ms)
+✔ write, potem read zwraca zapisany stan i nie zostawia pliku tymczasowego (1.795894ms)
+✔ add dwa razy sumuje (1.820679ms)
+✔ reset zeruje stan (1.862619ms)
+✔ reset na zepsutym lub obcym pliku rzuca wyjątek i nie rusza pliku (2.856027ms)
+✔ reset bez pliku tworzy {value: 0} (1.304141ms)
+✔ zepsuty JSON rzuca wyjątek i nie nadpisuje pliku (0.980765ms)
+✔ zły kształt stanu rzuca wyjątek (1.580596ms)
+✔ nieczytelny plik (katalog zamiast pliku) rzuca wyjątek, nie zero (1.012633ms)
+✔ add z nieliczbą rzuca wyjątek i nie zmienia stanu (2.313385ms)
+✔ przepełnienie rzuca wyjątek i nie zmienia stanu (5.233848ms)
+ℹ tests 22
+ℹ suites 0
+ℹ pass 22
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3303.493679

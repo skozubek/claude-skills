@@ -1,0 +1,10 @@
+{
+ "id": "E9",
+ "ts": "2026-11-08T14:14:32Z",
+ "for": "T4",
+ "cmd": "przodek, diff names, npm run verify w worktree, scenariusze w mktemp -d, mutacja bez wx",
+ "sha": "99c87c9274e45546235376daf03175ae6d16a7e5",
+ "result": "verify pass 22 fail 0; {bad/kształt -> 2 linie z abs ścieżką + podpowiedź reset, kod 1; EISDIR -> nie można odczytać, kod 1; zakres -> osobny komunikat, plik bez zmian; EACCES -> nie można zapisać, bez .tmp; użycie node src/cli.js, kod 2; mutacja w zapala test symlinka",
+ "file": null,
+ "verdict": "pass"
+}

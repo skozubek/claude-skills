@@ -1,0 +1,10 @@
+{
+ "id": "E2",
+ "ts": "2026-11-08T14:27:40Z",
+ "for": "C1",
+ "cmd": "grep -c \"w budowie\" README.md",
+ "sha": "424250188d84347bcd8bf5204845b1bf856265a2",
+ "result": "1",
+ "file": null,
+ "verdict": "pass"
+}

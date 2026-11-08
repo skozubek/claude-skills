@@ -1,0 +1,10 @@
+{
+ "id": "E16",
+ "ts": "2026-11-08T14:42:03Z",
+ "for": "C4",
+ "cmd": "blok sh z README wykonany dosłownie w mktemp z kopią src",
+ "sha": "a8d5de06191d600e75be533c7610251042823865",
+ "result": "add/show/reset + kody wyjścia opisane; przykład wypisuje 5, 0",
+ "file": null,
+ "verdict": "pass"
+}

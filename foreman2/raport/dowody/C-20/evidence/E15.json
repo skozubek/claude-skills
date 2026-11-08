@@ -1,0 +1,10 @@
+{
+ "id": "E15",
+ "ts": "2026-11-08T14:42:03Z",
+ "for": "C3",
+ "cmd": "npm run verify; node --test tests/store.test.js tests/cli.test.js",
+ "sha": "a8d5de06191d600e75be533c7610251042823865",
+ "result": "verify exit 0, 22/22 (legacy zielony); store+cli 20 pass; mutacje (a6c5a12) zapalały testy",
+ "file": "E15-c20-verify2.txt",
+ "verdict": "pass"
+}

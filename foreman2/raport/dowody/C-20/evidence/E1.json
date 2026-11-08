@@ -1,0 +1,10 @@
+{
+ "id": "E1",
+ "ts": "2026-11-08T14:30:58Z",
+ "for": "T3",
+ "cmd": "node --test tests/legacy.test.js; suma([1n,2n]), suma([])",
+ "sha": "7272450",
+ "result": "pass 2 fail 0; 3n 0; diff tylko src/legacy.js",
+ "file": null,
+ "verdict": "pass"
+}
