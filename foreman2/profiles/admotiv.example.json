@@ -3,6 +3,7 @@
  "live_verify_skill": "verify-admotiv",
  "shared_clone": true,
  "notes": [
+  "Mapa funkcji AdMotiv (`~/Coding/MOL/Panel/meta/mapa/`, narzędzie prywatne poza repo): kryteria odbioru planu to wpisy mapy, nowe zachowanie ekranu dostaje w grafie zadanie „dopisz wpis mapy” w tej samej robocie; przed robotą w obszarze `verify-admotiv/bin/doctor <obszar>` pokazuje cudze zmiany od ostatniego pełnego przejścia (także w modułach importowanych przez ekran), a te przechodzi się najpierw; krok, który przeszedł, zalicza weryfikator przez `bin/przeszlo <katalog> <ID>` (rejestr `przejscia.log`), nie dopiskiem w pliku mapy.",
   "Strażnik dokumentów liczy każdy commit osobno: commit kodu bez dokumentu naprawia późniejszy commit z linią `Dokumenty: uzupełnia <sha>` albo `Dokumenty: bez zmian <sha>`; ten sam SHA sprawdzany raz.",
   "Migracja po merge'u: workflow „Zastosuj migrację” zaraz po merge'u; `migration-drift` czeka 10 minut. Migracja zmieniająca obiekt z `scripts/konsumenci.json` poprawia jego wpis w tym samym PR-ze.",
   "Świeży worktree nie ma `supabase link`: odczyty bazy z głównego klonu (`supabase db query --linked`, tylko select); deploy funkcji z worktree z `--project-ref`.",

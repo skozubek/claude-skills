@@ -84,11 +84,14 @@ i `$B eval <plik>`, jak w `bin/sesja`.
 Odpowiada, czy instancję warto sterować: checkout i gałąź, serwer na porcie
 tego checkoutu z tego katalogu (nie cudzy), strona 200, jeden daemon
 przeglądarki, karta na właściwym adresie, kto jest zalogowany, błędy konsoli.
-Z nazwą modułu pokazuje commity w jego kodzie od ostatniego pełnego przejścia
-mapy, z autorem. Cudza zmiana w module oznacza: najpierw przejście wpisów mapy
-tych obszarów, których dotykają te commity, potem twoja robota. Wtedy regresja
-wychodzi jako znalezisko, nie jako „mój kod zepsuł”. Pełny przegląd modułu
-tylko przy jego odbiorze.
+Dla obszarów dotkniętych zmianą i dla obszaru z argumentu (`bin/doctor
+<obszar>`) czyta rejestr `przejscia.log` i pokazuje: cudze commity w kodzie
+obszaru od ostatniego pełnego przejścia (własne jedną liczbą), cudze commity
+w modułach, które ekran importuje spoza wiersza mapy, kroki przeszłe później
+i kroki bez żadnego przejścia. Cudza zmiana oznacza: najpierw przejście wpisów
+mapy, których dotykają te commity, potem twoja robota. Wtedy regresja wychodzi
+jako znalezisko, nie jako „mój kod zepsuł”. Pełny przegląd modułu tylko przy
+jego odbiorze.
 
 Kolejność: `bin/start`, `bin/sesja <email>`, `bin/doctor`. Bez sesji, bez
 karty na tym serwerze i z cudzym procesem na porcie wynik to błąd.
@@ -147,8 +150,12 @@ który przyjąłby sceptyczny recenzent. Zrzut „otwiera się” nie jest dowod
 - Pokaż akcję i stabilny stan końcowy, nie sam ekran końcowy.
 - Skutki, nie piksele: wiersz w bazie, wartość pola po przeładowaniu, żądanie
   w `network`, plik. Napis w toaście bez zapisu w bazie niczego nie dowodzi.
-- Czas: po stanie końcowym każdego kroku ekranu `bin/czasy <katalog> <ID>`.
-  Zapytanie o połowę wolniejsze niż w poprzednim przejściu tego kroku
+- Zaliczenie: po stanie końcowym kroku, który przeszedł (akcja i stan
+  końcowy, nie sam odczyt liczników), `bin/przeszlo <katalog> <ID>…`. Dopisuje
+  wiersz do rejestru `przejscia.log` (obszar z prefiksu ID, HEAD, baza na
+  `origin/main`) i mierzy czas zapytań ekranu do `czasy.tsv`; samo `bin/czasy`
+  nic nie zalicza. Krok, który nie przeszedł, idzie do meldunku, nie do
+  rejestru. Zapytanie o połowę wolniejsze niż w poprzednim przejściu tego kroku
   (`czasy.tsv` poprzedniego katalogu), a przy kroku bez poprzednika ponad
   1000 ms, to znalezisko w meldunku z nazwą widoku albo funkcji, nie blokada.
 - Atrapa liczy się tylko za tą samą granicą, którą produkcja izoluje system
@@ -169,9 +176,7 @@ adres, konto z id). Obok: odczyt ekranu w tekście (`snapshot` albo `js`)
 i każde zapytanie SQL **razem z jego treścią** i identyfikatorami wierszy, nie
 same liczby. Liczba zgodna z ekranem dowodzi tylko wtedy, gdy zapytanie
 liczy tę samą regułę co ekran (widok „Spam” to werdykt człowieka albo agenta,
-nie sam status). Krok mapy oznaczasz „przeszło na żywo <data>” dopiero, gdy
-przeszły jego akcja i jego stan końcowy, nie sam odczyt liczników. Meldunek cytuje odczyty liczbami i podaje
-katalog. Katalog żyje do odbioru na produkcji, potem kasujesz.
+nie sam status). Meldunek cytuje odczyty liczbami i podaje katalog. Katalog żyje do odbioru na produkcji, potem kasujesz.
 
 ## Skutki zewnętrzne
 
@@ -231,9 +236,10 @@ i portów.
 konwencje, spis i kolejność pełnego przeglądu), jeden plik na obszar,
 `<moduł>-sciezki-przekrojowe.md` (drogi przez kilka ekranów, zawsze na końcu
 pełnego przeglądu), skrypty danych testowych modułu (np.
-`crm-zapytanie-testowe.sh`, `crm-sprzatanie.sh`) i `przejscia.tsv` (obszar,
-ścieżki kodu, SHA `origin/main` i data ostatniego przejścia ścieżki głównej
-obszaru na żywo; czyta je `bin/doctor`).
+`crm-zapytanie-testowe.sh`, `crm-sprzatanie.sh`), `przejscia.tsv` (obszar,
+prefiks ID kroków, ścieżki kodu) i rejestr `przejscia.log` (czas, obszar, krok
+albo `-` za cały obszar, HEAD, baza na `origin/main`, uwaga; pisze go tylko
+`bin/przeszlo`, czyta `bin/doctor`).
 
 Plik obszaru: tytuł, jeden akapit o tym, co widzi użytkownik, potem dokładnie
 cztery sekcje w tej kolejności:
@@ -252,16 +258,17 @@ zaczyna potrzebować własnych warunków wstępnych.
 **Mapa rośnie za robotą, nie na zapas.** Zmiana poza mapą (doctor: „pliki
 nie należą do żadnego obszaru”) przechodzi według tej samej poprzeczki
 dowodu, a wejścia i uchwyty agent ustala z kodu. Drogę, którą przeszedł,
-zapisuje od razu jako nowy plik obszaru: tylko przejęte kroki, każdy
-z dopiskiem „przeszło na żywo <data>”, plus wiersz w `przejscia.tsv` ze
-ścieżkami zmienionych plików. Obszarów, w których nikt z nas nie pracuje,
+zapisuje od razu jako nowy plik obszaru: tylko przejęte kroki, wiersz
+w `przejscia.tsv` (prefiks ID, ścieżki zmienionych plików) i `bin/przeszlo`
+na każdy przejęty krok. Obszarów, w których nikt z nas nie pracuje,
 nie mapujesz.
 
 **Moduł bez pliku mapy nie jest domknięty.** Plik powstaje przy domykaniu
 modułu i jest definicją „działa”. Zmiana zachowania ekranu, którą sam
-robisz, poprawia jego plik w tej samej robocie. Przejście ścieżki głównej obszaru
-aktualizuje jego wiersz w `przejscia.tsv` (SHA `origin/main`, data). Nowy
-plik obszaru dostaje wiersz od razu, z `-` zamiast SHA.
+robisz, poprawia jego plik w tej samej robocie. Przejście każdej podfunkcji obszaru
+zapisuje `bin/przeszlo --obszar <obszar>`; od tego wiersza doctor liczy cudze
+commity. Prefiks ID jest jeden na obszar; kroki ścieżek przekrojowych
+zaliczasz z jawnym `--obszar`.
 
 ## Przegląd mapy
 
@@ -270,8 +277,8 @@ przejście dotkniętych obszarów (sekcja „Kontrola instancji”). Przebieg:
 
 1. Spis: martwe, brakujące i zdublowane wpisy w README i `przejscia.tsv`.
 2. Źródło: tylko dla obszarów z commitami od ostatniego przejścia czytasz
-   diff tych commitów (`git log -p <SHA>..origin/main -- <ścieżki>`), nie
-   cały kod; nowa powierzchnia jest „brakująca” dopiero z konkretną ścieżką.
+   diff tych commitów (skróty daje `bin/doctor <obszar>`, `git show <skrót>`),
+   nie cały kod; nowa powierzchnia jest „brakująca” dopiero z konkretną ścieżką.
 3. Przejście na żywo, obowiązkowe nawet przy czystym źródle: jedna instancja,
    sterowana szeregowo, każda funkcja co najmniej raz. Zawsze trzy
    niezmienniki: kontrola instancji przed pierwszym sterowaniem i po każdym
@@ -282,8 +289,9 @@ przejście dotkniętych obszarów (sekcja „Kontrola instancji”). Przebieg:
    i przechodzisz ponownie. Zepsute zachowanie aplikacji → regresja,
    **raportujesz, nie zamazujesz w mapie** i nie ruszasz kodu produktu
    w tym przebiegu.
-5. Wynik, jeden z trzech: **czysto** (pełne pokrycie), **zmiana** (poprawki
-   mapy lub `bin/`, każda dowiedziona), **zablokowane** (co dokładnie).
+5. Wynik, jeden z trzech: **czysto** (pełne pokrycie; zapis `bin/przeszlo
+   --obszar <obszar>`), **zmiana** (poprawki mapy lub `bin/`, każda
+   dowiedziona), **zablokowane** (co dokładnie).
 
 ## Dźwignia
 

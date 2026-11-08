@@ -2,9 +2,10 @@
 # Działa z katalogu repo AdMotiv albo jego worktree.
 
 SKILL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MAPA_DIR="$HOME/Coding/MOL/Panel/meta/mapa"
-DOWODY_DIR="$HOME/Coding/MOL/Panel/dowody"
-B="$HOME/.claude/skills/gstack/browse/dist/browse"
+# Zmienne środowiska nadpisują ścieżki (tests/ podstawia katalog mapy, dowodów i atrapę przeglądarki).
+MAPA_DIR="${MAPA_DIR:-$HOME/Coding/MOL/Panel/meta/mapa}"
+DOWODY_DIR="${DOWODY_DIR:-$HOME/Coding/MOL/Panel/dowody}"
+B="${B:-$HOME/.claude/skills/gstack/browse/dist/browse}"
 
 REPO="$(git rev-parse --show-toplevel 2>/dev/null)" || { echo "BŁĄD: nie jesteś w repo AdMotiv ani w jego worktree" >&2; exit 2; }
 [ -f "$REPO/src/integrations/supabase/client.ts" ] || { echo "BŁĄD: $REPO to nie repo AdMotiv" >&2; exit 2; }
@@ -31,3 +32,15 @@ pid_portu() { lsof -nP -iTCP:"$PORT" -sTCP:LISTEN -t 2>/dev/null | head -1; }
 cwd_procesu() { lsof -a -p "$1" -d cwd -Fn 2>/dev/null | sed -n 's/^n//p'; }
 # 0, gdy na porcie słucha proces uruchomiony z tego checkoutu
 serwer_nasz() { local p; p=$(pid_portu); [ -n "$p" ] && [ "$(cwd_procesu "$p")" = "$REPO" ]; }
+
+# Rejestr przejść mapy (append-only TSV: czas UTC, obszar, krok, HEAD, baza na origin/main, uwaga).
+# Pisze bin/przeszlo, czyta bin/doctor. Jeden checkout meta na maszynie, więc dopisanie krótkiego wiersza
+# przez `>>` jest atomowe; dwa równoległe przebiegi nie potrzebują blokady.
+REJESTR="$MAPA_DIR/przejscia.log"
+TSV="$MAPA_DIR/przejscia.tsv"
+# Autor commitów uznawany za własny (doctor grupuje własne commity w jedną linię): e-mail z konfiguracji repo.
+WLASNY_EMAIL="$(git -C "$REPO" config user.email 2>/dev/null || true)"
+# obszar dla prefiksu ID kroku (kolumna 2 przejscia.tsv); pusty, gdy prefiks nieznany
+obszar_prefiksu() { awk -F'\t' -v p="$1" '!/^#/ && $2 == p { print $1; exit }' "$TSV"; }
+# kolumny wiersza obszaru: obszar_wiersz <obszar> <nr kolumny>
+obszar_wiersz() { awk -F'\t' -v o="$1" -v k="$2" '!/^#/ && $1 == o { print $k; exit }' "$TSV"; }

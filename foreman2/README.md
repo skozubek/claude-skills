@@ -93,8 +93,9 @@ i pisze `decide answer`; to warstwa UX poza tym katalogiem.
 ## Czego jeszcze nie ma
 
 - Profil użytkownika dla AdMotiv (`~/.foreman2/profiles/<klucz>.json`
-  z `profiles/admotiv.example.json`) i wpis o mapie funkcji w AGENTS.md AdMotiv:
-  do zrobienia przy pierwszym nadzorowanym przelocie na tym repo.
+  z `profiles/admotiv.example.json`): do zrobienia przy pierwszym nadzorowanym
+  przelocie na tym repo. Mapa funkcji zostaje poza repo AdMotiv (narzędzie
+  prywatne), wskaźnik do niej niesie profil, nie AGENTS.md.
 - Most dla Mii, ChatGPT i głosu: proces, który czyta `status --json`
   i `decisions --pending`, pisze `decide answer` jako człowiek po jego słowie
   i woła `bin/run --resume`. Kontrakt wyżej jest kompletny, brakuje transportu

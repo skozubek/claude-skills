@@ -3,6 +3,7 @@
 # wywołania, z performance resource timing karty; bufor czyszczony i powiększany po odczycie, `goto` go zeruje.
 # Na dev serwerze moduły Vite zapełniają domyślne 250 wpisów zaraz po `goto`: wtedy pierwszy odczyt mówi
 # „bufor pełny”, a pomiar ekranu idzie po wejściu klikiem w aplikacji.
+# Pomiar nie jest zaliczeniem: krok, który przeszedł, zapisuje bin/przeszlo (woła ten skrypt).
 # Wołasz raz na krok, po stanie końcowym. Dopisuje wiersz do <katalog>/czasy.tsv: ID, czas UTC, HEAD, adres, wynik.
 # Użycie: bin/czasy <katalog-dowodów> <ID-kroku>   np. bin/czasy ~/Coding/MOL/Panel/dowody/2026-10-17-crm LEAD-01
 set -euo pipefail

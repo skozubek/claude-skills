@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Zapis przejścia do rejestru mapy (meta/mapa/przejscia.log) i pomiar czasu zapytań kroku (bin/czasy).
+# Wołasz po stanie końcowym kroku, który PRZESZEDŁ (akcja i stan końcowy, nie sam odczyt liczników);
+# krok, który nie przeszedł, idzie do meldunku, nie tu. Obszar wynika z prefiksu ID (kolumna 2 przejscia.tsv).
+# Użycie:
+#   bin/przeszlo <katalog-dowodów> <ID> [<ID>…]     krok ekranu: czas zapytań do <katalog>/czasy.tsv + wiersz rejestru na ID
+#   bin/przeszlo --obszar <obszar>                   pełne przejście obszaru (każda podfunkcja), po przeglądzie z wynikiem „czysto”
+#   bin/przeszlo --obszar <obszar> <katalog> <ID>…   kroki ścieżek przekrojowych: obszar jawnie, ID bez walidacji prefiksu
+#   --bez-czasu <ID>…                                bez pomiaru (krok bez ekranu, bufor pełny); bez katalogu, bez przeglądarki
+#   --prod                                           przejście na opublikowanym froncie: wersja nieznana (HEAD i baza „-”)
+# Wiersz rejestru: czas UTC, obszar, krok (ID albo „-” = cały obszar), HEAD checkoutu, baza (merge-base HEAD origin/main), uwaga.
+# Odmawia, gdy prefiks nie ma obszaru (albo ma dwa) i gdy karta przeglądarki nie stoi na serwerze tego checkoutu:
+# dwa worktree dzielą narzędzie przeglądarki, więc pomiar trafiłby w cudzy ekran, a wiersz w cudzy HEAD.
+set -euo pipefail
+source "$(dirname "$0")/_wspolne.sh"
+cd "$REPO"
+OBSZAR=""; PROD=0; CZAS=1; ARGS=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --obszar) OBSZAR="${2:?--obszar <obszar>}"; shift 2 ;;
+    --prod) PROD=1; shift ;;
+    --bez-czasu) CZAS=0; shift ;;
+    -*) echo "BŁĄD: nieznana opcja $1 (nagłówek skryptu pokazuje użycie)" >&2; exit 2 ;;
+    *) ARGS+=("$1"); shift ;;
+  esac
+done
+[ -f "$TSV" ] || { echo "BŁĄD: brak $TSV" >&2; exit 2; }
+if [ -n "$OBSZAR" ] && [ -z "$(obszar_wiersz "$OBSZAR" 1)" ]; then echo "BŁĄD: obszar „${OBSZAR}” nie ma wiersza w $TSV" >&2; exit 2; fi
+KATALOG=""; IDS=()
+if [ $CZAS -eq 1 ] && [ ${#ARGS[@]} -ge 2 ]; then KATALOG="${ARGS[0]}"; IDS=("${ARGS[@]:1}")
+elif [ $CZAS -eq 0 ] && [ ${#ARGS[@]} -ge 1 ]; then IDS=("${ARGS[@]}")
+elif [ ${#ARGS[@]} -eq 0 ] && [ -n "$OBSZAR" ]; then :
+else echo "BŁĄD: użycie: bin/przeszlo <katalog> <ID>… | --obszar <obszar> [<katalog> <ID>…] | --bez-czasu <ID>…" >&2; exit 2; fi
+
+# obszar per ID: jawny z --obszar albo z prefiksu ID (jednoznacznego w tsv)
+WIERSZE=()
+if [ ${#IDS[@]} -gt 0 ]; then
+  for id in "${IDS[@]}"; do
+    o="$OBSZAR"
+    if [ -z "$o" ]; then
+      p="${id%%-*}"
+      [ "$p" != "$id" ] || { echo "BŁĄD: „${id}” nie wygląda na ID kroku (PREFIKS-numer)" >&2; exit 2; }
+      n=$(awk -F'\t' -v p="$p" '!/^#/ && $2 == p' "$TSV" | wc -l | tr -d ' ')
+      [ "$n" -le 1 ] || { echo "BŁĄD: prefiks „${p}” ma $n obszary w $TSV; napraw tsv albo podaj --obszar" >&2; exit 2; }
+      o="$(obszar_prefiksu "$p")"
+      [ -n "$o" ] || { echo "BŁĄD: prefiks „${p}” (ID $id) nie ma obszaru w $TSV; ścieżka przekrojowa: --obszar <obszar>" >&2; exit 2; }
+    fi
+    WIERSZE+=("$o	$id")
+  done
+else WIERSZE=("$OBSZAR	-"); fi
+
+# karta musi stać na serwerze tego checkoutu (albo na froncie produkcyjnym przy --prod)
+if [ $CZAS -eq 1 ]; then
+  ADR="$("$B" url 2>/dev/null | tail -1 || true)"
+  if [ $PROD -eq 1 ]; then
+    case "$ADR" in "$PROD_URL"*) ;; *) echo "BŁĄD: karta przeglądarki na „${ADR}”, nie na $PROD_URL (--prod)" >&2; exit 2 ;; esac
+  else
+    case "$ADR" in "$URL"*) ;; *) echo "BŁĄD: karta przeglądarki na „${ADR}”, nie na $URL tego checkoutu: pomiar trafiłby w cudzy ekran (bin/doctor)" >&2; exit 2 ;; esac
+  fi
+fi
+
+if [ $PROD -eq 1 ]; then HEAD_SHA="-"; BAZA="-"; UWAGA="prod"
+else
+  HEAD_SHA="$(git rev-parse HEAD)"
+  BAZA="$(git merge-base HEAD origin/main 2>/dev/null || echo -)"
+  if [ -z "$(git status --porcelain)" ]; then UWAGA="-"; else UWAGA="drzewo brudne"; fi
+fi
+
+if [ $CZAS -eq 1 ] && [ ${#IDS[@]} -gt 0 ]; then "$SKILL_DIR/bin/czasy" "$KATALOG" "$(IFS=,; echo "${IDS[*]}")"; fi
+[ -f "$REJESTR" ] || printf '# czas\tobszar\tkrok\thead\tbaza\tuwaga\n' > "$REJESTR"
+TERAZ="$(date -u +%FT%TZ)"
+for w in "${WIERSZE[@]}"; do
+  printf '%s\t%s\t%s\t%s\t%s\n' "$TERAZ" "$w" "$HEAD_SHA" "$BAZA" "$UWAGA" >> "$REJESTR"
+  d=""; [ "$UWAGA" = "-" ] || d=" ($UWAGA)"
+  echo "rejestr: $(printf '%s' "$w" | tr '\t' ' ') @ ${BAZA:0:8}$d"
+done

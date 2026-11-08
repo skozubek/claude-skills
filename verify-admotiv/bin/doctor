@@ -2,7 +2,11 @@
 # Czy tę instancję warto sterować? Tylko odczyt. Uruchamiasz przed pierwszym sterowaniem,
 # po każdym nieudanym kroku i zawsze, gdy coś wygląda dziwnie.
 # Kolejność: bin/start, bin/sesja <email>, bin/doctor. Bez sesji i bez karty na tym serwerze wynik to BŁĄD.
-# Użycie: bin/doctor [obszar]   obszary dotknięte zmianą + cudze commity od ostatniego przejścia (obszar = wiersz meta/mapa/przejscia.tsv)
+# Użycie: bin/doctor [obszar]
+#   bez argumentu: obszary dotknięte zmianą; per obszar cudze commity od ostatniego pełnego przejścia (własne jedną liczbą)
+#   z obszarem (albo dla obszarów dotkniętych zmianą): pełna lista cudzych, cudze commity w modułach importowanych przez
+#   ekran spoza wiersza mapy, kroki przeszłe po pełnym przejściu, kroki bez żadnego przejścia
+# Źródła: meta/mapa/przejscia.tsv (obszar, prefiks ID, ścieżki) i przejscia.log (rejestr; pisze bin/przeszlo).
 set -uo pipefail
 source "$(dirname "$0")/_wspolne.sh"
 cd "$REPO"
@@ -10,6 +14,7 @@ BLAD=0
 ok()    { echo "OK     $*"; }
 uwaga() { echo "UWAGA  $*"; }
 blad()  { echo "BŁĄD   $*"; BLAD=1; }
+WYBRANY="${1:-}"
 
 # 1. Checkout
 GAL=$(git branch --show-current); HEAD=$(git rev-parse --short HEAD)
@@ -48,35 +53,108 @@ if [ -n "$PID" ]; then
   esac
 fi
 
-# 4. Mapa: które obszary przejść. Tylko te, których dotyka zmiana (koszt weryfikacji idzie za diffem).
-TSV="$MAPA_DIR/przejscia.tsv"
+# 4. Mapa: które obszary przejść (tylko dotknięte zmianą: koszt weryfikacji idzie za diffem) i co się w nich
+# zmieniło od ostatniego pełnego przejścia z rejestru. Pełne przejście = wiersz z krokiem „-” i znaną bazą;
+# pojedynczy krok przeszły później nie odświeża obszaru, doctor go tylko wymienia.
 timeout 20 git fetch -q origin main 2>/dev/null || uwaga "git fetch origin main nie przeszedł: porównanie z origin/main może być nieświeże"
 pasuje() { # plik, lista ścieżek obszaru (katalog, plik albo glob)
   local f="$1" p; shift
   for p in "$@"; do case "$f" in $p|$p/*) return 0 ;; esac; done; return 1
 }
+# wiersze rejestru obszaru: czas, krok, head, baza, uwaga
+rejestr() { [ -f "$REJESTR" ] && awk -F'\t' -v o="$1" '!/^#/ && $2 == o { print $1 "\t" $3 "\t" $4 "\t" $5 "\t" $6 }' "$REJESTR"; }
+# commity baza..origin/main na ścieżkach: skrót, e-mail autora, „autor: temat”
+commity() { local baza="$1"; shift; git log --format='%h%x09%ae%x09%an: %s' "$baza"..origin/main -- "$@" 2>&1; }
+cudze()  { awk -F'\t' -v e="$WLASNY_EMAIL" 'NF >= 3 && $2 != e { print $1 " " $3 }'; }
+wlasne() { awk -F'\t' -v e="$WLASNY_EMAIL" 'NF >= 3 && $2 == e' | wc -l | tr -d ' '; }
+RE_IMP="(from|import\()[[:space:]]*['\"]@/(lib|hooks|contexts|data|components)/[A-Za-z0-9_/.-]+"
+# pliki modułów, które pliki src/ wiersza importują aliasem @/ (poziom 1), a wiersz ich nie obejmuje. Bez re-eksportów
+# i importów pośrednich: lista „co jeszcze może ruszyć ekran”, nie dowód pokrycia. components/ui (shadcn) pominięte.
+importy_spoza() {
+  local sc="$*" front="" p m pb cov
+  for p in $sc; do case "$p" in src/*) front="$front $p";; esac; done
+  [ -n "$front" ] || return 0
+  # shellcheck disable=SC2086
+  for m in $(git grep -h -o -E "$RE_IMP" origin/main -- $front 2>/dev/null | sed -E "s/^(from|import\()[[:space:]]*['\"]@\//src\//" | grep -v '^src/components/ui/' | sort -u); do
+    cov=0; for p in $sc; do pb="${p%.ts}"; pb="${pb%.tsx}"; pb="${pb%/}"; case "$m" in "$pb"|"$pb"/*) cov=1; break;; esac; done
+    [ $cov -eq 1 ] && continue
+    git ls-tree --name-only origin/main -- "$m.ts" "$m.tsx" "$m/index.ts" "$m/index.tsx" 2>/dev/null | head -1
+  done
+}
 ZMIENIONE=$( { git diff --name-only origin/main...HEAD 2>/dev/null; git status --porcelain | cut -c4-; } | sort -u)
 if [ -f "$TSV" ]; then
-  DO_PRZEJSCIA=""
-  while IFS=$'\t' read -r OBSZAR SCIEZKI SHA DATA; do
-    [ -n "${1:-}" ] && [ "$1" != "$OBSZAR" ] && continue
+  DO_PRZEJSCIA=""; ZNANY=0
+  while IFS=$'\t' read -r OBSZAR PREFIKS SCIEZKI; do
+    [ -z "$OBSZAR" ] && continue; case "$OBSZAR" in \#*) continue ;; esac
+    [ -n "$WYBRANY" ] && [ "$WYBRANY" != "$OBSZAR" ] && continue
+    ZNANY=1
     # shellcheck disable=SC2086
     TWOJE=$(echo "$ZMIENIONE" | while read -r f; do [ -n "$f" ] && pasuje "$f" $SCIEZKI && echo "$f"; done)
     [ -n "$TWOJE" ] && DO_PRZEJSCIA="$DO_PRZEJSCIA $OBSZAR"
-    if [ "$SHA" != "-" ]; then
+    SZCZEGOLY=0; { [ -n "$WYBRANY" ] || [ -n "$TWOJE" ]; } && SZCZEGOLY=1
+    REJ=$(rejestr "$OBSZAR")
+    PELNE=$(echo "$REJ" | awk -F'\t' '$2 == "-" && $4 != "-"' | sort | tail -1)
+    POZNIEJ=""
+    if [ -n "$PELNE" ]; then
+      BAZA=$(echo "$PELNE" | cut -f4); OD="pełnego przejścia $(echo "$PELNE" | cut -c1-10)"
+      POZNIEJ=$(echo "$REJ" | awk -F'\t' -v t="$(echo "$PELNE" | cut -f1)" '$2 != "-" && $1 > t { print $2 }' | sort -u | paste -sd ' ' -)
+    else
+      BAZA=$(echo "$REJ" | awk -F'\t' '$2 != "-" && $4 != "-" { print $1 "\t" $4 }' | sort | head -1 | cut -f2)
+      OD="najstarszego przejścia kroku o znanej wersji (bez pełnego przejścia)"
+    fi
+    if [ -n "$BAZA" ]; then
       # shellcheck disable=SC2086
-      if ! CUDZE=$(git log --format='%h %an: %s' "$SHA"..origin/main -- $SCIEZKI 2>&1); then
-        blad "$OBSZAR: git log nie przeszedł (rewizja $SHA nieznana?)"
-      elif [ -n "$CUDZE" ]; then
-        uwaga "$OBSZAR: $(echo "$CUDZE" | wc -l | tr -d ' ') commit(y) na main od przejścia $DATA. Przejdź jego wpisy przed swoją robotą."
-        [ -n "${1:-}" ] && echo "$CUDZE" | sed 's/^/         /'
-      elif [ -n "${1:-}" ]; then ok "$OBSZAR: bez cudzych zmian od przejścia $DATA ($SHA)"
+      if ! LOG=$(commity "$BAZA" $SCIEZKI); then blad "$OBSZAR: git log nie przeszedł (rewizja $BAZA nieznana?)"; continue; fi
+      CUDZE=$(echo "$LOG" | cudze); WL=$(echo "$LOG" | wlasne); N_CUDZE=$(echo "$CUDZE" | grep -c .)
+      if [ "$N_CUDZE" -gt 0 ]; then
+        uwaga "$OBSZAR: cudzych commitów od $OD (${BAZA:0:8}): $N_CUDZE, własnych: $WL. Przejdź wpisy obszaru, których dotykają, przed swoją robotą."
+        if [ $SZCZEGOLY -eq 1 ]; then echo "$CUDZE" | sed 's/^/         /'
+        else echo "$CUDZE" | head -3 | sed 's/^/         /'; [ "$N_CUDZE" -gt 3 ] && echo "         … wszystkie: bin/doctor $OBSZAR"; fi
+      elif [ $SZCZEGOLY -eq 1 ]; then ok "$OBSZAR: bez cudzych zmian od $OD (${BAZA:0:8}), własnych commitów: $WL"; fi
+      if [ $SZCZEGOLY -eq 1 ]; then
+        # shellcheck disable=SC2086
+        MODULY=$(importy_spoza $SCIEZKI)
+        if [ -n "$MODULY" ]; then
+          # shellcheck disable=SC2086
+          CUDZE_M=$(commity "$BAZA" $MODULY | cudze)
+          if [ -n "$CUDZE_M" ]; then
+            uwaga "$OBSZAR: cudze commity w modułach, które ekran importuje spoza wiersza mapy ($(echo "$CUDZE_M" | grep -c .)):"
+            # shellcheck disable=SC2086
+            echo "$CUDZE_M" | while read -r h reszta; do echo "         $h $reszta [$(git show --format= --name-only "$h" -- $MODULY | tr '\n' ' ' | sed 's/ $//')]"; done
+          fi
+        fi
       fi
-    elif [ -n "${1:-}" ]; then uwaga "$OBSZAR: nigdy nie przeszedł na żywo"; fi
+    elif [ $SZCZEGOLY -eq 1 ]; then
+      N_NIEZN=$(echo "$REJ" | grep -c .)
+      if [ "$N_NIEZN" -gt 0 ]; then uwaga "$OBSZAR: przejścia tylko w nieznanej wersji ($N_NIEZN wpisów rejestru), bez punktu odniesienia dla commitów"
+      else uwaga "$OBSZAR: nigdy nie przeszedł na żywo"; fi
+    fi
+    if [ -n "$WYBRANY" ] && [ "$PREFIKS" != "-" ] && [ -f "$MAPA_DIR/$OBSZAR.md" ]; then
+      [ -n "$POZNIEJ" ] && ok "$OBSZAR: kroki przeszłe po pełnym przejściu: $POZNIEJ"
+      if [ -z "$PELNE" ]; then
+        IDS_MAPY=$(grep -o -E "\b${PREFIKS}-[0-9]+\b" "$MAPA_DIR/$OBSZAR.md" | sort -u)
+        IDS_REJ=$(echo "$REJ" | awk -F'\t' '$2 != "-" { print $2 }' | sort -u)
+        BEZ=$(comm -23 <(echo "$IDS_MAPY") <(echo "$IDS_REJ") | paste -sd ' ' -)
+        N_M=$(echo "$IDS_MAPY" | grep -c .); N_B=$(echo "$BEZ" | wc -w | tr -d ' ')
+        [ "$N_B" -gt 0 ] && uwaga "$OBSZAR: bez pełnego przejścia; kroków bez żadnego przejścia $N_B z $N_M: $BEZ"
+      fi
+    fi
   done < "$TSV"
+  [ -n "$WYBRANY" ] && [ $ZNANY -eq 0 ] && blad "obszar „${WYBRANY}” nie ma wiersza w $TSV"
   if [ -n "$DO_PRZEJSCIA" ]; then ok "zmiana dotyka obszarów:$DO_PRZEJSCIA (przejdź tylko je)"
   elif [ -n "$ZMIENIONE" ]; then uwaga "zmienione pliki nie należą do żadnego obszaru mapy: weryfikuj z kodu, a przejętą drogę zapisz jako nowy plik obszaru + wiersz w przejscia.tsv (SKILL.md, „Mapa rośnie za robotą”)"
   else ok "brak zmian względem origin/main"; fi
+  # kroki mapy (PREFIKS-numer o prefiksie z tsv) zmierzone bin/czasy bez wpisu w rejestrze tego dnia, ostatnie 7 dni:
+  # pomiar nie jest zaliczeniem, bin/przeszlo nim jest. ID spoza mapy (odbiory ad hoc) pomijane.
+  if [ -f "$REJESTR" ]; then
+    OD_DNIA=$(date -u -v-7d +%F 2>/dev/null || date -u -d '7 days ago' +%F)
+    PREFIKSY=$(awk -F'\t' '!/^#/ && $2 != "-" { print $2 }' "$TSV" | paste -sd '|' -)
+    for CZ in "$DOWODY_DIR"/*/czasy.tsv; do
+      [ -f "$CZ" ] || continue
+      BRAK=$(awk -F'\t' -v od="$OD_DNIA" -v re="^(${PREFIKSY})-[0-9]+$" 'FNR==NR { if (!/^#/) w[substr($1,1,10) "|" $3]=1; next } substr($2,1,10) >= od { n=split($1,ids,","); d=substr($2,1,10); for(i=1;i<=n;i++) if (ids[i] ~ re && !((d "|" ids[i]) in w)) print ids[i] }' "$REJESTR" "$CZ" | sort -u | paste -sd ' ' -)
+      [ -n "$BRAK" ] && uwaga "${CZ#"$DOWODY_DIR"/}: kroki zmierzone bez wpisu w rejestrze: ${BRAK} → przeszły? bin/przeszlo $(dirname "$CZ" | sed "s|^$HOME|~|") <ID>"
+    done
+  fi
 fi
 
 [ $BLAD -eq 0 ] && echo "WYNIK  instancja zdatna do sterowania" || echo "WYNIK  NIE steruj, napraw błędy wyżej"
