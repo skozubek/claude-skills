@@ -1,0 +1,13 @@
+{
+ "_opis": "Przykład profilu użytkownika dla repo, które nie może nieść własnej konfiguracji foremana. Aktywacja: `bin/foreman2 profile --repo <klon>` podaje ścieżkę docelową (~/.foreman2/profiles/<klucz>.json); tam kopiujesz ten plik bez pola _opis.",
+ "live_verify_skill": "verify-admotiv",
+ "shared_clone": true,
+ "notes": [
+  "Strażnik dokumentów liczy każdy commit osobno: commit kodu bez dokumentu naprawia późniejszy commit z linią `Dokumenty: uzupełnia <sha>` albo `Dokumenty: bez zmian <sha>`; ten sam SHA sprawdzany raz.",
+  "Migracja po merge'u: workflow „Zastosuj migrację” zaraz po merge'u; `migration-drift` czeka 10 minut. Migracja zmieniająca obiekt z `scripts/konsumenci.json` poprawia jego wpis w tym samym PR-ze.",
+  "Świeży worktree nie ma `supabase link`: odczyty bazy z głównego klonu (`supabase db query --linked`, tylko select); deploy funkcji z worktree z `--project-ref`.",
+  "Dev serwer czyta produkcyjne Supabase: Granice wymieniają projekt, konto i zapisy do usunięcia po przelocie.",
+  "Dev serwer w worktree na dowiązanym `node_modules` startuje z `--webpack` (Turbopack pada na ścieżce poza rootem).",
+  "Zmiana pod zadaniem cyklicznym (lustro, cron): kroki wdrożenia jednym ciągiem między przebiegami, z odczytem przebiegów przed i po."
+ ]
+}
