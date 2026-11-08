@@ -9,7 +9,7 @@ hooks:
     - matcher: Bash
       hooks:
         - type: command
-          command: "$HOME/.claude/agents/bramka-floty.sh"
+          command: "$HOME/.claude/skills/foreman2/bin/bramka-floty.sh"
 ---
 
 Dowodzisz, że zmiana działa tam, gdzie zobaczy ją użytkownik. Brief daje: SHA

@@ -17,8 +17,8 @@ Weryfikacja: <dokładne komendy, uruchamialne z worktree>
 Brief wskazuje zakresy do przeczytania (plik i funkcja), nie całe pliki. Każdy
 warunek niesie powód: warunek bez powodu wykonawca „poprawia”. Dowód ekranu: jeden
 skrypt `$B js` z `/browse` albo komenda skilla z profilu. Spawn:
-`Agent(subagent_type="foreman2-wykonawca", model=<wariant>, run_in_background=true)`;
-opus-high dostaje `effort: high` w wywołaniu. Przed spawnem `git rev-parse HEAD` na
+`Agent(subagent_type="foreman2-wykonawca", model=<sonnet|opus>, run_in_background=true)`;
+wariant opus-high to `model=opus` z `effort: high` w wywołaniu. Przed spawnem `git rev-parse HEAD` na
 integracji = SHA ze spawnu; po spawnie `$F2 task set <id> --status running --agent
 <id> --spawn-sha <sha> --worktree <dir>` i `own add worktree <dir>`.
 

@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
 """Stan przelotu foremana 2.0: jeden katalog na przelot, jeden piszący (brygadzista).
 
-Kontrakt (także dla cudzego agenta albo głosu, przez ten sam plik stanu):
+Kontrakt (także dla cudzego sterownika albo głosu, przez ten sam plik stanu):
   create   = create_task      status   = get_status       decisions = list_decisions
   decide   = provide_decision evidence = get_evidence     cancel    = cancel_task
-Pozostałe podkomendy (task, frontier, own, human, log, close, resume, report,
-stop-check, profile) obsługują przelot od środka.
+Pozostałe podkomendy (task, frontier, own, human, log, state, close, resume, report,
+stop-check, straz, profile, session, cost) obsługują przelot od środka.
 
 Dom przelotów: $FOREMAN2_HOME (domyślnie ~/.foreman2). Przelot aktywny dla repo
-stoi w active.json; każdy zapis dopisuje wiersz do log.tsv (append-only).
-Uruchom `foreman2 -h` albo `foreman2 <podkomenda> -h`.
+stoi w active.json; każdy zapis dopisuje wiersz do log.tsv (append-only). Każde
+wywołanie trzyma blokadę pliku przelotu na czas odczyt–zmiana–zapis.
+`foreman2 -h` albo `foreman2 <podkomenda> -h`.
 """
 import argparse
 import datetime as dt
+import fcntl
 import hashlib
 import json
 import os
@@ -22,11 +24,12 @@ import subprocess
 import sys
 
 HOME = os.path.expanduser(os.environ.get("FOREMAN2_HOME") or "~/.foreman2")
-SCHEMA = 1
+SCHEMA = 2
 STANY = ("planning", "running", "review", "gate", "done", "partial", "blocked", "cancelled")
 STANY_ZADANIA = ("ready", "running", "accepted", "fixing", "blocked", "merged", "dropped")
 RODZAJE_DECYZJI = ("auto", "approval", "challenge")
 KONCOWE = ("done", "partial", "blocked", "cancelled")
+CZLOWIEK = re.compile(r"^human(:[\w.-]+)?$")
 
 
 def teraz():
@@ -55,22 +58,39 @@ def czytaj_json(p, domyslne=None):
         return domyslne
 
 
+def czytaj_txt(p):
+    try:
+        with open(p) as f:
+            return f.read().strip()
+    except OSError:
+        return None
+
+
 def zapisz_json(p, dane):
-    tmp = p + ".tmp"
+    tmp = f"{p}.{os.getpid()}.tmp"
     with open(tmp, "w") as f:
         json.dump(dane, f, ensure_ascii=False, indent=1)
     os.replace(tmp, p)
+
+
+class Blokada:
+    """Wyłączna blokada pliku na czas jednego wywołania (odczyt–zmiana–zapis)."""
+
+    def __init__(self, sciezka):
+        os.makedirs(os.path.dirname(sciezka), exist_ok=True)
+        self.f = open(sciezka, "a+")
+        fcntl.flock(self.f, fcntl.LOCK_EX)
 
 
 class Przelot:
     def __init__(self, katalog):
         self.katalog = katalog
         self.plik = os.path.join(katalog, "run.json")
-        self.d = czytaj_json(self.plik)
-        if self.d is None:
+        if not os.path.exists(self.plik):
             sys.exit(f"brak przelotu w {katalog}")
+        self._lock = Blokada(os.path.join(katalog, ".lock"))
+        self.d = czytaj_json(self.plik)
 
-    # --- zapis ---
     def zapisz(self):
         self.d["updated"] = teraz()
         zapisz_json(self.plik, self.d)
@@ -80,7 +100,6 @@ class Przelot:
         with open(os.path.join(self.katalog, "log.tsv"), "a") as f:
             f.write("\t".join(str(x).replace("\t", " ").replace("\n", " ") for x in wiersz) + "\n")
 
-    # --- dostęp ---
     def zadanie(self, tid):
         for t in self.d["tasks"]:
             if t["id"] == tid:
@@ -102,41 +121,76 @@ class Przelot:
 
     def zapisz_decyzje(self, lista):
         p = os.path.join(self.katalog, "decisions.jsonl")
-        with open(p + ".tmp", "w") as f:
+        tmp = f"{p}.{os.getpid()}.tmp"
+        with open(tmp, "w") as f:
             for d in lista:
                 f.write(json.dumps(d, ensure_ascii=False) + "\n")
-        os.replace(p + ".tmp", p)
+        os.replace(tmp, p)
 
     def dowody(self):
         kat = os.path.join(self.katalog, "evidence")
         out = []
         if os.path.isdir(kat):
-            for n in sorted(os.listdir(kat)):
+            for n in os.listdir(kat):
                 if n.endswith(".json"):
                     out.append(czytaj_json(os.path.join(kat, n)))
-        return out
+        return sorted(out, key=lambda e: (e["ts"], e["id"]))
+
+    def ostatni_dowod(self, cel, dow=None):
+        """Najnowszy dowód z werdyktem pass/fail dla celu (unverified nie zastępuje pomiaru)."""
+        lista = [e for e in (dow if dow is not None else self.dowody()) if e["for"] == cel]
+        pomiary = [e for e in lista if e["verdict"] in ("pass", "fail")]
+        return (pomiary or lista or [None])[-1]
+
+    def przelicz_kryteria(self):
+        dow = self.dowody()
+        for c in self.d["criteria"]:
+            c["evidence"] = [e["id"] for e in dow if e["for"] == c["id"]]
+            e = self.ostatni_dowod(c["id"], dow)
+            c["status"] = "open" if e is None else e["verdict"]
+
+    def head(self, ref=None):
+        return git(self.d["repo"], "rev-parse", ref or self.d["branch"], ok=False) or None
+
+    def nieaktualne(self, head):
+        """Kryteria bez ważnego dowodu: brak pomiaru, ostatni pomiar fail, albo pass na innym SHA."""
+        dow = self.dowody()
+        braki = []
+        for c in self.d["criteria"]:
+            e = self.ostatni_dowod(c["id"], dow)
+            if e is None or e["verdict"] != "pass":
+                braki.append(f"{c['id']} {('bez dowodu' if e is None else e['verdict'])}")
+            elif head and e["sha"] != head:
+                braki.append(f"{c['id']} dowód {e['id']} na {e['sha'][:12]}, HEAD {head[:12]}")
+        return braki
 
     def wolne_miejsca(self):
         zywe = sum(1 for t in self.d["tasks"] if t["status"] in ("running", "fixing"))
         return max(0, self.d["max_live"] - zywe)
 
     def front(self):
-        """Zadania gotowe do spawnu: ready, zależności scalone, niezablokowane decyzją."""
+        """Zadania gotowe do spawnu: ready, zależności scalone, niezablokowane decyzją pending."""
         scalone = {t["id"] for t in self.d["tasks"] if t["status"] == "merged"}
         blokujace = {b for dcz in self.decyzje() if dcz["status"] == "pending" for b in dcz.get("blocks", [])}
-        gotowe = [t for t in self.d["tasks"]
-                  if t["status"] == "ready" and set(t["deps"]) <= scalone and t["id"] not in blokujace]
-        return gotowe
+        return [t for t in self.d["tasks"]
+                if t["status"] == "ready" and set(t["deps"]) <= scalone and t["id"] not in blokujace]
 
     def nowy_id(self, prefix, lista):
-        n = 1 + max([int(x["id"][len(prefix):]) for x in lista if x["id"].startswith(prefix) and x["id"][len(prefix):].isdigit()] or [0])
+        n = 1 + max([int(x["id"][len(prefix):]) for x in lista
+                     if x["id"].startswith(prefix) and x["id"][len(prefix):].isdigit()] or [0])
         return f"{prefix}{n}"
 
 
 # ---------------------------------------------------------------- odnajdywanie
 def repo_root(sciezka):
-    r = subprocess.run(["git", "-C", sciezka, "rev-parse", "--show-toplevel"], capture_output=True, text=True)
-    return r.stdout.strip() if r.returncode == 0 else os.path.abspath(sciezka)
+    """Główny klon także z worktree: katalog nad wspólnym .git."""
+    r = subprocess.run(["git", "-C", sciezka, "rev-parse", "--git-common-dir"], capture_output=True, text=True)
+    if r.returncode == 0 and r.stdout.strip():
+        common = r.stdout.strip()
+        if not os.path.isabs(common):
+            common = os.path.join(os.path.abspath(sciezka), common)
+        return os.path.realpath(os.path.dirname(common.rstrip("/")) if common.rstrip("/").endswith(".git") else common)
+    return os.path.realpath(sciezka)
 
 
 def aktywne():
@@ -144,23 +198,21 @@ def aktywne():
 
 
 def ustaw_aktywny(repo, run_id):
+    lk = Blokada(os.path.join(HOME, ".lock"))
     a = aktywne()
-    if run_id is None:
-        a.pop(repo, None)
-    else:
-        a[repo] = run_id
-    os.makedirs(HOME, exist_ok=True)
+    a[repo] = run_id
     zapisz_json(os.path.join(HOME, "active.json"), a)
+    lk.f.close()
 
 
 def znajdz(args):
-    """Przelot z --run, inaczej aktywny dla repo bieżącego katalogu."""
+    """Przelot z --run, inaczej aktywny (ostatnio utworzony) dla repo bieżącego katalogu."""
     if getattr(args, "run", None):
         return Przelot(os.path.join(HOME, "runs", args.run))
     repo = repo_root(os.getcwd())
     rid = aktywne().get(repo)
     if not rid:
-        sys.exit(f"brak aktywnego przelotu dla {repo}; `foreman2 create` albo `--run <id>`")
+        sys.exit(f"brak przelotu dla {repo}; `foreman2 create` albo `--run <id>`")
     return Przelot(os.path.join(HOME, "runs", rid))
 
 
@@ -170,10 +222,15 @@ def cmd_create(a):
     slug = re.sub(r"[^a-z0-9]+", "-", a.slug.lower()).strip("-")[:40]
     rid = f"{dt.date.today().isoformat()}-{slug}"
     kat = os.path.join(HOME, "runs", rid)
-    if os.path.exists(kat):
+    istn = czytaj_json(os.path.join(kat, "run.json"))
+    if istn and istn["repo"] != repo:
+        rid += "-" + hashlib.sha1(repo.encode()).hexdigest()[:6]
+        kat = os.path.join(HOME, "runs", rid)
+        istn = czytaj_json(os.path.join(kat, "run.json"))
+    if istn:
         if not a.force:
-            print(rid)  # idempotentnie: ten sam przelot
             ustaw_aktywny(repo, rid)
+            print(rid)  # idempotentnie: ten sam przelot
             return
         shutil.rmtree(kat)
     os.makedirs(os.path.join(kat, "evidence"))
@@ -195,7 +252,7 @@ def cmd_create(a):
             "gstack": czytaj_txt(os.path.expanduser("~/.claude/skills/gstack/VERSION")),
         },
         "criteria": [], "tasks": [], "owned": [], "human_steps": [], "sessions": [], "cost": {},
-        "verdict": None,
+        "verdict": None, "stop_blocks": {},
     }
     sid = os.environ.get("CLAUDE_SESSION_ID")
     if sid:
@@ -205,14 +262,6 @@ def cmd_create(a):
     p.log("create", f"przelot {rid}", f"repo {repo} @ {d['base_sha']}", "", "planning")
     ustaw_aktywny(repo, rid)
     print(rid)
-
-
-def czytaj_txt(p):
-    try:
-        with open(p) as f:
-            return f.read().strip()
-    except OSError:
-        return None
 
 
 def cmd_status(a):
@@ -230,7 +279,7 @@ def cmd_status(a):
         return
     print(f"{d['id']}  stan={d['state']}  repo={d['repo']}  gałąź={d['branch']}  baza={str(d['base_sha'])[:12]}")
     if d.get("verdict"):
-        print(f"werdykt: {d['verdict']}")
+        print(f"werdykt: {d['verdict']['state']}" + (f" (brakuje: {'; '.join(d['verdict']['missing'])})" if d["verdict"].get("missing") else ""))
     print("kryteria:")
     for c in d["criteria"]:
         print(f"  {c['id']} [{c['status']}] {c['text']}  ← {c['read']} ⇒ {c['expected']}  dowody: {','.join(c['evidence']) or '-'}")
@@ -243,12 +292,13 @@ def cmd_status(a):
             extra.append(t["worktree"])
         if t.get("rounds") or t.get("resumes"):
             extra.append(f"rundy {t.get('rounds', 0)}/wznowienia {t.get('resumes', 0)}")
+        if t.get("note"):
+            extra.append(f"({t['note']})")
         print(f"  {t['id']} [{t['status']}] {t['name']}  wariant={t['variant']} deps={','.join(t['deps']) or '-'}  {' '.join(extra)}")
-    fr = p.front()
-    print("front (do spawnu):", ", ".join(t["id"] for t in fr) or "-")
+    print("front (do spawnu):", ", ".join(t["id"] for t in p.front()) or "-")
     print(f"decyzje czekające ({len(oczek)}):")
     for x in oczek:
-        print(f"  {x['id']} [{x['kind']}] {x['question']}  opcje: {' | '.join(x['options'])}  rekomendacja: {x.get('rec') or '-'}  blokuje: {','.join(x.get('blocks', [])) or '-'}")
+        print(f"  {x['id']} [{x['kind']}] {x['question']}  opcje: {' | '.join(x['options'])}  rekomendacja: {x.get('rec') or '-'}  blokuje: {','.join(x.get('blocks', [])) or '-'}  odblokuje: {','.join(x.get('unblock_on', [])) or '-'}")
     hs = [h for h in d["human_steps"] if not h["done"]]
     if hs:
         print("kroki tylko-ludzkie:", "; ".join(f"{h['id']} {h['text']}" for h in hs))
@@ -260,16 +310,19 @@ def cmd_status(a):
 def cmd_criteria(a):
     p = znajdz(a)
     if a.op == "add":
+        if not a.text:
+            sys.exit("criteria add --text ... --read ... --expected ...")
         cid = p.nowy_id("C", p.d["criteria"])
         p.d["criteria"].append({"id": cid, "text": a.text, "read": a.read or "", "expected": a.expected or "", "status": "open", "evidence": []})
         p.zapisz(); p.log("contract", f"kryterium {cid}", a.text, "", "open"); print(cid)
     elif a.op == "set":
-        c = p.kryterium(a.id)
+        c = p.kryterium(a.id or sys.exit("criteria set <id> ..."))
+        for k in ("text", "read", "expected"):
+            if getattr(a, k):
+                c[k] = getattr(a, k)
         if a.status:
-            c["status"] = a.status
-        if a.evidence:
-            c["evidence"] = sorted(set(c["evidence"]) | set(a.evidence.split(",")))
-        p.zapisz(); p.log("verify", f"kryterium {c['id']} → {c['status']}", "", ",".join(c["evidence"]), c["status"])
+            sys.exit("status kryterium wynika z dowodów: `evidence add --for <id> ... --verdict pass|fail|unverified`")
+        p.zapisz(); p.log("contract", f"kryterium {c['id']} poprawione", "", "", c["status"])
     elif a.op == "list":
         for c in p.d["criteria"]:
             print(f"{c['id']}\t{c['status']}\t{c['text']}\t{c['read']}\t{c['expected']}\t{','.join(c['evidence'])}")
@@ -288,27 +341,37 @@ def cmd_task(a):
         for dep in lista(a.deps):
             if not any(t["id"] == dep for t in p.d["tasks"]):
                 sys.exit(f"zależność {dep} nie istnieje")
-        p.d["tasks"].append({"id": tid, "name": a.name, "files": lista(a.files), "readers": lista(a.readers),
+        zajete = {f: t["id"] for t in p.d["tasks"] for f in t["files"]}
+        kolizje = [f"{f} ({zajete[f]})" for f in lista(a.files) if f in zajete]
+        if kolizje:
+            sys.exit("plik ma już właściciela: " + ", ".join(kolizje))
+        p.d["tasks"].append({"id": tid, "name": a.name or tid, "files": lista(a.files), "readers": lista(a.readers),
                              "deps": lista(a.deps), "variant": a.variant or "opus", "verify": a.verify or "",
                              "status": "ready", "agent": None, "branch": None, "worktree": None,
                              "spawn_sha": None, "rounds": 0, "resumes": 0, "findings": 0, "note": ""})
-        p.zapisz(); p.log("plan", f"zadanie {tid}", a.name, "", "ready"); print(tid)
+        p.zapisz(); p.log("plan", f"zadanie {tid}", a.name or "", "", "ready"); print(tid)
     elif a.op == "set":
-        t = p.zadanie(a.id)
+        t = p.zadanie(a.id or sys.exit("task set <id> ..."))
         if a.status:
             if a.status not in STANY_ZADANIA:
                 sys.exit(f"stan {a.status} spoza {STANY_ZADANIA}")
-            if a.status == "running" and t["status"] in ("ready",) and p.wolne_miejsca() == 0:
+            if a.status in ("running", "fixing") and p.d["state"] == "cancelled":
+                sys.exit("przelot anulowany: zadania nie wracają do running")
+            if a.status in ("running", "fixing") and t["status"] not in ("running", "fixing") and p.wolne_miejsca() == 0:
                 sys.exit(f"brak wolnego miejsca ({p.d['max_live']} żywych)")
+            if a.status == "running" and t["status"] == "ready" and not (a.spawn_sha or t["spawn_sha"]):
+                sys.exit("spawn wymaga --spawn-sha (HEAD integracji w chwili spawnu)")
             t["status"] = a.status
-        for k in ("agent", "branch", "worktree", "spawn_sha", "variant", "verify", "note"):
-            v = getattr(a, k.replace("spawn_sha", "spawn_sha"), None)
+        for k in ("agent", "branch", "worktree", "spawn_sha", "variant", "verify", "note", "name"):
+            v = getattr(a, k, None)
             if v is not None:
                 t[k] = v
         if a.files is not None:
             t["files"] = lista(a.files)
         if a.readers is not None:
             t["readers"] = lista(a.readers)
+        if a.deps is not None:
+            t["deps"] = lista(a.deps)
         p.zapisz(); p.log("front", f"zadanie {t['id']} → {t['status']}", a.note or "", t.get("spawn_sha") or "", t["status"])
     elif a.op == "bump":
         t = p.zadanie(a.id)
@@ -316,7 +379,7 @@ def cmd_task(a):
         p.zapisz(); p.log("front", f"zadanie {t['id']} {a.field}={t[a.field]}", "", "", "")
     elif a.op == "list":
         for t in p.d["tasks"]:
-            print(f"{t['id']}\t{t['status']}\t{t['variant']}\t{t['name']}\tdeps={','.join(t['deps'])}\tfiles={','.join(t['files'])}")
+            print(f"{t['id']}\t{t['status']}\t{t['variant']}\t{t['name']}\tdeps={','.join(t['deps'])}\tfiles={','.join(t['files'])}\t{t['note']}")
 
 
 def cmd_frontier(a):
@@ -334,23 +397,23 @@ def cmd_evidence(a):
     if a.op == "add":
         if a.verdict not in ("pass", "fail", "unverified"):
             sys.exit("werdykt: pass | fail | unverified")
+        if not (a.for_ and a.cmd and a.sha):
+            sys.exit("evidence add --for <C|T> --cmd <komenda> --sha <sha> --result <wynik> --verdict <w>")
+        if a.for_.startswith("C"):
+            p.kryterium(a.for_)
         dow = p.dowody()
-        # idempotentnie: ten sam cel + komenda + SHA zastępuje
-        istn = next((e for e in dow if e["for"] == a.for_ and e["cmd"] == a.cmd and e["sha"] == a.sha), None)
-        eid = istn["id"] if istn else p.nowy_id("E", dow)
+        istn = next((e for e in dow if e["for"] == a.for_ and e["cmd"] == a.cmd and e["sha"] == a.sha and e["verdict"] == a.verdict), None)
+        if istn:
+            print(istn["id"])  # ten sam pomiar na tym samym SHA: bez powtórki
+            return
+        eid = p.nowy_id("E", dow)
         plik = None
         if a.file:
-            plik = f"E-{eid}-{os.path.basename(a.file)}"
+            plik = f"{eid}-{os.path.basename(a.file)}"
             shutil.copy(a.file, os.path.join(p.katalog, "evidence", plik))
         rek = {"id": eid, "ts": teraz(), "for": a.for_, "cmd": a.cmd, "sha": a.sha, "result": a.result, "file": plik, "verdict": a.verdict}
         zapisz_json(os.path.join(p.katalog, "evidence", f"{eid}.json"), rek)
-        if a.for_.startswith("C"):
-            c = p.kryterium(a.for_)
-            c["evidence"] = sorted(set(c["evidence"]) | {eid})
-            if a.verdict in ("pass", "fail"):
-                c["status"] = a.verdict
-            elif c["status"] == "open":
-                c["status"] = "unverified"
+        p.przelicz_kryteria()
         p.zapisz(); p.log("verify", f"dowód {eid} dla {a.for_}: {a.verdict}", a.cmd, f"{eid}@{a.sha[:12]}", a.result[:120]); print(eid)
     elif a.op == "list":
         for e in p.dowody():
@@ -362,13 +425,13 @@ def cmd_evidence(a):
                 return
         sys.exit(f"brak dowodu {a.id}")
     elif a.op == "check":
-        head = a.head or git(p.d["repo"], "rev-parse", a.ref or p.d["branch"])
-        stale = [e for e in p.dowody() if e["verdict"] == "pass" and e["for"].startswith("C") and e["sha"] != head]
-        for e in stale:
-            print(f"nieaktualny {e['id']} dla {e['for']}: dowód na {e['sha'][:12]}, HEAD {head[:12]}")
-        if not stale:
-            print(f"wszystkie dowody kryteriów na {head[:12]}")
-        sys.exit(1 if stale else 0)
+        head = a.head or p.head(a.ref)
+        braki = p.nieaktualne(head)
+        for b in braki:
+            print("brak:", b)
+        if not braki:
+            print(f"każde kryterium ma dowód pass na {str(head)[:12]}")
+        sys.exit(1 if braki else 0)
 
 
 def cmd_decisions(a):
@@ -377,7 +440,7 @@ def cmd_decisions(a):
         if a.pending and d["status"] != "pending":
             continue
         print(json.dumps(d, ensure_ascii=False) if a.json else
-              f"{d['id']}\t{d['kind']}\t{d['status']}\t{d['question']}\topcje: {' | '.join(d['options'])}\trec: {d.get('rec') or '-'}\tblokuje: {','.join(d.get('blocks', []))}\todp: {d.get('reply') or ''}")
+              f"{d['id']}\t{d['kind']}\t{d['status']}\t{d['question']}\topcje: {' | '.join(d['options'])}\trec: {d.get('rec') or '-'}\tblokuje: {','.join(d.get('blocks', []))}\todblokuje: {','.join(d.get('unblock_on', []))}\todp: {d.get('reply') or ''}")
 
 
 def cmd_decide(a):
@@ -386,15 +449,26 @@ def cmd_decide(a):
     if a.op == "ask":
         if a.kind not in RODZAJE_DECYZJI:
             sys.exit(f"rodzaj spoza {RODZAJE_DECYZJI}")
+        if not a.question:
+            sys.exit("decide ask --question ...")
         opcje = [o.strip() for o in a.options.split("|") if o.strip()] if a.options else []
         if a.kind == "approval" and len(opcje) < 2:
             sys.exit("decyzja approval ma co najmniej dwie opcje")
         if a.rec and opcje and a.rec not in opcje:
             sys.exit("rekomendacja musi być jedną z opcji")
+        blocks = lista(a.blocks)
+        for b in blocks:
+            p.zadanie(b)
+        odblok = [o.strip() for o in a.unblock_on.split("|") if o.strip()] if a.unblock_on else []
+        if blocks and a.kind != "auto" and not odblok:
+            sys.exit("decyzja z --blocks podaje --unblock-on \"<opcje, które odblokowują>\"; inna odpowiedź zostawia zadania zablokowane")
+        if any(o not in opcje for o in odblok):
+            sys.exit("--unblock-on spoza opcji")
         did = p.nowy_id("D", dec)
         rek = {"id": did, "ts": teraz(), "kind": a.kind, "question": a.question, "options": opcje, "rec": a.rec,
                "status": "auto_kept" if a.kind == "auto" else "pending", "reply": a.rec if a.kind == "auto" else None,
-               "by": "agent" if a.kind == "auto" else None, "blocks": lista(a.blocks), "answered": teraz() if a.kind == "auto" else None}
+               "by": "agent" if a.kind == "auto" else None, "blocks": blocks, "unblock_on": odblok,
+               "answered": teraz() if a.kind == "auto" else None}
         dec.append(rek)
         p.zapisz_decyzje(dec)
         p.log("decision", f"{did} {a.kind}: {a.question}", f"rec={a.rec}", "", rek["status"])
@@ -406,36 +480,49 @@ def cmd_decide(a):
         if d["status"] != "pending":
             print(f"{d['id']} już {d['status']} ({d.get('reply')})")  # idempotentnie
             return
-        if d["kind"] == "approval" and not (a.by or "").startswith("human"):
-            sys.exit(f"decyzja {d['id']} jest approval: odpowiedź tylko --by human[:imię]; agent nie autoryzuje")
-        odp = a.reply.strip()
+        kto = a.by or ""
+        if d["kind"] == "approval" and not CZLOWIEK.match(kto):
+            sys.exit(f"decyzja {d['id']} jest approval: odpowiada człowiek (`--by human[:imię]`) ze swojego terminala; agent nie autoryzuje")
+        odp = (a.reply or "").strip()
         if odp in ("rec", "rekomendacja"):
             if not d.get("rec"):
                 sys.exit("brak rekomendacji w tej decyzji")
             odp, status = d["rec"], "approved"
-        elif odp in ("reject", "odrzucam", "nie"):
+        elif odp in ("reject", "odrzucam"):
             status = "rejected"
         else:
             if d["options"] and odp not in d["options"]:
                 sys.exit(f"odpowiedź spoza opcji: {' | '.join(d['options'])} (albo rec / reject)")
             status = "approved" if odp == d.get("rec") else "overridden"
-        d.update({"status": status, "reply": odp, "by": a.by or "human", "answered": teraz()})
+        d.update({"status": status, "reply": odp, "by": kto or "human", "answered": teraz()})
         p.zapisz_decyzje(dec)
-        p.log("decision", f"{d['id']} → {status}", f"odpowiedź: {odp}", "", f"by {d['by']}")
-        print(f"{d['id']} {status}: {odp}")
+        zablokowane = []
+        if d["blocks"] and (status == "rejected" or (d.get("unblock_on") and odp not in d["unblock_on"])):
+            for tid in d["blocks"]:
+                t = p.zadanie(tid)
+                if t["status"] in ("ready", "running", "fixing"):
+                    t["status"] = "blocked"
+                    t["note"] = f"decyzja {d['id']}: {odp}"
+                    zablokowane.append(tid)
+            p.zapisz()
+        p.log("decision", f"{d['id']} → {status}", f"odpowiedź: {odp}", "", f"by {d['by']}" + (f"; zablokowane {','.join(zablokowane)}" if zablokowane else ""))
+        print(f"{d['id']} {status}: {odp}" + (f"; zadania zablokowane: {', '.join(zablokowane)}" if zablokowane else ""))
 
 
 def cmd_own(a):
     p = znajdz(a)
     if a.op == "add":
+        if not (a.kind and a.ref):
+            sys.exit("own add <kind> <ref>")
         if not any(o["ref"] == a.ref and not o["done"] for o in p.d["owned"]):
             p.d["owned"].append({"kind": a.kind, "ref": a.ref, "created": teraz(), "done": False})
             p.zapisz(); p.log("own", f"{a.kind} {a.ref}", "", "", "open")
     elif a.op == "done":
+        ref = a.ref or a.kind
         for o in p.d["owned"]:
-            if o["ref"] == a.ref:
+            if o["ref"] == ref:
                 o["done"] = True
-        p.zapisz(); p.log("own", f"sprzątnięte {a.ref}", "", "", "done")
+        p.zapisz(); p.log("own", f"sprzątnięte {ref}", "", "", "done")
     elif a.op == "list":
         for o in p.d["owned"]:
             if a.open and o["done"]:
@@ -447,13 +534,13 @@ def cmd_human(a):
     p = znajdz(a)
     if a.op == "add":
         hid = p.nowy_id("H", p.d["human_steps"])
-        p.d["human_steps"].append({"id": hid, "text": a.text, "done": False, "created": teraz()})
-        p.zapisz(); p.log("human", f"{hid} {a.text}", "", "", "open"); print(hid)
+        p.d["human_steps"].append({"id": hid, "text": a.text_or_id, "done": False, "created": teraz()})
+        p.zapisz(); p.log("human", f"{hid} {a.text_or_id}", "", "", "open"); print(hid)
     elif a.op == "done":
         for h in p.d["human_steps"]:
-            if h["id"] == a.id:
+            if h["id"] == a.text_or_id:
                 h["done"] = True
-        p.zapisz(); p.log("human", f"{a.id} done", "", "", "done")
+        p.zapisz(); p.log("human", f"{a.text_or_id} done", "", "", "done")
 
 
 def cmd_log(a):
@@ -465,6 +552,8 @@ def cmd_state(a):
     p = znajdz(a)
     if a.state not in STANY:
         sys.exit(f"stan spoza {STANY}")
+    if p.d["state"] == "cancelled":
+        sys.exit("przelot anulowany; nowy przelot przez `create`")
     p.d["state"] = a.state
     sid = os.environ.get("CLAUDE_SESSION_ID")
     if sid and sid not in p.d["sessions"]:
@@ -472,32 +561,41 @@ def cmd_state(a):
     p.zapisz(); p.log("state", a.state, a.note or "", "", a.state)
 
 
-def werdykt(p):
-    """DONE = każde kryterium pass ∧ brak zadań poza merged/dropped ∧ brak decyzji pending."""
-    kr = p.d["criteria"]
-    zad = p.d["tasks"]
-    pend = [d for d in p.decyzje() if d["status"] == "pending"]
+def cmd_session(a):
+    p = znajdz(a)
+    if a.id not in p.d["sessions"]:
+        p.d["sessions"].append(a.id)
+        p.zapisz(); p.log("session", a.id, a.note or "", "", "")
+
+
+def werdykt(p, head):
+    """done = każde kryterium ma najnowszy dowód pass na HEAD ∧ zadania tylko merged/dropped
+    ∧ brak decyzji pending ∧ brak otwartych kroków ludzkich."""
     braki = []
-    if not kr:
+    if not p.d["criteria"]:
         braki.append("brak kryteriów odbioru")
-    braki += [f"{c['id']} {c['status']}" for c in kr if c["status"] != "pass"]
-    braki += [f"{t['id']} {t['status']}" for t in zad if t["status"] not in ("merged", "dropped")]
-    braki += [f"decyzja {d['id']} pending" for d in pend]
+    braki += p.nieaktualne(head)
+    braki += [f"{t['id']} {t['status']}" for t in p.d["tasks"] if t["status"] not in ("merged", "dropped")]
+    braki += [f"decyzja {d['id']} pending" for d in p.decyzje() if d["status"] == "pending"]
     braki += [f"krok ludzki {h['id']}" for h in p.d["human_steps"] if not h["done"]]
-    return ("done" if not braki else ("blocked" if any(t["status"] == "blocked" for t in zad) else "partial")), braki
+    if not braki:
+        return "done", braki
+    return ("blocked" if any(t["status"] == "blocked" for t in p.d["tasks"]) else "partial"), braki
 
 
 def cmd_close(a):
     p = znajdz(a)
-    stan, braki = werdykt(p)
+    if p.d["state"] == "cancelled":
+        sys.exit("przelot anulowany")
+    head = a.head or p.head()
+    stan, braki = werdykt(p, head)
     if a.state and a.state != stan:
         if a.state == "done":
             sys.exit("DONE niedozwolone: " + "; ".join(braki))
         stan = a.state
     p.d["state"] = stan
-    p.d["verdict"] = {"state": stan, "missing": braki, "note": a.note or "", "ts": teraz()}
-    p.zapisz(); p.log("close", stan, a.note or "", "", "; ".join(braki)[:200])
-    ustaw_aktywny(p.d["repo"], None)
+    p.d["verdict"] = {"state": stan, "head": head, "missing": braki, "note": a.note or "", "ts": teraz()}
+    p.zapisz(); p.log("close", stan, a.note or "", str(head)[:12], "; ".join(braki)[:200])
     print(stan + ("" if not braki else ": " + "; ".join(braki)))
 
 
@@ -506,7 +604,6 @@ def cmd_cancel(a):
     p.d["state"] = "cancelled"
     p.d["verdict"] = {"state": "cancelled", "missing": [], "note": a.note or "", "ts": teraz()}
     p.zapisz(); p.log("cancel", "cancelled", a.note or "", "", "")
-    ustaw_aktywny(p.d["repo"], None)
     print("cancelled; rejestr własności do sprzątnięcia:", ", ".join(o["ref"] for o in p.d["owned"] if not o["done"]) or "pusty")
 
 
@@ -514,30 +611,30 @@ def cmd_resume(a):
     """Przekazanie do nowej sesji: stan z pliku, nie z pamięci."""
     p = znajdz(a)
     d = p.d
-    head = git(d["repo"], "rev-parse", d["branch"], ok=False)
+    head = p.head() or ""
     print(f"# Wznowienie przelotu {d['id']} (stan {d['state']})\nrepo {d['repo']}, gałąź {d['branch']} @ {head[:12] or '?'} (baza {str(d['base_sha'])[:12]}); plan: {d['plan']}")
-    print(f"mandat: merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}; bez nadzoru: {d['unattended']}; budżet USD: {d['budget_usd']}")
+    print(f"mandat: merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}; bez nadzoru: {d['unattended']}; budżet USD: {d['budget_usd']}; wydane: {(d.get('cost') or {}).get('usd_total')}")
     print("\nkryteria:", "; ".join(f"{c['id']} {c['status']}" for c in d["criteria"]) or "brak")
     zywe = [t for t in d["tasks"] if t["status"] in ("running", "fixing")]
-    print("\nzadania żywe (agent innej sesji NIE wznowi się SendMessage; worktree trzyma robotę):")
+    print("\nzadania running/fixing (agenci poprzedniej sesji nie żyją; worktree trzyma robotę, nowy wykonawca od SHA z rejestru):")
     for t in zywe:
         print(f"  {t['id']} {t['name']}: agent {t['agent']}, gałąź {t['branch']}, worktree {t['worktree']}, spawn {str(t['spawn_sha'])[:12]}")
     print("front:", ", ".join(t["id"] for t in p.front()) or "-", f"(wolne {p.wolne_miejsca()})")
     print("zablokowane:", ", ".join(f"{t['id']} ({t['note']})" for t in d["tasks"] if t["status"] == "blocked") or "-")
     pend = [x for x in p.decyzje() if x["status"] == "pending"]
     print("decyzje czekające:", "; ".join(f"{x['id']} {x['question']} [rec {x.get('rec')}]" for x in pend) or "-")
-    if head:
-        stale = [e for e in p.dowody() if e["verdict"] == "pass" and e["for"].startswith("C") and e["sha"] != head]
-        print("dowody nieaktualne wobec HEAD:", ", ".join(f"{e['id']}({e['for']})" for e in stale) or "-")
+    print("kryteria bez ważnego dowodu na HEAD:", "; ".join(p.nieaktualne(head)) or "-")
     print("rejestr własności otwarty:", "; ".join(f"{o['kind']}:{o['ref']}" for o in d["owned"] if not o["done"]) or "-")
     print("kroki tylko-ludzkie:", "; ".join(h["text"] for h in d["human_steps"] if not h["done"]) or "-")
     print(f"\nlog: {os.path.join(p.katalog, 'log.tsv')}")
 
 
 def cmd_stop_check(a):
-    """Hook Stop brygadzisty: zakończenie tury dozwolone, gdy przelot nie ma roboty do ruszenia
-    bez człowieka. Blokuje (exit 2) z powodem, gdy front ma gotowe zadania, są wolne miejsca
-    i nic nie biegnie w tle. Po dwóch blokadach pod rząd na tym samym froncie przepuszcza."""
+    """Hook Stop brygadzisty. Blokuje koniec tury (JSON decision=block), gdy przelot ma robotę,
+    którą da się ruszyć bez człowieka: (1) front ma gotowe zadania i wolne miejsca, (2) zadania
+    running/fixing bez agentów w tle, (3) etap running/review/gate skończony bez `close`.
+    Ten sam powód blokuje najwyżej dwa razy. Nieczytelne wejście przepuszcza: strażnicy ruchu
+    (push, deploy) stoją w PreToolUse, hook Stop tylko ponagla."""
     try:
         wej = json.load(sys.stdin)
     except Exception:
@@ -548,25 +645,78 @@ def cmd_stop_check(a):
         return
     p = Przelot(os.path.join(HOME, "runs", rid))
     if p.d["state"] in KONCOWE or p.d["state"] == "planning":
+        p.log("stop", "przepuszczam", f"stan {p.d['state']}", "", "allow")
         return
-    if wej.get("background_tasks"):
-        return  # czeka na agentów: oddanie tury jest poprawne
+    tlo = bool(wej.get("background_tasks"))
     fr = p.front()
     wolne = p.wolne_miejsca()
-    if not fr or not wolne:
+    zywe = [t["id"] for t in p.d["tasks"] if t["status"] in ("running", "fixing")]
+    otwarte = [t["id"] for t in p.d["tasks"] if t["status"] in ("ready", "running", "fixing")]
+    if fr and wolne and not tlo:
+        klucz, powod = "front:" + ",".join(t["id"] for t in fr), (
+            f"Przelot {rid}: zadania {', '.join(t['id'] for t in fr)} są gotowe, {wolne} wolne miejsca, nic nie biegnie w tle. "
+            f"Spawnuj je teraz (BRIEF.md) albo `foreman2 task set <id> --status blocked --note <czego brakuje>`; "
+            f"decyzja dla człowieka: `foreman2 decide ask --kind approval ... --blocks <id> --unblock-on <opcja>`.")
+    elif zywe and not tlo:
+        klucz, powod = "zywe:" + ",".join(zywe), (
+            f"Przelot {rid}: zadania {', '.join(zywe)} są running/fixing, a w tle nie ma agentów. Odbierz ich wynik "
+            f"(protokół odbioru → `evidence add`, `task set --status merged`) albo wznów nowym wykonawcą od SHA z rejestru.")
+    elif not otwarte and not tlo and p.d["state"] in ("running", "review", "gate"):
+        klucz, powod = "etapy:" + p.d["state"], (
+            f"Przelot {rid}: front pusty w etapie {p.d['state']}. Dokończ etapy 6–7 (recenzja na SHA, brama, PR) i zamknij "
+            f"`foreman2 close`; brak dowodu kończy się `partial`, nie ciszą.")
+    else:
+        p.log("stop", "przepuszczam", "tło pracuje" if tlo else "nic do ruszenia bez człowieka", "", "allow")
         return
-    klucz = ",".join(t["id"] for t in fr)
     licznik = p.d.setdefault("stop_blocks", {})
-    if wej.get("stop_hook_active") and licznik.get(klucz, 0) >= 2:
+    if licznik.get(klucz, 0) >= 2:
         p.log("stop", "przepuszczam po dwóch blokadach", klucz, "", "allow")
         return
     licznik[klucz] = licznik.get(klucz, 0) + 1
-    p.zapisz(); p.log("stop", "blokada zakończenia tury", f"front {klucz}, wolne {wolne}", "", "block")
-    powod = (f"Przelot {rid} ma gotowe zadania {klucz} i {wolne} wolne miejsca, a nic nie biegnie w tle. "
-             f"Spawnuj je teraz (brief wg BRIEF.md) albo oznacz `foreman2 task set <id> --status blocked --note <czego brakuje>`; "
-             f"decyzja dla człowieka idzie przez `foreman2 decide ask --kind approval ... --blocks <id>`.")
-    print(json.dumps({"decision": "block", "reason": powod}))
-    sys.exit(0)
+    p.zapisz(); p.log("stop", "blokada zakończenia tury", klucz, "", "block")
+    print(json.dumps({"decision": "block", "reason": powod}, ensure_ascii=False))
+
+
+def segmenty(cmd):
+    return [s for s in re.split(r"&&|\|\||;|\||\$\(|`|\n", cmd) if s.strip()]
+
+
+def cmd_straz(a):
+    """Hook PreToolUse brygadzisty (Bash i Agent). Odmawia z sesji modelu: odpowiedzi na decyzję
+    jako człowiek, ręcznego zapisu plików stanu; po `cancel` także spawnu, powrotu zadań do
+    running i ruchów zakazanych flocie (bramka-floty.sh). Komenda Bash nieczytelna = odmowa."""
+    def odmowa(powod):
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                                                 "permissionDecisionReason": powod}}, ensure_ascii=False))
+        sys.exit(0)
+    try:
+        wej = json.load(sys.stdin)
+    except Exception:
+        wej = {}
+    narzedzie = wej.get("tool_name")
+    rid = aktywne().get(repo_root(wej.get("cwd") or os.getcwd()))
+    stan = (czytaj_json(os.path.join(HOME, "runs", rid, "run.json"), {}) or {}).get("state") if rid else None
+    if narzedzie == "Agent":
+        if stan == "cancelled":
+            odmowa(f"Przelot {rid} anulowany: bez nowych agentów. Nowy przelot: `foreman2 create`.")
+        return
+    if narzedzie != "Bash":
+        return
+    cmd = (wej.get("tool_input") or {}).get("command")
+    if not isinstance(cmd, str):
+        odmowa("Strażnik brygadzisty nie odczytał komendy; przepisz ją prościej.")
+    for seg in segmenty(cmd):
+        if re.search(r"\bdecide +answer\b", seg) and re.search(r"--by[ =]+[\"']?human", seg):
+            odmowa("Odpowiedź `--by human` należy do człowieka z jego terminala; sesja modelu nie autoryzuje decyzji approval.")
+        if re.search(r"(run\.json|decisions\.jsonl|log\.tsv|evidence/E\d+\.json)\b", seg) and re.search(r">|\bsed +-i|\btee\b|\bmv\b|\bcp\b|\bpython3?\b|\bnode\b|\bperl\b|\bprintf\b|\becho\b", seg):
+            odmowa("Pliki stanu przelotu zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
+        if stan == "cancelled" and re.search(r"\btask +set\b.*--status[ =]+[\"']?(running|fixing)", seg):
+            odmowa(f"Przelot {rid} anulowany: zadania nie wracają do running.")
+    if stan == "cancelled":
+        bramka = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bramka-floty.sh")
+        r = subprocess.run(["bash", bramka], input=json.dumps(wej), capture_output=True, text=True)
+        if r.stdout.strip():
+            print(r.stdout.strip())
 
 
 def cmd_profile(a):
@@ -591,7 +741,7 @@ def cmd_profile(a):
                     break
     for f in ("verify.sh", "bramki.sh", "scripts/verify.sh", "Makefile"):
         if os.path.exists(os.path.join(repo, f)):
-            prof["verify"].append(f"make verify" if f == "Makefile" else f"./{f}")
+            prof["verify"].append("make verify" if f == "Makefile" else f"./{f}")
     if os.path.exists(os.path.join(repo, "pyproject.toml")) and not prof["verify"]:
         prof["verify"].append("python3 -m pytest -q")
     wf = os.path.join(repo, ".github", "workflows")
@@ -611,16 +761,16 @@ def cmd_profile(a):
         m = re.search(r"\b(verify-[a-z0-9-]+)\b", txt)
         if m:
             prof["live_verify_skill"] = m.group(1)
-    # profil użytkownika (poza repo): ~/.foreman2/profiles/<hash remote albo ścieżki>.json
     remote = git(repo, "remote", "get-url", "origin", ok=False) or repo
     klucz = hashlib.sha1(remote.encode()).hexdigest()[:12]
-    up = czytaj_json(os.path.join(HOME, "profiles", f"{klucz}.json"))
+    sciezka = os.path.join(HOME, "profiles", f"{klucz}.json")
+    up = czytaj_json(sciezka)
     if up:
-        prof.update({k: v for k, v in up.items() if k != "notes"})
+        prof.update({k: v for k, v in up.items() if k != "notes" and not k.startswith("_")})
         prof["notes"] += up.get("notes", [])
-        prof["user_profile"] = os.path.join(HOME, "profiles", f"{klucz}.json")
+        prof["user_profile"] = sciezka
     else:
-        prof["user_profile_path"] = os.path.join(HOME, "profiles", f"{klucz}.json")
+        prof["user_profile_path"] = sciezka
     prof["default_branch"] = git(repo, "symbolic-ref", "--short", "refs/remotes/origin/HEAD", ok=False).replace("origin/", "") or "main"
     skills = os.path.expanduser("~/.claude/skills")
     prof["skills_available"] = {s: os.path.isdir(os.path.join(skills, s)) for s in ("browse", "verify", "investigate", "codex")}
@@ -633,16 +783,18 @@ def cmd_report(a):
     d = p.d
     dow = {e["id"]: e for e in p.dowody()}
     dec = p.decyzje()
-    stan, braki = werdykt(p)
-    md = [f"# Przelot {d['id']}: {d['state'].upper()}", "",
-          f"repo `{d['repo']}`, gałąź `{d['branch']}`, baza `{str(d['base_sha'])[:12]}`; mandat merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}", ""]
+    head = p.head()
+    stan, braki = werdykt(p, head)
+    md = [f"# Przelot {d['id']}: {(d.get('verdict') or {}).get('state', stan).upper()}", "",
+          f"repo `{d['repo']}`, gałąź `{d['branch']}` @ `{str(head)[:12]}`, baza `{str(d['base_sha'])[:12]}`; mandat merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}", ""]
     md.append("## Kryteria odbioru")
     for c in d["criteria"]:
-        ev = "; ".join(f"{dow[e]['verdict']} `{dow[e]['cmd']}` @{dow[e]['sha'][:8]}: {dow[e]['result'][:90]}" for e in c["evidence"] if e in dow) or "brak dowodu"
+        e = p.ostatni_dowod(c["id"])
+        ev = f"{e['verdict']} `{e['cmd']}` @{e['sha'][:8]}: {e['result'][:90]}" if e else "brak dowodu"
         md.append(f"- **{c['id']}** [{c['status']}] {c['text']} — odczyt: {c['read']} ⇒ {c['expected']}. Dowód: {ev}")
     md += ["", "## Twoja uwaga"]
     pend = [x for x in dec if x["status"] == "pending"]
-    md += [f"- decyzja {x['id']}: {x['question']} (opcje: {' | '.join(x['options'])}; rekomendacja: {x.get('rec') or '-'})" for x in pend] or ["- brak decyzji do podjęcia"]
+    md += [f"- decyzja {x['id']}: {x['question']} (opcje: {' | '.join(x['options'])}; rekomendacja: {x.get('rec') or '-'}; odpowiedź: `foreman2 --run {d['id']} decide answer {x['id']} rec --by human`)" for x in pend] or ["- brak decyzji do podjęcia"]
     md += [f"- krok tylko-ludzki {h['id']}: {h['text']}" for h in d["human_steps"] if not h["done"]]
     md += [f"- blokada {t['id']} {t['name']}: {t['note']}" for t in d["tasks"] if t["status"] == "blocked"]
     md += ["", "## Zadania"]
@@ -653,7 +805,6 @@ def cmd_report(a):
     if d.get("cost"):
         md += ["", "## Koszt", f"- {json.dumps(d['cost'], ensure_ascii=False)}"]
     md += ["", f"Werdykt z pliku stanu: **{stan}**" + (f" (brakuje: {'; '.join(braki)})" if braki else ""), f"Log: `{os.path.join(p.katalog, 'log.tsv')}`"]
-    tekst = "\n".join(md)
     if a.html:
         import html as H
         body = "\n".join(
@@ -669,19 +820,10 @@ def cmd_report(a):
             f.write(page)
         print(a.html)
     else:
-        print(tekst)
-
-
-def cmd_session(a):
-    """Dopisuje id sesji Claude Code do przelotu (runner albo brygadzista)."""
-    p = znajdz(a)
-    if a.id not in p.d["sessions"]:
-        p.d["sessions"].append(a.id)
-        p.zapisz(); p.log("session", a.id, a.note or "", "", "")
+        print("\n".join(md))
 
 
 def cmd_cost(a):
-    """Zapisuje koszt z `koszty.py` (albo dowolny JSON) do stanu przelotu."""
     p = znajdz(a)
     try:
         p.d["cost"] = json.loads(a.json_)
@@ -710,9 +852,9 @@ def main():
 
     s = sub.add_parser("status", help="stan przelotu (get_status)"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_status)
 
-    s = sub.add_parser("criteria", help="kryteria odbioru"); s.add_argument("op", choices=["add", "set", "list"]); s.add_argument("id", nargs="?")
-    s.add_argument("--text"); s.add_argument("--read"); s.add_argument("--expected"); s.add_argument("--status", choices=["open", "pass", "fail", "unverified"]); s.add_argument("--evidence")
-    s.set_defaults(f=lambda a: cmd_criteria(_crit(a)))
+    s = sub.add_parser("criteria", help="kryteria odbioru (status wynika z dowodów)"); s.add_argument("op", choices=["add", "set", "list"]); s.add_argument("id", nargs="?")
+    s.add_argument("--text"); s.add_argument("--read"); s.add_argument("--expected"); s.add_argument("--status")
+    s.set_defaults(f=cmd_criteria)
 
     s = sub.add_parser("task", help="graf zadań"); s.add_argument("op", choices=["add", "set", "bump", "list"]); s.add_argument("id", nargs="?"); s.add_argument("--id", dest="id_opt")
     for k in ("name", "files", "readers", "deps", "verify", "agent", "branch", "worktree", "spawn-sha", "note", "status"):
@@ -731,52 +873,29 @@ def main():
     s = sub.add_parser("decisions", help="lista decyzji (list_decisions)"); s.add_argument("--pending", action="store_true"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_decisions)
 
     s = sub.add_parser("decide", help="ask: nowa decyzja; answer: odpowiedź (provide_decision)"); s.add_argument("op", choices=["ask", "answer"]); s.add_argument("id", nargs="?"); s.add_argument("reply", nargs="?")
-    s.add_argument("--kind", default="approval"); s.add_argument("--question"); s.add_argument("--options", help="a | b | c"); s.add_argument("--rec"); s.add_argument("--blocks"); s.add_argument("--by")
+    s.add_argument("--kind", default="approval"); s.add_argument("--question"); s.add_argument("--options", help="a | b | c"); s.add_argument("--rec"); s.add_argument("--blocks"); s.add_argument("--unblock-on", help="opcje, które odblokowują zadania z --blocks"); s.add_argument("--by")
     s.set_defaults(f=cmd_decide)
 
     s = sub.add_parser("own", help="rejestr własności do sprzątania"); s.add_argument("op", choices=["add", "done", "list"]); s.add_argument("kind", nargs="?"); s.add_argument("ref", nargs="?"); s.add_argument("--open", action="store_true")
-    s.set_defaults(f=lambda a: cmd_own(_own(a)))
+    s.set_defaults(f=cmd_own)
 
-    s = sub.add_parser("human", help="kroki, które wykona tylko człowiek"); s.add_argument("op", choices=["add", "done"]); s.add_argument("text_or_id"); s.set_defaults(f=lambda a: cmd_human(_human(a)))
+    s = sub.add_parser("human", help="kroki, które wykona tylko człowiek"); s.add_argument("op", choices=["add", "done"]); s.add_argument("text_or_id"); s.set_defaults(f=cmd_human)
 
     s = sub.add_parser("log", help="wiersz logu: faza decyzja [powód] [dowód] [wynik]"); s.add_argument("phase"); s.add_argument("decision"); s.add_argument("why", nargs="?"); s.add_argument("evidence", nargs="?"); s.add_argument("result", nargs="?"); s.set_defaults(f=cmd_log)
 
     s = sub.add_parser("state", help="zmiana etapu przelotu"); s.add_argument("state"); s.add_argument("--note"); s.set_defaults(f=cmd_state)
-    s = sub.add_parser("close", help="werdykt końcowy z pliku stanu"); s.add_argument("--state", choices=["done", "partial", "blocked"]); s.add_argument("--note"); s.set_defaults(f=cmd_close)
+    s = sub.add_parser("session", help="dopisz id sesji Claude"); s.add_argument("id"); s.add_argument("--note"); s.set_defaults(f=cmd_session)
+    s = sub.add_parser("close", help="werdykt końcowy z pliku stanu (done tylko z dowodami na HEAD)"); s.add_argument("--state", choices=["done", "partial", "blocked"]); s.add_argument("--note"); s.add_argument("--head"); s.set_defaults(f=cmd_close)
     s = sub.add_parser("cancel", help="przerwanie przelotu (cancel_task)"); s.add_argument("--note"); s.set_defaults(f=cmd_cancel)
     s = sub.add_parser("resume", help="przekazanie do nowej sesji"); s.set_defaults(f=cmd_resume)
     s = sub.add_parser("stop-check", help="hook Stop brygadzisty (stdin JSON)"); s.set_defaults(f=cmd_stop_check)
+    s = sub.add_parser("straz", help="hook PreToolUse brygadzisty: Bash i Agent (stdin JSON)"); s.set_defaults(f=cmd_straz)
     s = sub.add_parser("profile", help="konwencje repo jako JSON"); s.add_argument("--repo"); s.set_defaults(f=cmd_profile)
     s = sub.add_parser("report", help="raport z pliku stanu (markdown albo --html plik)"); s.add_argument("--html"); s.set_defaults(f=cmd_report)
-    s = sub.add_parser("session", help="dopisz id sesji"); s.add_argument("id"); s.add_argument("--note"); s.set_defaults(f=cmd_session)
     s = sub.add_parser("cost", help="zapis kosztu (JSON)"); s.add_argument("json_"); s.set_defaults(f=cmd_cost)
 
     a = ap.parse_args()
     a.f(a)
-
-
-def _crit(a):
-    if a.op == "add" and not a.text:
-        sys.exit("criteria add --text ... --read ... --expected ...")
-    if a.op == "set" and not a.id:
-        sys.exit("criteria set <id> --status ... [--evidence E1,E2]")
-    return a
-
-
-def _own(a):
-    if a.op in ("add",) and not (a.kind and a.ref):
-        sys.exit("own add <kind> <ref>")
-    if a.op == "done":
-        a.ref = a.ref or a.kind
-    return a
-
-
-def _human(a):
-    if a.op == "add":
-        a.text = a.text_or_id
-    else:
-        a.id = a.text_or_id
-    return a
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ hooks:
     - matcher: Bash
       hooks:
         - type: command
-          command: "$HOME/.claude/agents/bramka-floty.sh"
+          command: "$HOME/.claude/skills/foreman2/bin/bramka-floty.sh"
 ---
 
 Wykonujesz jedno zadanie z grafu. Brief podaje plan i sekcję, SHA startu, Twoje
@@ -40,8 +40,9 @@ Brief jest kompletny: czego w nim nie ma, zgłaszasz w raporcie, nie zgadujesz.
 ## Przed raportem
 
 1. Komendy weryfikacji z briefu, każda z wynikiem liczbą (testy: n/m; lint: 0).
-2. Skan własnych plików: bajty NUL `tr -cd '\000' < plik | wc -c` (ma być 0);
-   gdy repo ma `.gitleaks.toml`: `gitleaks detect --redact --source . --log-opts=<SHA ze spawnu>..HEAD`.
+2. Skan zmienionych plików tekstowych (`git diff --name-only <SHA ze spawnu>..HEAD`, bez
+   binariów): bajty NUL `tr -cd '\000' < plik | wc -c` (ma być 0); gdy repo ma
+   `.gitleaks.toml`: `gitleaks detect --redact --source . --log-opts=<SHA ze spawnu>..HEAD`.
 3. `git status --short` pusty, `git log --oneline <SHA ze spawnu>..HEAD`.
 
 ## Raport (jedyny kształt)

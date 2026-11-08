@@ -8,6 +8,11 @@ hooks:
     - hooks:
         - type: command
           command: python3 -I "$HOME/.claude/skills/foreman2/bin/foreman2" stop-check
+  PreToolUse:
+    - matcher: Bash|Agent
+      hooks:
+        - type: command
+          command: python3 -I "$HOME/.claude/skills/foreman2/bin/foreman2" straz
 ---
 
 # Foreman 2.0: brygadzista
@@ -29,13 +34,15 @@ do `log.tsv` (czas, faza, decyzja, powód, dowód, wynik). `$F2 <komenda> -h` da
 | graf | `$F2 task add --id T1 --name <co> --files a,b --readers T3 --deps T0 --variant sonnet\|opus\|opus-high --verify "<komenda>"`; `task set <id> --status <stan> --agent <id> --spawn-sha <sha> --worktree <dir>`; `task bump <id> --field rounds\|resumes` |
 | front | `$F2 frontier`: zadania gotowe w wolnych miejscach (≤ 3 żywych agentów) |
 | dowód | `$F2 evidence add --for C1\|T1 --cmd "<komenda>" --sha <sha> --result "<wynik>" --verdict pass\|fail\|unverified [--file <plik>]`; `evidence check`: dowody nieaktualne wobec HEAD |
-| decyzja | `$F2 decide ask --kind auto\|challenge\|approval --question <q> --options "a \| b" --rec a [--blocks T2]`; odpowiedź: `decide answer <id> rec\|<opcja> --by human` |
+| decyzja | `$F2 decide ask --kind auto\|challenge\|approval --question <q> --options "a \| b" --rec a [--blocks T2 --unblock-on a]`; odpowiedź: `decide answer <id> rec\|<opcja> --by human` |
 | własność | `$F2 own add worktree\|branch\|process\|cron\|coffee\|account\|pr <ref>`; `own done <ref>` |
 | człowiek | `$F2 human add "<krok, który wykona tylko człowiek>"` |
 | koniec | `$F2 close` (werdykt z pliku; `done` tylko przy komplecie `pass`); `report [--html plik]`; `resume` (przekazanie nowej sesji) |
 
-Hook Stop tego skilla blokuje koniec tury, gdy front ma gotowe zadania, są wolne
-miejsca i nic nie biegnie w tle.
+Hook Stop tego skilla blokuje koniec tury, gdy front ma gotowe zadania i wolne
+miejsca, gdy zadania są `running` bez agentów w tle albo etap skończył się bez `close`.
+Hook PreToolUse odmawia odpowiedzi `--by human` i zapisu plików stanu z sesji modelu;
+po `cancel` także spawnu, pushu i deployu. Człowiek odpowiada ze swojego terminala.
 
 ## Pliki czytane na żądanie
 
@@ -122,7 +129,7 @@ nieprzyjętych → opus-high; opus-high po 2 → `task set --status blocked --no
 "<czego brakuje, co próbowano>"`; zależne czekają, reszta frontu idzie.
 Odejście od planu z powodem = poprawka planu; odejście zmieniające kontrakt dostaje
 czytelników w grafie. Konflikt przy merge = błąd podziału grafu: ten sam agent przez
-SendMessage dociąga integrację i rozwiązuje. Robota > 2× zapowiedzianej → `decide ask`.
+SendMessage dociąga integrację i rozwiązuje. Robota > 2× zapowiedzianej → `decide ask --kind auto` (dalej z założeniem albo cięcie zakresu, powód w logu).
 Kontekst brygadzisty > ~250k → `$F2 resume` i przekazanie nowej sesji.
 Gotowe, gdy: brak zadań `ready`/`running`/`fixing`; pełna weryfikacja repo na
 integracji (`profile.verify`) zielona → dowód dla kryteriów, które pokrywa.
@@ -132,7 +139,8 @@ integracji (`profile.verify`) zielona → dowód dla kryteriów, które pokrywa.
 `SHA=$(git rev-parse <integracja>)`; `git diff <baza>...$SHA > <tmp>/diff.patch`;
 katalog odbioru `git worktree add <tmp>/odbior $SHA` (`own add worktree`). Na tym
 samym SHA: `/code-review high`, Codex (`codex exec -s read-only … < diff.patch`),
-`foreman2-recenzent` (oś tekstu dla użytkownika, gdy zmiana ma napisy). Findingi
+`foreman2-recenzent` (oś tekstu dla użytkownika, gdy zmiana ma napisy; bez Codexa
+także poprawność, a PR dostaje notkę „bez drugiego modelu”). Findingi
 łączysz w jedną rundę poprawek; delta dostaje drugą rundę Codexa tylko przy migracji
 albo uprawnieniach; findingi tekstu kończą się po dwóch rundach. Odbiór na żywo: `foreman2-weryfikator` ze skillem z profilu
 (`live_verify_skill`), bez skilla gstack `/browse` na adresie z planu; bez obu
@@ -167,7 +175,7 @@ bez nadzoru, zadziałała drabina albo była blokada.
 |---|---|---|
 | techniczna, odwracalna | Ty, od razu | `decide ask --kind auto` (założenie widoczne w raporcie) |
 | niepewność techniczna | Codex albo recenzent na tym samym SHA | `--kind challenge`; finding odtwarzasz |
-| zakres, biznes, nieodwracalne, dane produkcyjne, wysyłki, uprawnienia, pieniądze | człowiek | `--kind approval --rec <opcja> --blocks <zadania>`; reszta frontu idzie; bez odpowiedzi przelot kończy się `partial` |
+| zakres, biznes, nieodwracalne, dane produkcyjne, wysyłki, uprawnienia, pieniądze | człowiek | `--kind approval --rec <opcja> --blocks <zadania> --unblock-on <opcje>`; reszta frontu idzie; bez odpowiedzi przelot kończy się `partial` |
 
 Zgoda modeli (Codex, recenzent, drugi Claude) nic nie autoryzuje: odpowiedź na
 `approval` przyjmuje tylko `--by human`.
