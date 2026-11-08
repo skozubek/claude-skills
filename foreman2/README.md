@@ -20,26 +20,24 @@ foremana 1.x (`../foreman`), który zostaje punktem powrotu.
 | `tests/` | `python3 -I -m unittest discover -s foreman2/tests` z katalogu repo |
 | `DECYZJE.md` | macierz źródeł: co wołamy z zewnątrz, co trzymamy, co odrzucamy |
 
-## Instalacja (po decyzji o wdrożeniu)
+## Instalacja (wykonana 2026-11-08)
 
-```
-ln -s ~/Coding/claude-skills/foreman2 ~/.claude/skills/foreman2
-ln -s ~/Coding/claude-skills/foreman2/agents/foreman2-wykonawca.md ~/.claude/agents/
-ln -s ~/Coding/claude-skills/foreman2/agents/foreman2-recenzent.md ~/.claude/agents/
-ln -s ~/Coding/claude-skills/foreman2/agents/foreman2-weryfikator.md ~/.claude/agents/
-```
-
-`~/.claude/agents` jest dowiązaniem do `../agents` tego repo, więc równoważnie:
-`git mv foreman2/agents/*.md agents/` w commicie wdrożenia. Hooki skilla i agentów
-oczekują `~/.claude/skills/foreman2/bin/` (foreman2, bramka-floty.sh).
+Skill: `~/.claude/skills/foreman2 → ~/Coding/claude-skills/foreman2`, wpina
+`~/Coding/_context/wepnij-claude.sh` (razem z 1.x i verify-admotiv; `--status`
+sprawdza). Agenci: `agents/foreman2-*.md` w tym repo to dowiązania do
+`foreman2/agents/` (jedno źródło dla `~/.claude/agents` i dla `bin/run`, który
+buduje `--agents` z `foreman2/agents/`); świeża sesja widzi sześć typów agentów,
+trzy 1.x i trzy 2.0. Hooki skilla i agentów oczekują `~/.claude/skills/foreman2/bin/`
+(foreman2, bramka-floty.sh).
 
 Decyzje `approval` człowiek odpowiada ze swojego terminala
 (`foreman2 --run <id> decide answer <D> rec --by human`), nie z sesji
 brygadzisty: jej hook PreToolUse odmawia `--by human`.
 
-Rollback: usunięcie czterech dowiązań i katalogu `~/.foreman2` (stan przelotów).
-Foreman 1.x nie jest przez 2.0 dotykany. Narzędzie kosztu `koszty.py` zostaje
-w `../foreman/` i jest wołane stamtąd; przy zdjęciu 1.x przechodzi do `bin/`.
+Rollback: usunięcie dowiązania skilla, trzech dowiązań w `agents/` i katalogu
+`~/.foreman2` (stan przelotów i profile). Foreman 1.x nie jest przez 2.0 dotykany.
+Narzędzie kosztu `koszty.py` zostaje w `../foreman/` i jest wołane stamtąd; przy
+zdjęciu 1.x przechodzi do `bin/`.
 
 ## Stan przelotu
 
@@ -92,10 +90,12 @@ i pisze `decide answer`; to warstwa UX poza tym katalogiem.
 
 ## Czego jeszcze nie ma
 
-- Profil użytkownika dla AdMotiv (`~/.foreman2/profiles/<klucz>.json`
-  z `profiles/admotiv.example.json`): do zrobienia przy pierwszym nadzorowanym
-  przelocie na tym repo. Mapa funkcji zostaje poza repo AdMotiv (narzędzie
-  prywatne), wskaźnik do niej niesie profil, nie AGENTS.md.
+- Pierwszy przelot na repo z użytkownikami (AdMotiv): raport ma status PARTIAL,
+  dopóki nie przejdzie nadzorowany. Profil użytkownika AdMotiv już leży
+  w `~/.foreman2/profiles/` (z `profiles/admotiv.example.json`, klucz = sha1
+  adresu origin; `bin/foreman2 profile --repo <klon>` pokazuje ścieżkę i treść).
+  Mapa funkcji zostaje poza repo AdMotiv (narzędzie prywatne), wskaźnik do niej
+  niesie profil, nie AGENTS.md.
 - Most dla Mii, ChatGPT i głosu: proces, który czyta `status --json`
   i `decisions --pending`, pisze `decide answer` jako człowiek po jego słowie
   i woła `bin/run --resume`. Kontrakt wyżej jest kompletny, brakuje transportu
