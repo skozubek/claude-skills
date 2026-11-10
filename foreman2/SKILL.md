@@ -85,7 +85,9 @@ kilka razy tyle co ta sama zmiana w jednej sesji; zwraca się, gdy zachodzi cho�
 
 Łańcuch zadań, z których każde czeka na poprzednie, paczka drobnych poprawek (choćby
 dziesięć), zakres bez kryteriów odbioru, robota wymagająca rozmowy co kilka minut: zwykła
-sesja. Tryb bez nadzoru sam floty nie uzasadnia. Mówisz wtedy jednym zdaniem, że przelot
+sesja. Zakres mieszany (jedna zmiana warstwowa i paczka drobnych poprawek): zadania
+grafu dostaje tylko część spełniająca warunek, a drobne poprawki idą jednym zadaniem
+jednego wykonawcy. Tryb bez nadzoru sam floty nie uzasadnia. Mówisz wtedy jednym zdaniem, że przelot
 tu nie pasuje i dlaczego, i robisz zmianę sam, z tym samym zapisem: `$F2 create --slug
 <nazwa> --plan <plik> --branch <bieżąca gałąź>` → zmiana i commit → bramki repo → jedna
 runda Codexa na diffie → `$F2 evidence run` → odczyt kryteriów bez komendy (`evidence add`)

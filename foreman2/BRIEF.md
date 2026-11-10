@@ -18,9 +18,10 @@ Brief wskazuje zakresy do przeczytania (plik i funkcja), nie całe pliki. Każdy
 warunek niesie powód: warunek bez powodu wykonawca „poprawia”. Dowód ekranu: jeden
 skrypt `$B js` z `/browse` albo komenda skilla z profilu. Spawn:
 `Agent(subagent_type="foreman2-wykonawca", model=<sonnet|opus>, run_in_background=true)`;
-wariant opus-high to `model=opus` z `effort: high` w wywołaniu. Przed spawnem `git
-rev-parse HEAD` w katalogu, w którym stoi sesja, = SHA ze spawnu, bo z HEAD tego
-katalogu wyrastają worktree agentów, a `merge --ff-only` nie cofa nowszego; rezerwacja
+wariant opus-high to `model=opus` z `effort: high` w wywołaniu. SHA ze spawnu
+to HEAD integracji (`git -C <katalog integracji> rev-parse HEAD`), także gdy integracja
+stoi w osobnym worktree, a sesja w głównym klonie: worktree agentów wyrastają z HEAD
+katalogu sesji i wykonawca dociąga je `merge --ff-only` do SHA ze spawnu; rezerwacja
 `$F2 task set <ids> --status running --spawn-sha <sha>`. Po spawnie `$F2 task set <id>
 --agent <id> --worktree <dir>` (rejestruje worktree i gałąź do sprzątania).
 

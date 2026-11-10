@@ -618,6 +618,15 @@ def sprawdz_plan(sciezka, unattended=False):
     return bledy, {"kryteria": len(kryteria), "granice": granice, "sciezka": sciezka_uz, "lista": [rozloz_kryterium(k) for k in kryteria]}
 
 
+def ostrzezenie_komend(info):
+    """Plan bez żadnej komendy: każdy dowód będzie słowem modelu. Ostrzeżenie, nie odmowa,
+    bo plan czysto ekranowy jest legalny; test SQL czy curl w kryterium bez grawisów nie."""
+    if info.get("lista") and not any(k["cmd"] for k in info["lista"]):
+        return ("uwaga: 0 kryteriów z komendą, więc cały odbiór to słowo modelu. Odczyt wykonywalny "
+                "(test, SQL, curl) piszesz jako komendę w grawisach z wynikiem (PLAN.md).")
+    return None
+
+
 def cmd_plan(a):
     bledy, info = sprawdz_plan(a.plik, a.unattended)
     for b in bledy:
@@ -627,6 +636,8 @@ def cmd_plan(a):
         sys.exit(1)
     z_komenda = sum(1 for k in info["lista"] if k["cmd"])
     print(f"plan OK: kryteria {info['kryteria']} (komenda: {z_komenda}, słowo modelu: {info['kryteria'] - z_komenda})" + (", Granice" if info["granice"] else ""))
+    if ostrz := ostrzezenie_komend(info):
+        print(ostrz, file=sys.stderr)
     for k in info["lista"]:
         print(("  komenda, stdout: " if k["expect_out"] is not None else "  komenda, kod 0: " if k["cmd"] else "  słowo modelu:    ") + k["text"][:100])
 
@@ -664,7 +675,7 @@ def cmd_create(a):
     if not a.slug:
         sys.exit("create wymaga --slug")
     if a.plan:
-        bledy, _ = sprawdz_plan(a.plan, a.unattended)
+        bledy, info_planu = sprawdz_plan(a.plan, a.unattended)
         if bledy:
             sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman2 plan check`, szablon PLAN.md")
     repo = repo_root(a.repo)
@@ -691,6 +702,8 @@ def cmd_create(a):
             return
         p._lock.zwolnij()
         shutil.rmtree(kat)
+    if a.plan and (ostrz := ostrzezenie_komend(info_planu)):  # tylko nowy przelot, ponowny create milczy
+        print(ostrz, file=sys.stderr)
     os.makedirs(os.path.join(kat, "evidence"))
     tu = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     d = {
@@ -845,6 +858,16 @@ def cmd_task(a):
                 bez_sha = [t["id"] for t in nowe if not (a.spawn_sha or t["spawn_sha"])]
                 if bez_sha:
                     sys.exit("spawn wymaga --spawn-sha (HEAD integracji w chwili spawnu): " + ", ".join(bez_sha))
+        if a.status == "merged":
+            # scalenie idzie przez `accept --merge`; ręczne merged po fail odbioru (pipe zjada kod
+            # wyjścia w `accept | tail && git merge`) wpuszczało nieprzyjętą robotę do integracji (LC-124)
+            bez_pass = [t["id"] for t in zad if t["status"] != "merged" and (p.ostatni_dowod(t["id"]) or {}).get("verdict") != "pass"]
+            if bez_pass and not a.force:
+                sys.exit(f"{', '.join(bez_pass)} bez odbioru pass: scalasz przez `foreman2 accept <T> --worktree <dir> --merge`; świadomy wyjątek: --force --note <powód>")
+            if bez_pass and not a.note:
+                sys.exit("--force wymaga --note <powód>")
+            if bez_pass:
+                p.log("front", f"{','.join(bez_pass)} → merged mimo odbioru (--force)", a.note, "", "")
         for t in zad:
             if a.status == "fixing" and t["status"] == "merged" and a.spawn_sha is None:
                 # runda poprawek po scaleniu startuje z integracji: odbiór liczy od niej, nie od

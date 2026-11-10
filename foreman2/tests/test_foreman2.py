@@ -12,6 +12,7 @@ import unittest
 BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "foreman2")
 BRAMKA = os.path.join(os.path.dirname(BIN), "bramka-floty.sh")
 RUN = os.path.join(os.path.dirname(BIN), "run")
+SKROT = ("--force", "--note", "skrót testu: stan bez odbioru")
 
 PLAN_OK = """# Eksport listy do CSV
 
@@ -131,7 +132,7 @@ class TestPrzelot(Baza):
         self.nowy()
         fr = json.loads(self.f2("frontier", "--json").stdout)
         self.assertEqual(fr["ready"], ["T1"])
-        self.f2("task", "set", "T1", "--status", "merged", "--spawn-sha", self.head)
+        self.f2("task", "set", "T1", "--status", "merged", "--spawn-sha", self.head, *SKROT)
         fr = json.loads(self.f2("frontier", "--json").stdout)
         self.assertEqual(fr["ready"], ["T2", "T3"])
         r = self.f2("task", "set", "T2", "--status", "running", ok=False)
@@ -154,14 +155,14 @@ class TestPrzelot(Baza):
         self.assertNotEqual(r.returncode, 0)
         r = self.f2("task", "add", "--name", "z", "--files", "a.ts", ok=False)
         self.assertIn("właściciela", r.stderr)
-        self.f2("task", "set", "T1", "--status", "merged")
+        self.f2("task", "set", "T1", "--status", "merged", *SKROT)
         self.assertEqual(self.f2("task", "add", "--name", "poprawki recenzji", "--files", "a.ts").stdout.strip(), "T5",
                          "plik zadania scalonego wolno dać nowemu zadaniu (runda poprawek)")
 
     def test_skrocony_sha_liczy_sie_jak_pelny(self):
         rid = self.nowy()
         for t in ("T1", "T2", "T3", "T4"):
-            self.f2("task", "set", t, "--status", "merged")
+            self.f2("task", "set", t, "--status", "merged", *SKROT)
         e = self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head[:7], "--result", "2", "--verdict", "pass").stdout.strip()
         self.assertEqual(json.loads(self.f2("evidence", "show", e).stdout)["sha"], self.head, "skrócony SHA rozwinięty do pełnego")
         self.assertEqual(self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head, "--result", "2", "--verdict", "pass").stdout.strip(), e, "ten sam pomiar bez powtórki")
@@ -243,7 +244,7 @@ class TestPrzelot(Baza):
         self.assertIn("running/fixing", out["reason"])
         # wszystko merged, etap running bez close → blokada
         for t in ("T1", "T2", "T3", "T4"):
-            self.f2("task", "set", t, "--status", "merged")
+            self.f2("task", "set", t, "--status", "merged", *SKROT)
         out = json.loads(self.f2("stop-check", stdin=wej).stdout)
         self.assertIn("close", out["reason"])
         self.f2("close")
@@ -270,7 +271,7 @@ class TestPrzelot(Baza):
     def test_close_done_tylko_z_dowodem_na_head(self):
         rid = self.nowy()
         for t in ("T1", "T2", "T3", "T4"):
-            self.f2("task", "set", t, "--status", "merged")
+            self.f2("task", "set", t, "--status", "merged", *SKROT)
         self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head, "--result", "2", "--verdict", "pass")
         self.f2("human", "add", "opublikuj front")
         self.integracja()
@@ -487,7 +488,7 @@ class Bledy(Baza):
 
     def scalone(self):
         for t in ("T1", "T2", "T3", "T4"):
-            self.f2("task", "set", t, "--status", "merged")
+            self.f2("task", "set", t, "--status", "merged", *SKROT)
 
     def test_close_bez_head_integracji_nie_daje_done(self):
         self.nowy()
@@ -558,7 +559,7 @@ class Bledy(Baza):
 
     def test_rezerwacja_frontu_jednym_wywolaniem(self):
         self.nowy()
-        self.f2("task", "set", "T1", "--status", "merged")
+        self.f2("task", "set", "T1", "--status", "merged", *SKROT)
         self.f2("task", "add", "--id", "T5", "--name", "x", "--files", "e.ts")
         self.f2("task", "add", "--id", "T6", "--name", "y", "--files", "f.ts")
         r = self.f2("task", "set", "T2,T3,T5,T6", "--status", "running", "--spawn-sha", self.head, ok=False)
@@ -722,7 +723,7 @@ class Integracja(Baza):
     def test_close_liczy_head_galezi_nie_tagu_o_tej_nazwie(self):
         self.nowy()
         for t in ("T1", "T2", "T3", "T4"):
-            self.f2("task", "set", t, "--status", "merged")
+            self.f2("task", "set", t, "--status", "merged", *SKROT)
         self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head, "--result", "2", "--verdict", "pass")
         self.g("commit", "-q", "--allow-empty", "-m", "B")
         b = self.g("rev-parse", "HEAD")
@@ -737,7 +738,7 @@ class Integracja(Baza):
         swój plik: odbiór widzi tylko jego zmianę, nie scaloną integrację."""
         self.nowy()
         self.f2("task", "set", "T1", "--status", "running", "--spawn-sha", self.head, "--verify", "true")
-        self.f2("task", "set", "T1", "--status", "merged")
+        self.f2("task", "set", "T1", "--status", "merged", *SKROT)
         self.g("checkout", "-q", "-b", "integracja/test-przelotu")
         with open(os.path.join(self.repo, "b.ts"), "w") as f:
             f.write("T2")
@@ -758,7 +759,7 @@ class Integracja(Baza):
     def test_close_z_pelna_nazwa_galezi(self):
         self.nowy("--branch", "refs/heads/integracja/test-przelotu")
         for t in ("T1", "T2", "T3", "T4"):
-            self.f2("task", "set", t, "--status", "merged")
+            self.f2("task", "set", t, "--status", "merged", *SKROT)
         self.integracja()
         self.f2("evidence", "add", "--for", "C1", "--cmd", "curl /n", "--sha", self.head, "--result", "2", "--verdict", "pass")
         out = self.f2("close").stdout
@@ -833,6 +834,19 @@ class Odbior(Baza):
         self.assertEqual(self.t1()["status"], "merged")
         self.assertEqual(self.g("rev-parse", "HEAD^2"), sha, "merge --no-ff przypiętego SHA")
         self.assertIn("gotowe: T2, T3", r.stdout)
+    def test_reczne_merged_po_nieudanym_odbiorze_odrzucone(self):
+        """`accept … | tail && git merge && task set --status merged`: pipe zjada kod wyjścia,
+        zadanie z odbiorem fail nie może wejść jako merged bez --force --note."""
+        self.commit("a.ts", "poza.ts")
+        self.assertNotEqual(self.accept().returncode, 0)
+        r = self.f2("task", "set", "T1", "--status", "merged", ok=False)
+        self.assertNotEqual(r.returncode, 0, "merged mimo fail")
+        self.assertIn("accept", r.stderr)
+        self.assertEqual(self.t1()["status"], "running")
+        self.f2("task", "set", "T1", "--status", "merged", "--force", "--note", "konflikt rozwiązany ręcznie")
+        self.assertEqual(self.t1()["status"], "merged")
+        self.assertIn("mimo odbioru", open(os.path.join(self.home, "runs", self.rid, "log.tsv")).read())
+
     def test_accept_merge_z_worktree_sesji(self):
         """Sesja w worktree repo przelotu (nie w głównym klonie) scala tak samo."""
         sha = self.commit("a.ts")
