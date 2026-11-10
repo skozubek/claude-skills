@@ -11,9 +11,13 @@ idzie) albo krok tylko-ludzki (`human add`). Przelot bez człowieka kończy się
 - Zakres: zadania i pliki z grafu; poza grafem nic.
 - Dane: które projekty, konta i marki wolno czytać, w które wolno pisać. Dev serwer
   czytający produkcję wymienia projekt, konto i zapisy, które po przelocie usuwasz.
-- Tożsamość obiektów po nazwie i miejscu, nie po ID; odbiór zastępczy, gdy brak.
+- Tożsamość poświadczeń: która komenda daje klucz, która funkcja go przyjmuje,
+  czego klucz nie otworzy (np. starter wymagający tokenu użytkownika) i jaki jest
+  wtedy odbiór zastępczy.
 - Koszt: budżet USD (`create --budget`, runner `--max-budget-usd`) i limit wywołań
-  płatnych (sędzia, API) per obiekt, liczony w planie i w `own`.
+  płatnych (sędzia, API) per obiekt, zsumowany z całym planem przed pierwszym
+  wywołaniem i liczony w trakcie w pliku licznika w katalogu przelotu, bo zadania,
+  smoke i porównania biją w ten sam limit. <!-- LC-099 -->
 - Kroki tylko-ludzkie z odbiorem zastępczym; po przelocie lista w `human`.
 
 Granice nie rosną w trakcie; bramek nie osłabiasz; sekretów nie wpisujesz do
@@ -38,6 +42,8 @@ Sprawdzasz jako operator, zanim poleci pierwszy spawn:
 - konta ról: wywołanie z oczekiwaniem 200/4xx, nie 401, per kryterium z bramką;
 - dane po drucie do pliku (`curl`, `psql`, CLI z `> plik`), do kontekstu liczby
   i wycinki; dane testowe bez SQL na produkcji;
+- pobranie z przeglądarki i krok kończący się dialogiem to ślepa uliczka, a karta
+  w tle dławi pętle, więc postęp czytasz z bazy; <!-- LC-106 -->
 - odbiór ekranu niezależny od przeglądarki człowieka: skill z profilu albo `/browse`.
 
 Krok, którego nie da się przejść → `human add` i kryterium `unverified` z góry.
@@ -48,12 +54,14 @@ Krok, którego nie da się przejść → `human add` i kryterium `unverified` z 
   recenzji. Bez Codexa: recenzent Claude na delcie, PR z adnotacją „bez Codexa od
   <SHA>”, merge dopiero po Codexie na bieżącym SHA.
 - Limit konta Claude: sesja czeka na reset; `CronCreate` budzik godzinę po resecie
-  jako zapas. `/coffee` na start sesji interaktywnej; runner daje `caffeinate`.
+  jako zapas. Sieć pada częściej niż limit, a sesja po awarii sieci nie wraca
+  sama: drugi budzik `CronCreate` stawiasz na starcie, na porę, o której człowiek
+  wstaje. `/coffee` na start sesji interaktywnej; runner daje `caffeinate`.
 - Po odzyskaniu sieci: `git status` w każdym worktree z rejestru; SendMessage do
   żywych agentów „dokończ i raportuj”; agent bez odpowiedzi dostaje następcę z SHA
   z rejestru.
-- Koszt: `cost` w run.json (runner zapisuje z `claude -p`); sesja interaktywna
-  `koszty.py`.
+- Koszt: `foreman2 cost --scan` (zużycie per sesja i agent z zapisów sesji; runner
+  woła je sam i dopisuje USD budżetu z `claude -p`).
 
 ## Sędzia próbki (zmiana masowa oceniana modelem)
 
@@ -61,4 +69,4 @@ Etykiety z ludzkiego śladu najpierw; próbka ze stałym ziarnem, zanonimizowana
 kontrole, które muszą paść; punktacja per rodzaj pola; sędzia z innej rodziny
 (Codex) z tym samym przydziałem, co audytor; druga runda na świeżej próbce. Próg
 względem kontroli zmierzonej tym samym narzędziem, zapisany w planie przed
-pierwszym wynikiem.
+pierwszym wynikiem. <!-- LC-093 -->

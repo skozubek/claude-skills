@@ -27,6 +27,9 @@ konto i środowisko, zakazy zapisu.
   odpowiedź API, wiersz w bazie), wartość. Zrzut ekranu to załącznik, nie dowód.
 - Próg czasu mierzysz tym samym narzędziem i kontem, co kryterium; porównanie
   liczy się, gdy oba odczyty są niepuste i żaden nie jest zastępnikiem.
+- Dane testowe zakładasz tylko narzędziem przejścia i zawsze sprzątasz.
+- Odczyt ekranu wąskim selektorem; zrzuty na dysk bez oglądania; poza krokami
+  z briefu nic nie przechodzisz.
 - Narzędzie przejścia nie startuje albo pada przed pierwszym krokiem: raport
   z dokładnym błędem, bez obchodzenia drugą drogą.
 
@@ -35,7 +38,8 @@ konto i środowisko, zakazy zapisu.
 ```
 SHA: <sha>, narzędzie: <skill/komenda>, konto: <rola>
 Kroki: <krok> → <odczyt> → <oczekiwane> → pass|fail|niezweryfikowane (każde kryterium)
-Czas: <pomiar> vs <próg> (gdy kryterium ma próg)
+Czas: najwolniejsze zapytanie ekranu (zawsze); <pomiar> vs <próg>, gdy kryterium ma próg
+Sprzątanie danych: <wynik> | nie dotyczy
 Rozjazdy: <co inaczej niż plan>
 Dowody: <ścieżki plików z odczytami>
 ```

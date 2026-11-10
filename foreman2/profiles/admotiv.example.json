@@ -3,12 +3,14 @@
  "live_verify_skill": "verify-admotiv",
  "shared_clone": true,
  "notes": [
-  "Mapa funkcji AdMotiv (`~/Coding/MOL/Panel/meta/mapa/`, narzędzie prywatne poza repo): kryteria odbioru planu to wpisy mapy, nowe zachowanie ekranu dostaje w grafie zadanie „dopisz wpis mapy” w tej samej robocie; przed robotą w obszarze `verify-admotiv/bin/doctor <obszar>` pokazuje cudze zmiany od ostatniego pełnego przejścia (także w modułach importowanych przez ekran), a te przechodzi się najpierw; krok, który przeszedł, zalicza weryfikator przez `bin/przeszlo <katalog> <ID>` (rejestr `przejscia.log`), nie dopiskiem w pliku mapy.",
+  "Mapa funkcji AdMotiv (`~/Coding/MOL/Panel/meta/mapa/`, narzędzie prywatne poza repo): kryteria odbioru planu to wpisy mapy, nowe zachowanie ekranu dostaje w grafie zadanie „dopisz wpis mapy” w tej samej robocie; przed robotą w obszarze `verify-admotiv/bin/doctor <obszar>` pokazuje cudze zmiany od ostatniego pełnego przejścia (także w modułach importowanych przez ekran), a te przechodzi się najpierw; krok, który przeszedł, zalicza weryfikator przez `bin/przeszlo <katalog> <ID>` (rejestr `przejscia.log`), nie dopiskiem w pliku mapy. Wpis mapy nowego zachowania pisze wykonawca zadania ekranu w raporcie blokiem „Wpis mapy” (plik i funkcja przy każdym zdaniu); brygadzista wkleja go po sprawdzeniu, że wpisy pokrywają kryteria i obietnice planu, bo wykonawca opisuje tylko to, co zbudował.",
   "Strażnik dokumentów liczy każdy commit osobno: commit kodu bez dokumentu naprawia późniejszy commit z linią `Dokumenty: uzupełnia <sha>` albo `Dokumenty: bez zmian <sha>`; ten sam SHA sprawdzany raz.",
   "Migracja po merge'u: workflow „Zastosuj migrację” zaraz po merge'u; `migration-drift` czeka 10 minut. Migracja zmieniająca obiekt z `scripts/konsumenci.json` poprawia jego wpis w tym samym PR-ze.",
-  "Świeży worktree nie ma `supabase link`: odczyty bazy z głównego klonu (`supabase db query --linked`, tylko select); deploy funkcji z worktree z `--project-ref`.",
+  "Świeży worktree nie ma `supabase link`: odczyty bazy z głównego klonu (`supabase db query --linked`, tylko select); deploy funkcji z worktree z `--project-ref`. `supabase functions list` w świeżym worktree oddaje pusty wynik bez błędu: flagi `verify_jwt` czytasz z głównego klonu.",
   "Dev serwer czyta produkcyjne Supabase: Granice wymieniają projekt, konto i zapisy do usunięcia po przelocie.",
   "Dev serwer w worktree na dowiązanym `node_modules` startuje z `--webpack` (Turbopack pada na ścieżce poza rootem).",
-  "Zmiana pod zadaniem cyklicznym (lustro, cron): kroki wdrożenia jednym ciągiem między przebiegami, z odczytem przebiegów przed i po."
+  "Przed spawnem weryfikatora `verify-admotiv/bin/sesja` na docelowym hoście i jedno zapytanie do Supabase (z `supabase link`) muszą odpowiedzieć.",
+  "Dane testowe weryfikatora sprząta `~/Coding/MOL/Panel/meta/mapa/crm-sprzatanie.sh <RUN> --wykonaj` (bez flagi tylko liczy); czas ekranu daje `verify-admotiv/bin/czasy`.",
+  "Repo notatek `MOL/Panel/meta/`, w którym przelot odhacza postęp: po przelocie commit i push, `git status -sb` bez „ahead”, bo następna sesja czyta stan ze zdalnego."
  ]
 }

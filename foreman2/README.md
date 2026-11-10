@@ -38,8 +38,8 @@ sesji brygadzisty odmawia `--by human`.
 
 Rollback: usunięcie dowiązania skilla, trzech dowiązań w `agents/` i katalogu
 `~/.foreman2` (stan przelotów i profile). Foreman 1.x nie jest przez 2.0 dotykany.
-Narzędzie kosztu `koszty.py` zostaje w `../foreman/` i jest wołane stamtąd; przy
-zdjęciu 1.x przechodzi do `bin/`.
+Koszt przelotu liczy `foreman2 cost --scan` tą samą regułą co `../foreman/koszty.py`
+(test trzyma zgodność); przy zdjęciu 1.x `koszty.py` przechodzi do `bin/`.
 
 ## Stan przelotu
 
@@ -50,7 +50,10 @@ zdjęciu 1.x przechodzi do `bin/`.
   wersje źródeł (foreman2, claude, codex, gstack) w chwili `create`;
 - `decisions.jsonl`: decyzje `auto` | `challenge` | `approval` ze statusem
   `pending` | `approved` | `overridden` | `rejected` | `auto_kept`;
-- `evidence/E*.json`: dowód = komenda + SHA + wynik + werdykt (+ plik);
+- `plan.md`: kopia planu z chwili `create`; skrót planu w `run.json` zamraża oryginał;
+- `kontrakt.md`: ustalenia, architektura i opis grafu, pisane przez brygadzistę;
+- `evidence/E*.json`: dowód = komenda + SHA + wynik + werdykt + źródło (`by`: `tool`,
+  gdy komendę wykonało narzędzie, `model` przy wpisie ręcznym) (+ plik);
 - `log.tsv`: czas, faza, decyzja, powód, dowód, wynik (append-only).
 
 `~/.foreman2/active.json` wskazuje przelot aktywny per repo; `~/.foreman2/profiles/`
@@ -108,5 +111,5 @@ i pisze `decide answer`; to warstwa UX poza tym katalogiem.
 - Hook Stop skilla w sesji interaktywnej (`/foreman2`): zmierzony tylko
   w `claude -p` przez runner.
 - Koszt sesji zabitej w biegu: runner zapisuje koszt na końcu sesji, więc po
-  zabiciu `run --resume` bez `--budget` dostaje pełną resztę budżetu. Do czasu
-  liczenia kosztu z transkryptu podaje się `--budget` ręcznie.
+  zabiciu `run --resume` bez `--budget` dostaje pełną resztę budżetu. `cost --scan`
+  liczy tokeny ważone, nie USD budżetu, więc `--budget` podaje się ręcznie.

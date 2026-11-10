@@ -4,11 +4,12 @@
 Kontrakt (także dla cudzego sterownika albo głosu, przez ten sam plik stanu):
   create   = create_task      status   = get_status       decisions = list_decisions
   decide   = provide_decision evidence = get_evidence     cancel    = cancel_task
-Pozostałe podkomendy (task, frontier, own, human, log, state, close, resume, report,
-stop-check, straz, profile, session, cost) obsługują przelot od środka.
+Pozostałe podkomendy (task, frontier, accept, own, human, log, state, close, resume,
+report, stop-check, straz, profile, session, cost) obsługują przelot od środka.
 
-Dom przelotów: $FOREMAN2_HOME (domyślnie ~/.foreman2). Przelot aktywny dla repo
-stoi w active.json; każdy zapis dopisuje wiersz do log.tsv (append-only). Każde
+Dom przelotów: $FOREMAN2_HOME (domyślnie ~/.foreman2). active.json mapuje repo i parę
+„repo|sesja” na przelot; run.json trzyma właściciela (id sesji Claude), a zapis z innej
+sesji jest odrzucany. Każdy zapis dopisuje wiersz do log.tsv (append-only). Każde
 wywołanie trzyma blokadę pliku przelotu na czas odczyt–zmiana–zapis.
 `foreman2 -h` albo `foreman2 <podkomenda> -h`.
 """
@@ -30,6 +31,7 @@ STANY_ZADANIA = ("ready", "running", "accepted", "fixing", "blocked", "merged", 
 RODZAJE_DECYZJI = ("auto", "approval", "challenge")
 KONCOWE = ("done", "partial", "blocked", "cancelled")
 CZLOWIEK = re.compile(r"^human(:[\w.-]+)?$")
+PROG_KONTEKSTU = 200_000  # automatyczna kompakcja stoi na 250k
 
 
 def teraz():
@@ -48,6 +50,147 @@ def wersja(cmd):
         return subprocess.run(cmd, capture_output=True, text=True, timeout=20).stdout.strip().splitlines()[0]
     except Exception:
         return None
+
+
+def sesja():
+    """Id sesji Claude Code wołającej CLI; terminal człowieka nie ma żadnego."""
+    return os.environ.get("CLAUDE_CODE_SESSION_ID") or os.environ.get("CLAUDE_SESSION_ID") or None
+
+
+def kanon(sciezka):
+    """Ścieżka pliku zadania w jednym zapisie: `./a.ts`, `src//../a.ts` → `a.ts`. Bez strip:
+    nazwa z diffu zostaje co do znaku (białe znaki z `--files` zdejmuje `lista()`)."""
+    return os.path.normpath(sciezka)
+
+
+def sha256_pliku(p):
+    try:
+        with open(p, "rb") as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except OSError:
+        return None
+
+
+def kontekst(jsonl):
+    """Bieżący kontekst z transkryptu Claude Code: ostatni `message.usage` odpowiedzi
+    (bez `<synthetic>`), input + cache_read + cache_creation. Kompakcja po nim
+    (`system/compact_boundary` albo `isCompactSummary`) albo brak pomiaru → "?".
+    Nieczytelny plik → None (bez linii); urwana linia pomijana; nigdy wyjątek."""
+    try:
+        with open(jsonl, errors="replace") as f:
+            linie = f.readlines()
+    except Exception:
+        return None
+    try:
+        for l in reversed(linie):
+            try:
+                r = json.loads(l)
+            except ValueError:
+                continue
+            if not isinstance(r, dict):
+                continue
+            if (r.get("type") == "system" and r.get("subtype") == "compact_boundary") or r.get("isCompactSummary"):
+                return "?"
+            m = r.get("message") if r.get("type") == "assistant" else None
+            if isinstance(m, dict) and m.get("model") != "<synthetic>" and isinstance(m.get("usage"), dict):
+                u = m["usage"]
+                return sum(int(u.get(k) or 0) for k in ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"))
+        return "?"
+    except Exception:
+        return None
+
+
+def transkrypt(wzor):
+    """Pierwszy plik pasujący do wzoru w katalogu projektów Claude Code."""
+    import glob
+    baza = os.path.expanduser(os.environ.get("CLAUDE_CONFIG_DIR") or "~/.claude")
+    trafienia = glob.glob(os.path.join(glob.escape(os.path.join(baza, "projects")), wzor))
+    return trafienia[0] if trafienia else None
+
+
+def zuzycie(jsonl, od=""):
+    """Zużycie z zapisu sesji tą samą regułą co `foreman/koszty.py` (test trzyma zgodność):
+    ostatni `usage` każdej unikalnej odpowiedzi (`message.id`), bez `<synthetic>`;
+    E = input + 0,1·cache_read + 1,25·cache_write + 5·output w mln tokenów modelu, nie w USD.
+    `od` (ISO UTC) odcina odpowiedzi sprzed przelotu. Nieczytelny plik → None."""
+    pola = ("input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens", "output_tokens")
+    ostatni, modele = {}, set()
+    try:
+        f = open(jsonl, errors="replace")
+    except OSError:
+        return None
+    with f:
+        for l in f:
+            try:
+                r = json.loads(l)
+            except ValueError:
+                continue
+            m = r.get("message") if isinstance(r, dict) and r.get("type") == "assistant" else None
+            if (isinstance(m, dict) and m.get("id") and m.get("model") != "<synthetic>"
+                    and isinstance(m.get("usage"), dict) and (r.get("timestamp") or "") >= od):
+                ostatni[m["id"]] = m["usage"]
+                modele.add(m.get("model") or "?")
+    s = {k: sum(int(u.get(k) or 0) for u in ostatni.values()) for k in pola}
+    e = (s[pola[0]] + 0.1 * s[pola[1]] + 1.25 * s[pola[2]] + 5 * s[pola[3]]) / 1e6
+    wejscia = [sum(int(u.get(k) or 0) for k in pola[:3]) for u in ostatni.values()]
+    return {"model": ",".join(sorted(modele)) or "?", "replies": len(ostatni), "e": round(e, 6),
+            "ctx_last": wejscia[-1] if wejscia else 0, "ctx_max": max(wejscia, default=0)}
+
+
+def koszt_z_zapisow(p, od=""):
+    """Koszt przelotu z zapisów jego sesji: brygadzista per sesja, agenci per zapis subagenta,
+    agent przypięty do zadania po `task.agent`. Sesja bez zapisu trafia do `missing`."""
+    import glob
+    zadania = {str(t["agent"]): t["id"] for t in p.d["tasks"] if t.get("agent")}
+    sesje = list(dict.fromkeys([s for s in p.d["sessions"] + [p.d.get("runner_session"), p.d.get("owner")] if s]))
+    wiersze, brak, per_model = [], [], {}
+    for sid in sesje:
+        zapis = transkrypt(f"*/{sid}.jsonl")
+        z = zuzycie(zapis, od) if zapis else None
+        if z is None:
+            brak.append(sid)
+            continue
+        wiersze.append(dict(z, who="brygadzista", session=sid, agent=None, task=None))
+        for sub in sorted(glob.glob(os.path.join(glob.escape(zapis[:-6]), "subagents", "*.jsonl"))):
+            za = zuzycie(sub, od)
+            if za is None or not za["replies"]:
+                continue
+            aid = os.path.basename(sub)[:-6]
+            aid = aid[6:] if aid.startswith("agent-") else aid
+            wiersze.append(dict(za, who="agent", session=sid, agent=aid, task=zadania.get(aid)))
+    for w in wiersze:
+        per_model[w["model"]] = round(per_model.get(w["model"], 0) + w["e"], 6)
+    return {"ts": teraz(), "per_model": per_model, "rows": wiersze, "missing": brak}
+
+
+def linie_kosztu(e):
+    out = [f"{w['who']}{' ' + w['agent'][:12] if w['agent'] else ''}{' ' + w['task'] if w['task'] else ''}: "
+           f"E={w['e']:.2f} {w['model']}, odpowiedzi {w['replies']}, kontekst {w['ctx_last'] // 1000}k/{w['ctx_max'] // 1000}k"
+           for w in e.get("rows", [])]
+    out.append("E per model (mln tokenów ważonych, nie USD): " + (", ".join(f"{m} {v:.2f}" for m, v in e.get("per_model", {}).items()) or "brak zapisów"))
+    if e.get("missing"):
+        out.append("sesje bez zapisu: " + ", ".join(e["missing"]))
+    return out
+
+
+def linie_kontekstu(agent=None):
+    """Linie o kontekście dla brygadzisty: agenta (próg nowego wykonawcy) i bieżącej sesji
+    (próg przekazania). Brak transkryptu = brak linii."""
+    out = []
+    if agent:
+        k = kontekst(transkrypt(f"*/*/subagents/agent-{agent}.jsonl") or "")
+        if k is not None:
+            out.append(f"kontekst agenta {agent}: {k if k == '?' else f'{k // 1000}k'}")
+            if k != "?" and k > PROG_KONTEKSTU:
+                out.append(f"następna poprawka: nowy wykonawca (kontekst {k // 1000}k)")
+    sid = sesja()
+    if sid:
+        k = kontekst(transkrypt(f"*/{sid}.jsonl") or "")
+        if k is not None:
+            out.append(f"kontekst brygadzisty: {k if k == '?' else f'{k // 1000}k'}")
+            if k != "?" and k > PROG_KONTEKSTU:
+                out.append("nowego frontu nie spawnuj: domknij poprawki, `foreman2 resume`, nowa sesja")
+    return out
 
 
 def czytaj_json(p, domyslne=None):
@@ -80,6 +223,9 @@ class Blokada:
         os.makedirs(os.path.dirname(sciezka), exist_ok=True)
         self.f = open(sciezka, "a+")
         fcntl.flock(self.f, fcntl.LOCK_EX)
+
+    def zwolnij(self):
+        self.f.close()
 
 
 class Przelot:
@@ -134,13 +280,61 @@ class Przelot:
             for n in os.listdir(kat):
                 if n.endswith(".json"):
                     out.append(czytaj_json(os.path.join(kat, n)))
-        return sorted(out, key=lambda e: (e["ts"], e["id"]))
+        return sorted(out, key=numer_dowodu)
+
+    def nowy_seq(self):
+        """Monotoniczny numer pomiaru (rezerwacja; luki po przerwanym pomiarze są dozwolone)."""
+        n = max([self.d.get("seq") or 0] + [numer_dowodu(e) for e in self.dowody()]) + 1
+        self.d["seq"] = n
+        return n
+
+    def dodaj_dowod(self, cel, cmd, sha, wynik, werdykt, zrodlo=None, plik=None, seq=None, by="model", zawsze=False):
+        """Nowy pomiar celu → (id, nowy). Idempotentnie tylko wobec NAJNOWSZEGO dowodu celu:
+        ten sam SHA, komenda, werdykt i pochodzenie zwraca jego id bez wpisu; każdy inny wynik
+        to nowy wpis. `by`: tool = komendę wykonało narzędzie (accept, evidence run), model =
+        wpis ręczny. `zawsze` zapisuje pomiar także wtedy, gdy powtarza poprzedni (własny log)."""
+        lista = [e for e in self.dowody() if e["for"] == cel]
+        if (not zawsze and lista and lista[-1]["cmd"] == cmd and lista[-1]["verdict"] == werdykt
+                and (lista[-1].get("by") or "model") == by and sha_rowne(lista[-1]["sha"], sha)):
+            return lista[-1]["id"], False
+        n = seq or self.nowy_seq()
+        eid = f"E{n}"
+        if zrodlo:
+            plik = f"{eid}-{os.path.basename(zrodlo)}"
+            shutil.copy(zrodlo, os.path.join(self.katalog, "evidence", plik))
+        rek = {"id": eid, "seq": n, "ts": teraz(), "for": cel, "cmd": cmd, "sha": sha, "result": wynik, "file": plik, "verdict": werdykt, "by": by}
+        zapisz_json(os.path.join(self.katalog, "evidence", f"{eid}.json"), rek)
+        self.przelicz_kryteria()
+        self.zapisz()
+        self.log("verify", f"dowód {eid} dla {cel}: {werdykt}", cmd, f"{eid}@{sha[:12]}", wynik[:120])
+        return eid, True
 
     def ostatni_dowod(self, cel, dow=None):
-        """Najnowszy dowód z werdyktem pass/fail dla celu (unverified nie zastępuje pomiaru)."""
+        """Najnowszy dowód z werdyktem pass/fail dla celu (unverified nie zastępuje pomiaru).
+        Kryterium z komendą dowodzi tylko pomiar narzędzia (`by` = tool) tą samą komendą: wpis
+        ręczny i dowód sprzed pola `by` są dla niego słowem modelu i się nie liczą."""
         lista = [e for e in (dow if dow is not None else self.dowody()) if e["for"] == cel]
+        c = next((c for c in self.d["criteria"] if c["id"] == cel), None)
+        if c and c.get("cmd"):
+            lista = [e for e in lista if e.get("by") == "tool" and e["cmd"] == c["cmd"]]
         pomiary = [e for e in lista if e["verdict"] in ("pass", "fail")]
         return (pomiary or lista or [None])[-1]
+
+    def slowem_modelu(self):
+        """Kryteria, których liczący się dowód pass wpisał model, a nie wykonało narzędzie."""
+        dow = self.dowody()
+        out = []
+        for c in self.d["criteria"]:
+            e = self.ostatni_dowod(c["id"], dow)
+            if e and e["verdict"] == "pass" and e.get("by") != "tool":
+                out.append(c["id"])
+        return out
+
+    def nowe_id_kryterium(self):
+        """Id kryterium nigdy nie wraca do obiegu: dowody usuniętego C2 nie przejdą na nowe C2."""
+        n = max([self.d.get("crit_seq") or 0] + [int(c["id"][1:]) for c in self.d["criteria"] if c["id"][1:].isdigit()]) + 1
+        self.d["crit_seq"] = n
+        return f"C{n}"
 
     def przelicz_kryteria(self):
         dow = self.dowody()
@@ -150,7 +344,11 @@ class Przelot:
             c["status"] = "open" if e is None else e["verdict"]
 
     def head(self, ref=None):
-        return git(self.d["repo"], "rev-parse", ref or self.d["branch"], ok=False) or None
+        """Pełny SHA gałęzi integracji (refs/heads/, nie tag o tej samej nazwie) albo podanego
+        refu; None, gdy repo albo gałąź nie istnieje."""
+        b = self.d["branch"]
+        ref = ref or (b if b.startswith("refs/") else "refs/heads/" + b)
+        return git(self.d["repo"], "rev-parse", "--verify", "--quiet", f"{ref}^{{commit}}", ok=False) or None
 
     def pelny_sha(self, sha):
         """Skrócony SHA rozwija do pełnego przez git repo; nieznany zostaje jak podany."""
@@ -161,7 +359,7 @@ class Przelot:
     def nieaktualne(self, head):
         """Kryteria bez ważnego dowodu: brak pomiaru, ostatni pomiar fail, albo pass na innym SHA."""
         dow = self.dowody()
-        braki = []
+        braki = [] if head else ["HEAD integracji nieznany"]
         for c in self.d["criteria"]:
             e = self.ostatni_dowod(c["id"], dow)
             if e is None or e["verdict"] != "pass":
@@ -174,6 +372,12 @@ class Przelot:
         zywe = sum(1 for t in self.d["tasks"] if t["status"] in ("running", "fixing"))
         return max(0, self.d["max_live"] - zywe)
 
+    def posiadaj(self, kind, ref):
+        """Rejestr tego, co przelot utworzył i posprząta (idempotentnie)."""
+        if not any(o["ref"] == ref and not o["done"] for o in self.d["owned"]):
+            self.d["owned"].append({"kind": kind, "ref": ref, "created": teraz(), "done": False})
+            self.log("own", f"{kind} {ref}", "", "", "open")
+
     def front(self):
         """Zadania gotowe do spawnu: ready, zależności scalone, niezablokowane decyzją pending."""
         scalone = {t["id"] for t in self.d["tasks"] if t["status"] == "merged"}
@@ -185,6 +389,11 @@ class Przelot:
         n = 1 + max([int(x["id"][len(prefix):]) for x in lista
                      if x["id"].startswith(prefix) and x["id"][len(prefix):].isdigit()] or [0])
         return f"{prefix}{n}"
+
+
+def numer_dowodu(e):
+    """Numer pomiaru; dowody sprzed pola `seq` biorą go z id (E7 → 7)."""
+    return e.get("seq") or int(e["id"][1:])
 
 
 # ---------------------------------------------------------------- odnajdywanie
@@ -203,23 +412,77 @@ def aktywne():
     return czytaj_json(os.path.join(HOME, "active.json"), {})
 
 
-def ustaw_aktywny(repo, run_id):
+def ustaw_aktywny(repo, run_id, sid=None):
+    """repo → przelot (ostatnio utworzony) i, z sesją, „repo|sesja” → przelot."""
     lk = Blokada(os.path.join(HOME, ".lock"))
     a = aktywne()
     a[repo] = run_id
+    if sid:
+        a[f"{repo}|{sid}"] = run_id
     zapisz_json(os.path.join(HOME, "active.json"), a)
-    lk.f.close()
+    lk.zwolnij()
+
+
+def rozwiaz(repo, sid, run_opt):
+    """Jeden resolver CLI i hooków → (id przelotów, błąd). Kolejność: --run, mapowanie
+    (repo, sesja), jedyny niezakończony przelot repo, ostatnio utworzony (gdy wszystkie
+    zakończone). Kilka niezakończonych bez mapowania: wszystkie z błędem."""
+    if run_opt:
+        return [run_opt], None
+    a = aktywne()
+    if sid and a.get(f"{repo}|{sid}"):
+        return [a[f"{repo}|{sid}"]], None
+    kat = os.path.join(HOME, "runs")
+    zywe = []
+    for rid in sorted(os.listdir(kat)) if os.path.isdir(kat) else []:
+        d = czytaj_json(os.path.join(kat, rid, "run.json"))
+        if isinstance(d, dict) and d.get("repo") == repo and d.get("state") not in KONCOWE:
+            zywe.append(rid)
+    if len(zywe) > 1:
+        return zywe, f"kilka przelotów w repo ({', '.join(zywe)}), podaj --run"
+    return (zywe or ([a[repo]] if a.get(repo) else [])), None
+
+
+ODCZYTY = ("status", "frontier", "report", "decisions", "resume")
+
+
+def sprawdz_wlasciciela(p):
+    """Zapis z sesji, która nie prowadzi przelotu → odmowa; przelot bez właściciela bierze
+    pierwsza sesja, która pisze. Terminal człowieka (bez id) wolny."""
+    sid, wl = sesja(), p.d.get("owner")
+    if sid and wl and wl != sid:
+        sys.exit(f"przelot {p.d['id']} prowadzi inna sesja; `foreman2 --run {p.d['id']} resume`, żeby przejąć")
+    if sid and not wl:
+        p.log("session", f"właściciel: {sid} (pierwszy zapis)", "", "", "")
+        przejmij(p, sid, "pierwszy zapis")
+
+
+def przejmij(p, sid, skad):
+    """Bieżąca sesja zostaje właścicielem przelotu i dostaje mapowanie (repo, sesja) → przelot."""
+    if not sid:
+        return
+    if p.d.get("owner") != sid:
+        if p.d.get("owner"):
+            p.log("session", f"przejęcie przez {sid}", f"{skad}; poprzedni właściciel {p.d['owner']}", "", "")
+        p.d["owner"] = sid
+        if sid not in p.d["sessions"]:
+            p.d["sessions"].append(sid)
+        p.zapisz()
+    ustaw_aktywny(p.d["repo"], p.d["id"], sid)
 
 
 def znajdz(args):
-    """Przelot z --run, inaczej aktywny (ostatnio utworzony) dla repo bieżącego katalogu."""
-    if getattr(args, "run", None):
-        return Przelot(os.path.join(HOME, "runs", args.run))
+    """Przelot przez `rozwiaz()` dla repo bieżącego katalogu; zapis sprawdza właściciela."""
     repo = repo_root(os.getcwd())
-    rid = aktywne().get(repo)
-    if not rid:
+    ids, blad = rozwiaz(repo, sesja(), getattr(args, "run", None))
+    if blad:
+        sys.exit(blad)
+    if not ids:
         sys.exit(f"brak przelotu dla {repo}; `foreman2 create` albo `--run <id>`")
-    return Przelot(os.path.join(HOME, "runs", rid))
+    p = Przelot(os.path.join(HOME, "runs", ids[0]))
+    if args.cmd not in ODCZYTY and getattr(args, "op", None) not in ("list", "show", "check"):
+        sprawdz_wlasciciela(p)
+    return p
 
 
 # ---------------------------------------------------------------- podkomendy
@@ -234,9 +497,65 @@ def punkty_planu(linie):
     return out
 
 
+def rozloz_kryterium(k):
+    """Punkt „odczyt → wynik” jako pola kryterium. Odczyt będący w całości fragmentem
+    w grawisach to komenda, którą `evidence run` wykona sam; wynik w całości w grawisach to
+    oczekiwane stdout, inaczej liczy się kod wyjścia 0. Grawisy w środku zdania to zwykły
+    tekst: takie kryterium dowodzi weryfikator (`evidence add`, słowo modelu)."""
+    m = re.match(r"^`([^`]+)`\s*(?:→|->)\s*(.*)$", k)
+    if m:
+        cmd, wynik = m.group(1).strip(), m.group(2).strip()
+        w = re.match(r"^`([^`]*)`[.;]?$", wynik)
+        return {"text": k, "read": cmd, "expected": wynik, "cmd": cmd, "expect_out": w.group(1) if w else None}
+    lewa, _, prawa = re.split(r"\s*(→|->)\s*", k, maxsplit=1) if re.search(r"→|->", k) else (k, "", "")
+    return {"text": k, "read": lewa.strip(), "expected": prawa.strip(), "cmd": None, "expect_out": None}
+
+
+def blad_planu(p):
+    """Plan po `create` jest zamrożony: None, gdy plik planu ma zapisany skrót albo już nie
+    istnieje (PR mógł go skasować; kontraktem są kopia w katalogu przelotu i kryteria w stanie)."""
+    plan, zapisany = p.d.get("plan"), p.d.get("plan_sha256")
+    if not (plan and zapisany and os.path.lexists(plan)):
+        return None
+    teraz_sha = sha256_pliku(plan)
+    if teraz_sha == zapisany:
+        return None
+    if teraz_sha is None:
+        return f"plan {plan} istnieje, ale nie daje się odczytać: zamrożenia planu nie da się potwierdzić"
+    kopia = os.path.join(p.katalog, "plan.md")
+    roznica = f"`diff {kopia} {plan}`; " if sha256_pliku(kopia) == zapisany else ""
+    return (f"plan zmieniony po starcie przelotu: {roznica}przywróć plik z kopii albo, gdy zmianę zatwierdził człowiek, "
+            f"`foreman2 --run {p.d['id']} create --plan {plan} --replan --by human:<imię>`. Ustalenia i graf piszesz do {os.path.join(p.katalog, 'kontrakt.md')}, nie do planu.")
+
+
+def importuj_kryteria(p, sciezka):
+    """Kryteria z planu do stanu. Kryterium o tym samym tekście zachowuje id i dowody; kryteria
+    z planu, których w planie już nie ma, wypadają; dopisane ręcznie zostają. Zapisuje skrót
+    planu i jego kopię (plan.md w katalogu przelotu)."""
+    _, info = sprawdz_plan(sciezka)
+    stare = [c for c in p.d["criteria"] if c.get("src") == "plan"]
+    nowe = [c for c in p.d["criteria"] if c.get("src") != "plan"]
+    for k in info.get("lista", []):
+        i = next((i for i, c in enumerate(stare) if c["text"] == k["text"]), None)
+        if i is not None:
+            c = dict(stare.pop(i), **k)
+        else:
+            c = dict(k, id=p.nowe_id_kryterium(), src="plan", status="open", evidence=[])
+            p.log("contract", f"kryterium {c['id']} z planu", c["text"][:120], "komenda" if c["cmd"] else "słowo modelu", "open")
+        nowe.append(c)
+    for c in stare:
+        p.log("contract", f"kryterium {c['id']} usunięte z planu", c["text"][:120], "", "")
+    p.d["criteria"] = sorted(nowe, key=lambda c: int(c["id"][1:]) if c["id"][1:].isdigit() else 0)
+    p.d["plan_sha256"] = sha256_pliku(sciezka)
+    shutil.copy(sciezka, os.path.join(p.katalog, "plan.md"))
+    p.przelicz_kryteria()
+    p.zapisz()
+
+
 def sprawdz_plan(sciezka, unattended=False):
     """Plan pod create: ścieżka użytkownika jednym zdaniem, 2–5 kryteriów „odczyt → wynik”,
-    „Poza zakresem”, a przy --unattended Granice z pięcioma punktami BEZ-NADZORU.md.
+    „Poza zakresem”, nagłówek „Pojęcia” (treść niesprawdzana), a przy --unattended Granice
+    z pięcioma punktami BEZ-NADZORU.md.
     Zwraca (błędy, info). Szablon: PLAN.md w katalogu skilla."""
     txt = czytaj_txt(sciezka)
     if txt is None:
@@ -246,7 +565,7 @@ def sprawdz_plan(sciezka, unattended=False):
         m = re.match(r"^#{1,3}\s+(.*)", l)
         if m:
             naglowek, biezaca = m.group(1).strip().lower(), None
-            for k, rx in (("kryteria", r"kryteri"), ("poza", r"poza\s+zakresem"), ("granice", r"granice"), ("sciezka", r"ścieżka\s+użytkownika")):
+            for k, rx in (("kryteria", r"kryteri"), ("poza", r"poza\s+zakresem"), ("granice", r"granice"), ("sciezka", r"ścieżka\s+użytkownika"), ("pojecia", r"pojęci")):
                 if re.search(rx, naglowek):
                     biezaca = k
                     sekcje.setdefault(k, [])
@@ -273,16 +592,19 @@ def sprawdz_plan(sciezka, unattended=False):
     if not any(x.strip() for x in sekcje.get("poza", [])):
         bledy.append("brak sekcji „## Poza zakresem” (co najmniej jeden punkt)")
     granice = "granice" in sekcje
+    if "pojecia" not in sekcje:
+        bledy.append("Pojęcia: nowe nazwy widoczne dla użytkownika z definicją, wskaźnik do słownika modułu albo „brak nowych pojęć”; "
+                     "pojęcia, które się nakładają, dowozi słownik skillem /mattpocock-skills:domain-modeling przed startem")
     if unattended:
         if not granice:
             bledy.append("--unattended: brak sekcji „## Granice” (BEZ-NADZORU.md)")
         else:
             g = "\n".join(sekcje["granice"]).lower()
-            brak = [n for n, rx in (("zakres", r"zakres"), ("dane", r"\bdane\b|projekt|konto"), ("tożsamość obiektów", r"tożsamo"),
+            brak = [n for n, rx in (("zakres", r"zakres"), ("dane", r"\bdane\b|projekt|konto"), ("tożsamość (poświadczenia)", r"tożsamo"),
                                     ("koszt/budżet", r"koszt|budżet"), ("kroki tylko-ludzkie", r"tylko-ludzk|człowiek")) if not re.search(rx, g)]
             if brak:
                 bledy.append("Granice bez: " + ", ".join(brak))
-    return bledy, {"kryteria": len(kryteria), "granice": granice, "sciezka": sciezka_uz}
+    return bledy, {"kryteria": len(kryteria), "granice": granice, "sciezka": sciezka_uz, "lista": [rozloz_kryterium(k) for k in kryteria]}
 
 
 def cmd_plan(a):
@@ -292,10 +614,44 @@ def cmd_plan(a):
     if bledy:
         print(f"plan {a.plik}: braków {len(bledy)}; szablon: {os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'PLAN.md')}", file=sys.stderr)
         sys.exit(1)
-    print(f"plan OK: kryteria {info['kryteria']}" + (", Granice" if info["granice"] else ""))
+    z_komenda = sum(1 for k in info["lista"] if k["cmd"])
+    print(f"plan OK: kryteria {info['kryteria']} (komenda: {z_komenda}, słowo modelu: {info['kryteria'] - z_komenda})" + (", Granice" if info["granice"] else ""))
+    for k in info["lista"]:
+        print(("  komenda, stdout: " if k["expect_out"] is not None else "  komenda, kod 0: " if k["cmd"] else "  słowo modelu:    ") + k["text"][:100])
+
+
+def replan(a):
+    """`create --replan --plan <plik> --by human:<imię>`: istniejący przelot (`--run` albo aktywny
+    dla repo) wczytuje kryteria ze zmienionego planu. Id przelotu niesie datę startu, więc cel
+    wybiera resolver, nie `--slug`."""
+    if not a.plan:
+        sys.exit("--replan wymaga --plan")
+    bledy, _ = sprawdz_plan(a.plan, a.unattended)
+    if bledy:
+        sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman2 plan check`, szablon PLAN.md")
+    ids, blad = rozwiaz(repo_root(a.repo), sesja(), a.run)
+    if blad or not ids:
+        sys.exit(blad or "--replan: brak przelotu dla tego repo; podaj `--run <id>`")
+    p = Przelot(os.path.join(HOME, "runs", ids[0]))
+    sprawdz_wlasciciela(p)
+    if p.d["state"] == "cancelled":
+        sys.exit("przelot anulowany")
+    if p.d.get("unattended") and sesja():
+        sys.exit("przelot bez nadzoru: plan zmienia człowiek ze swojego terminala, nie sesja modelu")
+    if not re.match(r"human:\S", a.by or ""):
+        sys.exit("--replan wymaga --by human:<imię>: zmianę planu zatwierdza człowiek")
+    przed = p.d.get("plan_sha256")
+    p.d["plan"] = os.path.abspath(a.plan)
+    importuj_kryteria(p, a.plan)
+    p.log("create", "replan: kryteria z planu wczytane ponownie", f"{a.plan}; zatwierdził {a.by}", str(p.d["plan_sha256"])[:12], f"poprzedni skrót {str(przed)[:12]}")
+    print(p.d["id"])
 
 
 def cmd_create(a):
+    if a.replan:
+        return replan(a)
+    if not a.slug:
+        sys.exit("create wymaga --slug")
     if a.plan:
         bledy, _ = sprawdz_plan(a.plan, a.unattended)
         if bledy:
@@ -310,10 +666,19 @@ def cmd_create(a):
         kat = os.path.join(HOME, "runs", rid)
         istn = czytaj_json(os.path.join(kat, "run.json"))
     if istn:
-        if not a.force:
+        p = Przelot(kat)
+        sprawdz_wlasciciela(p)  # także przed --force: cudzego przelotu nie kasujesz
+        if a.force and p.d.get("unattended") and sesja():
+            sys.exit("przelot bez nadzoru: `--force` kasuje stan i zamrożony plan, więc należy do człowieka i runnera, nie do sesji modelu")
+        if not a.force:  # idempotentnie: ten sam przelot
+            if blad := blad_planu(p):
+                print(blad, file=sys.stderr)
+                p.log("create", "plan zmieniony po starcie przelotu", p.d["plan"], "", "kryteria bez zmian do --replan")
             ustaw_aktywny(repo, rid)
-            print(rid)  # idempotentnie: ten sam przelot
+            przejmij(p, sesja(), "create")
+            print(rid)
             return
+        p._lock.zwolnij()
         shutil.rmtree(kat)
     os.makedirs(os.path.join(kat, "evidence"))
     tu = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -324,6 +689,7 @@ def cmd_create(a):
         "branch": a.branch or f"integracja/{slug}",
         "state": "planning", "created": teraz(), "updated": teraz(),
         "plan": os.path.abspath(a.plan) if a.plan else None,
+        "plan_sha256": sha256_pliku(a.plan) if a.plan else None,
         "budget_usd": a.budget, "max_live": a.max_live,
         "mandate": {"merge": "merge" in (a.mandate or ""), "deploy": "deploy" in (a.mandate or ""), "note": ""},
         "unattended": bool(a.unattended),
@@ -334,15 +700,15 @@ def cmd_create(a):
             "gstack": czytaj_txt(os.path.expanduser("~/.claude/skills/gstack/VERSION")),
         },
         "criteria": [], "tasks": [], "owned": [], "human_steps": [], "sessions": [], "cost": {},
-        "verdict": None, "stop_blocks": {},
+        "verdict": None, "stop_blocks": {}, "seq": 0, "owner": None, "runner_session": None,
     }
-    sid = os.environ.get("CLAUDE_SESSION_ID")
-    if sid:
-        d["sessions"].append(sid)
     zapisz_json(os.path.join(kat, "run.json"), d)
     p = Przelot(kat)
     p.log("create", f"przelot {rid}", f"repo {repo} @ {d['base_sha']}", "", "planning")
+    if a.plan:
+        importuj_kryteria(p, a.plan)
     ustaw_aktywny(repo, rid)
+    przejmij(p, sesja(), "create")
     print(rid)
 
 
@@ -362,6 +728,9 @@ def cmd_status(a):
     print(f"{d['id']}  stan={d['state']}  repo={d['repo']}  gałąź={d['branch']}  baza={str(d['base_sha'])[:12]}")
     if d.get("verdict"):
         print(f"werdykt: {d['verdict']['state']}" + (f" (brakuje: {'; '.join(d['verdict']['missing'])})" if d["verdict"].get("missing") else ""))
+    print(f"kontrakt (ustalenia, architektura, opis grafu): {os.path.join(p.katalog, 'kontrakt.md')}")
+    if blad := blad_planu(p):
+        print("PLAN ZMIENIONY:", blad)
     print("kryteria:")
     for c in d["criteria"]:
         print(f"  {c['id']} [{c['status']}] {c['text']}  ← {c['read']} ⇒ {c['expected']}  dowody: {','.join(c['evidence']) or '-'}")
@@ -391,14 +760,19 @@ def cmd_status(a):
 
 def cmd_criteria(a):
     p = znajdz(a)
+    zmiana_planu = "kryteria przelotu z planem pochodzą z planu: zmianę wpisuje do planu człowiek, potem `foreman2 create --plan <plan> --replan --by human:<imię>`"
     if a.op == "add":
         if not a.text:
             sys.exit("criteria add --text ... --read ... --expected ...")
-        cid = p.nowy_id("C", p.d["criteria"])
+        if p.d.get("plan"):
+            sys.exit(zmiana_planu)
+        cid = p.nowe_id_kryterium()
         p.d["criteria"].append({"id": cid, "text": a.text, "read": a.read or "", "expected": a.expected or "", "status": "open", "evidence": []})
         p.zapisz(); p.log("contract", f"kryterium {cid}", a.text, "", "open"); print(cid)
     elif a.op == "set":
         c = p.kryterium(a.id or sys.exit("criteria set <id> ..."))
+        if c.get("src") == "plan":
+            sys.exit(zmiana_planu)
         for k in ("text", "read", "expected"):
             if getattr(a, k):
                 c[k] = getattr(a, k)
@@ -423,38 +797,70 @@ def cmd_task(a):
         for dep in lista(a.deps):
             if not any(t["id"] == dep for t in p.d["tasks"]):
                 sys.exit(f"zależność {dep} nie istnieje")
-        zajete = {f: t["id"] for t in p.d["tasks"] if t["status"] not in ("merged", "dropped") for f in t["files"]}
-        kolizje = [f"{f} ({zajete[f]})" for f in lista(a.files) if f in zajete]
+        zajete = {kanon(f): t["id"] for t in p.d["tasks"] if t["status"] not in ("merged", "dropped") for f in t["files"]}
+        pliki = [kanon(f) for f in lista(a.files)]
+        kolizje = [f"{f} ({zajete[f]})" for f in pliki if f in zajete]
         if kolizje:
             sys.exit("plik ma już właściciela: " + ", ".join(kolizje))
-        p.d["tasks"].append({"id": tid, "name": a.name or tid, "files": lista(a.files), "readers": lista(a.readers),
+        p.d["tasks"].append({"id": tid, "name": a.name or tid, "files": pliki, "readers": lista(a.readers),
                              "deps": lista(a.deps), "variant": a.variant or "opus", "verify": a.verify or "",
                              "status": "ready", "agent": None, "branch": None, "worktree": None,
                              "spawn_sha": None, "rounds": 0, "resumes": 0, "findings": 0, "note": ""})
         p.zapisz(); p.log("plan", f"zadanie {tid}", a.name or "", "", "ready"); print(tid)
     elif a.op == "set":
-        t = p.zadanie(a.id or sys.exit("task set <id> ..."))
+        zad = [p.zadanie(x) for x in lista(a.id or sys.exit("task set <id>[,<id>...] ..."))]
+        if a.spawn_sha is not None:  # przypięty commit, nie ruchoma nazwa (HEAD, gałąź)
+            a.spawn_sha = git(p.d["repo"], "rev-parse", "--verify", "--quiet", f"{a.spawn_sha}^{{commit}}", ok=False) or \
+                sys.exit(f"--spawn-sha {a.spawn_sha}: nie rozwiązuje się do commita w {p.d['repo']}")
+        if len(zad) > 1 and any(getattr(a, k) is not None for k in ("agent", "branch", "worktree", "files", "name", "verify")):
+            sys.exit("kilka zadań naraz: tylko --status, --spawn-sha, --note, --variant; agenta dopisujesz osobno per zadanie")
         if a.status:
             if a.status not in STANY_ZADANIA:
                 sys.exit(f"stan {a.status} spoza {STANY_ZADANIA}")
             if a.status in ("running", "fixing") and p.d["state"] == "cancelled":
                 sys.exit("przelot anulowany: zadania nie wracają do running")
-            if a.status in ("running", "fixing") and t["status"] not in ("running", "fixing") and p.wolne_miejsca() == 0:
-                sys.exit(f"brak wolnego miejsca ({p.d['max_live']} żywych)")
-            if a.status == "running" and t["status"] == "ready" and not (a.spawn_sha or t["spawn_sha"]):
-                sys.exit("spawn wymaga --spawn-sha (HEAD integracji w chwili spawnu)")
-            t["status"] = a.status
-        for k in ("agent", "branch", "worktree", "spawn_sha", "variant", "verify", "note", "name"):
-            v = getattr(a, k, None)
-            if v is not None:
-                t[k] = v
-        if a.files is not None:
-            t["files"] = lista(a.files)
-        if a.readers is not None:
-            t["readers"] = lista(a.readers)
-        if a.deps is not None:
-            t["deps"] = lista(a.deps)
-        p.zapisz(); p.log("front", f"zadanie {t['id']} → {t['status']}", a.note or "", t.get("spawn_sha") or "", t["status"])
+            nowe = [t for t in zad if a.status in ("running", "fixing") and t["status"] not in ("running", "fixing")]
+            if len(nowe) > p.wolne_miejsca():
+                sys.exit(f"brak wolnego miejsca ({p.d['max_live']} żywych, wolne {p.wolne_miejsca()}, chcesz {len(nowe)})")
+            if a.status == "running":
+                front = {t["id"] for t in p.front()}
+                poza = [t["id"] for t in nowe if t["id"] not in front]
+                if poza and not a.force:
+                    sys.exit(f"{', '.join(poza)} poza frontem (zależności niescalone, decyzja pending albo stan nie ready): `foreman2 frontier`; świadomy wyjątek: --force --note <powód>")
+                if poza and not a.note:
+                    sys.exit("--force wymaga --note <powód>")
+                if poza:
+                    p.log("front", f"{','.join(poza)} → running mimo frontu (--force)", a.note, "", "")
+                bez_sha = [t["id"] for t in nowe if not (a.spawn_sha or t["spawn_sha"])]
+                if bez_sha:
+                    sys.exit("spawn wymaga --spawn-sha (HEAD integracji w chwili spawnu): " + ", ".join(bez_sha))
+        for t in zad:
+            if a.status == "fixing" and t["status"] == "merged" and a.spawn_sha is None:
+                # runda poprawek po scaleniu startuje z integracji: odbiór liczy od niej, nie od
+                # pierwszego spawnu (inaczej scalone cudze zadania wychodzą „poza zakresem”)
+                t["spawn_sha"] = p.head() or sys.exit(f"{t['id']}: HEAD integracji nieznany, podaj --spawn-sha")
+            if a.status:
+                t["status"] = a.status
+            if a.variant is not None and a.variant != t["variant"]:
+                t["rounds"] = 0  # drabina liczy nieprzyjęte od zera na nowym wariancie
+            for k in ("agent", "branch", "worktree", "spawn_sha", "variant", "verify", "note", "name"):
+                v = getattr(a, k, None)
+                if v is not None:
+                    t[k] = v
+            if a.worktree is not None:
+                p.posiadaj("worktree", a.worktree)
+                gal = a.branch or git(a.worktree, "branch", "--show-current", ok=False)
+                if gal:
+                    p.posiadaj("branch", gal)
+            if a.files is not None:
+                t["files"] = [kanon(f) for f in lista(a.files)]
+            if a.readers is not None:
+                t["readers"] = lista(a.readers)
+            if a.deps is not None:
+                t["deps"] = lista(a.deps)
+        p.zapisz()
+        for t in zad:
+            p.log("front", f"zadanie {t['id']} → {t['status']}", a.note or "", t.get("spawn_sha") or "", t["status"])
     elif a.op == "bump":
         t = p.zadanie(a.id)
         t[a.field] = t.get(a.field, 0) + a.by
@@ -469,9 +875,248 @@ def cmd_frontier(a):
     fr = p.front()
     wolne = p.wolne_miejsca()
     if a.json:
-        print(json.dumps({"free_slots": wolne, "ready": [t["id"] for t in fr], "spawn_now": [t["id"] for t in fr[:wolne]]}))
+        print(json.dumps({"free_slots": wolne, "ready": [t["id"] for t in fr], "spawn_now": [t["id"] for t in fr[:wolne]], "context": linie_kontekstu()}, ensure_ascii=False))
         return
     print(f"wolne miejsca: {wolne}; gotowe: {', '.join(t['id'] for t in fr) or '-'}; spawnuj teraz: {', '.join(t['id'] for t in fr[:wolne]) or '-'}")
+    for l in linie_kontekstu():
+        print(l)
+
+
+def zmiany_zakresu(wt, od, do):
+    """Ścieżki zmienione między dwoma commitami, pełny diff z rename (obie strony), kanonicznie."""
+    r = subprocess.run(["git", "-C", wt, "diff", "--name-status", "-z", "-M", od, do], capture_output=True, text=True)
+    if r.returncode:
+        sys.exit(f"git diff {od[:12]} {do[:12]}: {r.stderr.strip()}")
+    pola, out, i = r.stdout.split("\0"), [], 0
+    while i < len(pola) and pola[i]:
+        n = 2 if pola[i][0] in "RC" else 1
+        out += [kanon(x) for x in pola[i + 1:i + 1 + n]]
+        i += 1 + n
+    return out
+
+
+def stan_drzewa(wt):
+    """(HEAD, czy czyste) worktree agenta; nieznany worktree kończy komendę."""
+    sha = git(wt, "rev-parse", "HEAD")
+    return sha, git(wt, "status", "--porcelain") == ""
+
+
+def merge_head(kat=None):
+    return git(kat or os.getcwd(), "rev-parse", "-q", "--verify", "MERGE_HEAD", ok=False) or None
+
+
+def blad_katalogu_integracji(p):
+    """None, gdy katalog sesji to repo przelotu na gałęzi integracji, bez scalenia w toku."""
+    b = p.d["branch"]
+    top = git(os.getcwd(), "rev-parse", "--show-toplevel", ok=False)
+    if not top or os.path.realpath(top) != os.path.realpath(p.d["repo"]):
+        return f"--merge: katalog sesji ({os.getcwd()}) nie jest repo przelotu {p.d['repo']}"
+    tu = git(os.getcwd(), "symbolic-ref", "-q", "HEAD", ok=False)
+    if tu != (b if b.startswith("refs/") else "refs/heads/" + b):
+        return f"--merge: katalog sesji stoi na {tu or 'odłączonym HEAD'}, nie na {b}; `git checkout {b}` albo odbiór bez --merge"
+    if merge_head():
+        return "--merge: w katalogu sesji trwa cudze scalenie (MERGE_HEAD); nie ruszam go, odbiór bez --merge"
+    return None
+
+
+def scal(p, tid, sha):
+    """git merge --no-ff przypiętego SHA w katalogu sesji. Cofa tylko własne scalenie; None przy
+    sukcesie, inaczej powód."""
+    if blad := blad_katalogu_integracji(p):  # katalog mógł się zmienić w trakcie pomiaru
+        return blad
+    top = p.d["repo"]  # katalog sesji to ten klon (sprawdzone wyżej); ścieżki od korzenia
+    przed = git(top, "rev-parse", "HEAD")
+    wnoszone = [x for x in git(top, "diff", "--name-only", "-z", f"{przed}...{sha}").split("\0") if x]
+    # git merge nadpisuje nieśledzone pliki ignorowane (--no-overwrite-ignore nie działa w 2.50)
+    lezace = [x for x in git(top, "ls-files", "-o", "-z", "--", *wnoszone).split("\0") if x] if wnoszone else []
+    if lezace:
+        return "w katalogu sesji leżą nieśledzone pliki na ścieżkach scalenia (cudza praca?): " + ", ".join(lezace)
+    r = subprocess.run(["git", "merge", "--no-ff", "--commit", "-q",
+                        "-m", f"scal {tid}: {p.zadanie(tid)['name']}", sha], capture_output=True, text=True, cwd=top)
+    po = git(top, "rev-parse", "HEAD")
+    if r.returncode == 0 and po != przed and git(top, "rev-parse", f"{po}^2", ok=False) == sha:
+        return None
+    if merge_head(top) == sha:
+        subprocess.run(["git", "merge", "--abort"], capture_output=True, cwd=top)
+    return "scalenie nieudane (konflikt albo plik w katalogu sesji na drodze), cofnięte: " + (r.stdout + r.stderr).strip()[-400:]
+
+
+def cmd_accept(a):
+    """Odbiór zadania z worktree agenta, bez merge: SHA przypięty przed pomiarem, drzewo czyste,
+    SHA spawnu przodkiem, każda zmieniona ścieżka (pełny diff, obie strony rename) w plikach
+    zadania, komenda weryfikacji w worktree z timeoutem, poza blokadą stanu, wyjście drutem
+    do evidence/<T>-<n>.log. Po pomiarze HEAD i czystość jeszcze raz. Dowód --for <T> na
+    przypiętym SHA; fail podbija rounds. Kod wyjścia 0 tylko przy pass."""
+    p = znajdz(a)
+    t = p.zadanie(a.id)
+    if not t.get("spawn_sha"):
+        sys.exit(f"{t['id']} bez --spawn-sha: odbiór nie ma od czego liczyć zakresu")
+    if not t.get("verify"):
+        sys.exit(f"{t['id']} bez komendy weryfikacji: `foreman2 task set {t['id']} --verify \"<komenda>\"`")
+    if blad := blad_planu(p):
+        sys.exit(blad)
+    wt = os.path.abspath(a.worktree)
+    if a.merge and (blad := blad_katalogu_integracji(p)):  # przed pomiarem, żeby go nie marnować
+        sys.exit(blad)
+    sha, czyste = stan_drzewa(wt)
+    if not czyste:
+        sys.exit(f"{wt}: niezacommitowane zmiany; agent commituje robotę, odbiór mierzy commit")
+    n = p.nowy_seq()
+    p.zapisz()
+    kat, tid, spawn, verify, agent = p.katalog, t["id"], t["spawn_sha"], t["verify"], t.get("agent")
+    pliki = {kanon(f) for f in t["files"]}
+    p._lock.zwolnij()  # pomiar poza blokadą: komenda może sama wołać foreman2, cancel nie czeka
+
+    log = f"{tid}-{n}.log"
+    sciezka_logu = os.path.join(kat, "evidence", log)
+    zmiany = None
+    if subprocess.run(["git", "-C", wt, "merge-base", "--is-ancestor", spawn, sha], capture_output=True).returncode:
+        werdykt, wynik = "fail", f"SHA spawnu {spawn[:12]} nie jest przodkiem {sha[:12]}"
+    else:
+        zmiany = zmiany_zakresu(wt, spawn, sha)
+        poza = sorted({x for x in zmiany if x not in pliki})
+        if poza:
+            werdykt, wynik = "fail", "poza zakresem zadania: " + ", ".join(poza)
+        else:
+            with open(sciezka_logu, "w") as out:
+                proc = subprocess.Popen(verify, shell=True, cwd=wt, stdout=out, stderr=subprocess.STDOUT,
+                                        stdin=subprocess.DEVNULL, start_new_session=True)
+                try:
+                    kod = proc.wait(timeout=a.timeout)
+                    werdykt, wynik = ("pass" if kod == 0 else "fail"), f"exit {kod}"
+                except subprocess.TimeoutExpired:
+                    os.killpg(proc.pid, 9)
+                    proc.wait()
+                    werdykt, wynik = "fail", f"timeout {a.timeout} s"
+            po, czyste = stan_drzewa(wt)
+            if po != sha or not czyste:
+                werdykt, wynik = "fail", f"drzewo zmieniło się w trakcie pomiaru (HEAD {po[:12]}, czyste={czyste}); {wynik}"
+            if os.path.exists(sciezka_logu):
+                with open(sciezka_logu, errors="replace") as f:
+                    ogon = "".join(f.readlines()[-20:]).rstrip()
+                if ogon:
+                    print(ogon)
+
+    p = Przelot(kat)
+    sprawdz_wlasciciela(p)
+    if blad := blad_planu(p):  # plan mógł się zmienić w trakcie pomiaru
+        sys.exit(f"pomiar {tid} niezapisany: {blad}")
+    if zmiany is not None:  # zakres mógł się zmienić w trakcie pomiaru: aktualne pliki zadania
+        poza = sorted({x for x in zmiany if x not in {kanon(f) for f in p.zadanie(tid)["files"]}})
+        if poza:
+            werdykt, wynik = "fail", "poza zakresem zadania: " + ", ".join(poza) + f"; {wynik}"
+    eid, nowy = p.dodaj_dowod(tid, verify, sha, wynik, werdykt, plik=log if os.path.exists(sciezka_logu) else None, seq=n)
+    if nowy and werdykt == "fail":
+        t = p.zadanie(tid)
+        t["rounds"] = t.get("rounds", 0) + 1
+        p.zapisz(); p.log("front", f"zadanie {tid} rounds={t['rounds']}", wynik[:120], eid, "")
+    print(f"{werdykt}: {tid} {wynik}; dowód {eid}")
+    if werdykt == "pass" and a.merge:
+        if blad := scal(p, tid, sha):
+            p.log("front", f"zadanie {tid}: pass bez scalenia", blad[:120], eid, "")
+            print(f"{blad}\nkonflikt to błąd podziału grafu: SendMessage „dociągnij {p.d['branch']}, rozwiąż, raport”; SHA do scalenia: {sha}")
+            sys.exit(1)
+        t = p.zadanie(tid)
+        t["status"] = "merged"
+        p.zapisz(); p.log("front", f"zadanie {tid} → merged", f"scalone {sha[:12]}", eid, "merged")
+        fr = p.front()
+        print(f"scalone: {tid} → {git(os.getcwd(), 'rev-parse', 'HEAD')}; wolne miejsca: {p.wolne_miejsca()}; gotowe: {', '.join(x['id'] for x in fr) or '-'}")
+    else:
+        print(f"SHA do scalenia: {sha}" if werdykt == "pass" else f"nieprzyjęte na {sha}")
+    if os.path.exists(sciezka_logu):
+        print(f"log: {sciezka_logu}")
+    for l in linie_kontekstu(agent):
+        print(l)
+    sys.exit(0 if werdykt == "pass" else 1)
+
+
+def miejsce_pomiaru(p):
+    """(korzeń worktree sesji, HEAD, błąd). Pomiar kryterium liczy się w worktree repo przelotu,
+    na HEAD gałęzi integracji, w czystym drzewie: plik nieśledzony (zapomniane `git add`) dałby
+    pass komendzie, która na commicie zawodzi. Pliki ignorowane nie przeszkadzają."""
+    top = git(os.getcwd(), "rev-parse", "--show-toplevel", ok=False)
+    if not top or repo_root(top) != os.path.realpath(p.d["repo"]):
+        return None, None, f"katalog sesji ({os.getcwd()}) nie należy do repo przelotu {p.d['repo']}"
+    head, tu = p.head(), git(top, "rev-parse", "HEAD", ok=False)
+    if not head or tu != head:
+        return None, None, f"katalog sesji stoi na {tu[:12] or 'nieznanym HEAD'}, gałąź integracji {p.d['branch']} na {(head or 'nieznanym')[:12]}: pomiar liczy się na HEAD integracji"
+    zmiany = git(top, "status", "--porcelain", ok=False)
+    if zmiany:
+        return None, None, ("niezacommitowane zmiany albo pliki nieśledzone: pomiar dowodzi commita, nie katalogu roboczego "
+                            "(cudze pliki w klonie dzielonym: pomiar we własnym worktree na HEAD integracji)\n" + zmiany[:400])
+    return top, head, None
+
+
+def pomiar_kryteriow(p, a):
+    """`evidence run [C…]`: komendy kryteriów wykonuje narzędzie, w worktree sesji na HEAD
+    integracji, poza blokadą stanu, z timeoutem. stdout do evidence/<C>-<n>.log, stderr do
+    <C>-<n>.err. pass = kod 0, a przy oczekiwanym stdout także jego zgodność (po strip).
+    Dowód `by` = tool, każdy pomiar osobnym wpisem. Kod wyjścia 0 tylko, gdy wszystkie pass."""
+    if blad := blad_planu(p):
+        sys.exit(blad)
+    cele = [p.kryterium(c) for c in a.ids] if a.ids else [c for c in p.d["criteria"] if c.get("cmd")]
+    bez = [c["id"] for c in cele if not c.get("cmd")]
+    if bez:
+        sys.exit(f"{', '.join(bez)}: kryterium bez komendy w planie; jego dowód daje weryfikator (`evidence add`)")
+    if not cele:
+        print("żadne kryterium nie ma komendy (lewa strona w całości w grawisach): dowody daje weryfikator przez `evidence add`")
+        return
+    top, head, blad = miejsce_pomiaru(p)
+    if blad:
+        sys.exit(blad)
+    plan = [(c["id"], c["cmd"], c.get("expect_out"), p.nowy_seq()) for c in cele]
+    p.zapisz()
+    kat, przed = p.katalog, p  # `przed` po zwolnieniu blokady służy tylko do odczytu repo i gałęzi
+    p._lock.zwolnij()  # pomiar poza blokadą: komenda może sama wołać foreman2, cancel nie czeka
+
+    wyniki = []
+    for cid, cmd, oczek, n in plan:
+        log = os.path.join(kat, "evidence", f"{cid}-{n}.log")
+        with open(log, "w") as out, open(log[:-4] + ".err", "w") as err:
+            proc = subprocess.Popen(cmd, shell=True, cwd=top, stdout=out, stderr=err, stdin=subprocess.DEVNULL, start_new_session=True)
+            try:
+                kod = proc.wait(timeout=a.timeout)
+            except subprocess.TimeoutExpired:
+                os.killpg(proc.pid, 9)
+                proc.wait()
+                kod = None
+        with open(log, errors="replace") as f:
+            stdout = f.read().strip()
+        if not os.path.getsize(log[:-4] + ".err"):
+            os.remove(log[:-4] + ".err")
+        if kod is None:
+            w, wynik = "fail", f"timeout {a.timeout} s"
+        elif kod != 0:
+            w, wynik = "fail", f"exit {kod}"
+        elif oczek is not None and stdout != oczek.strip():
+            w, wynik = "fail", f"exit 0, stdout „{stdout[:80]}”, oczekiwane „{oczek[:80]}”"
+        else:
+            w, wynik = "pass", "exit 0" + (f", stdout „{stdout[:80]}”" if oczek is not None else "")
+        _, _, blad = miejsce_pomiaru(przed)
+        wyniki.append((cid, cmd, n, "fail" if blad else w, f"drzewo zmieniło się w trakcie pomiaru; {wynik}" if blad else wynik))
+        if blad:
+            break
+
+    p = Przelot(kat)
+    sprawdz_wlasciciela(p)
+    if blad := blad_planu(p):  # stan mógł się zmienić w trakcie pomiaru
+        sys.exit(f"pomiary niezapisane: {blad}")
+    if p.head() != head:
+        sys.exit(f"pomiary niezapisane: HEAD integracji zmienił się w trakcie ({head[:12]} → {str(p.head())[:12]})")
+    zle = len(plan) - len(wyniki)
+    for cid, cmd, n, w, wynik in wyniki:
+        c = next((c for c in p.d["criteria"] if c["id"] == cid), None)
+        if not c or c.get("cmd") != cmd:
+            print(f"{cid}: kryterium zmienione w trakcie pomiaru, wynik pominięty")
+            zle += 1
+            continue
+        eid, _ = p.dodaj_dowod(cid, cmd, head, wynik, w, plik=f"{cid}-{n}.log", seq=n, by="tool", zawsze=True)
+        zle += w != "pass"
+        print(f"{w}: {cid} {wynik}; dowód {eid}; `{cmd}`")
+    slowne = [c["id"] for c in p.d["criteria"] if not c.get("cmd")]
+    if slowne:
+        print(f"bez komendy (dowód weryfikatora, `evidence add`): {', '.join(slowne)}")
+    sys.exit(1 if zle else 0)
 
 
 def cmd_evidence(a):
@@ -481,32 +1126,23 @@ def cmd_evidence(a):
             sys.exit("werdykt: pass | fail | unverified")
         if not (a.for_ and a.cmd and a.sha):
             sys.exit("evidence add --for <C|T> --cmd <komenda> --sha <sha> --result <wynik> --verdict <w>")
-        if a.for_.startswith("C"):
-            p.kryterium(a.for_)
-        a.sha = p.pelny_sha(a.sha)
-        dow = p.dowody()
-        istn = next((e for e in dow if e["for"] == a.for_ and e["cmd"] == a.cmd and sha_rowne(e["sha"], a.sha) and e["verdict"] == a.verdict), None)
-        if istn:
-            print(istn["id"])  # ten sam pomiar na tym samym SHA: bez powtórki
-            return
-        eid = p.nowy_id("E", dow)
-        plik = None
-        if a.file:
-            plik = f"{eid}-{os.path.basename(a.file)}"
-            shutil.copy(a.file, os.path.join(p.katalog, "evidence", plik))
-        rek = {"id": eid, "ts": teraz(), "for": a.for_, "cmd": a.cmd, "sha": a.sha, "result": a.result, "file": plik, "verdict": a.verdict}
-        zapisz_json(os.path.join(p.katalog, "evidence", f"{eid}.json"), rek)
-        p.przelicz_kryteria()
-        p.zapisz(); p.log("verify", f"dowód {eid} dla {a.for_}: {a.verdict}", a.cmd, f"{eid}@{a.sha[:12]}", a.result[:120]); print(eid)
+        if blad := blad_planu(p):
+            sys.exit(blad)
+        if a.for_.startswith("C") and p.kryterium(a.for_).get("cmd") and a.verdict != "unverified":
+            sys.exit(f"{a.for_} ma komendę w planie: dowód zapisuje `foreman2 evidence run {a.for_}`, nie wpis ręczny")
+        eid, _ = p.dodaj_dowod(a.for_, a.cmd, p.pelny_sha(a.sha), a.result, a.verdict, zrodlo=a.file)
+        print(eid)
+    elif a.op == "run":
+        pomiar_kryteriow(p, a)
     elif a.op == "list":
         for e in p.dowody():
             print(f"{e['id']}\t{e['for']}\t{e['verdict']}\t{e['sha'][:12]}\t{e['cmd']}\t{e['result'][:100]}\t{e['file'] or ''}")
     elif a.op == "show":
         for e in p.dowody():
-            if e["id"] == a.id:
+            if e["id"] == (a.ids or [None])[0]:
                 print(json.dumps(e, ensure_ascii=False, indent=1))
                 return
-        sys.exit(f"brak dowodu {a.id}")
+        sys.exit(f"brak dowodu {' '.join(a.ids) or '(podaj id)'}")
     elif a.op == "check":
         head = p.pelny_sha(a.head) if a.head else p.head(a.ref)
         braki = p.nieaktualne(head)
@@ -597,9 +1233,8 @@ def cmd_own(a):
     if a.op == "add":
         if not (a.kind and a.ref):
             sys.exit("own add <kind> <ref>")
-        if not any(o["ref"] == a.ref and not o["done"] for o in p.d["owned"]):
-            p.d["owned"].append({"kind": a.kind, "ref": a.ref, "created": teraz(), "done": False})
-            p.zapisz(); p.log("own", f"{a.kind} {a.ref}", "", "", "open")
+        p.posiadaj(a.kind, a.ref)
+        p.zapisz()
     elif a.op == "done":
         ref = a.ref or a.kind
         for o in p.d["owned"]:
@@ -637,26 +1272,38 @@ def cmd_state(a):
         sys.exit(f"stan spoza {STANY}")
     if p.d["state"] == "cancelled":
         sys.exit("przelot anulowany; nowy przelot przez `create`")
+    if a.state in KONCOWE:
+        sys.exit(f"stan {a.state} wynika z werdyktu: `foreman2 close` (done tylko z dowodami na HEAD) albo `foreman2 cancel`")
     p.d["state"] = a.state
-    sid = os.environ.get("CLAUDE_SESSION_ID")
+    sid = sesja()
     if sid and sid not in p.d["sessions"]:
         p.d["sessions"].append(sid)
     p.zapisz(); p.log("state", a.state, a.note or "", "", a.state)
 
 
 def cmd_session(a):
+    """Historia sesji (`session <id>`) albo sesja runnera (`session --runner <uuid>`): runner
+    staje się właścicielem przed startem `claude -p`, a `run --resume` wznawia właśnie ją."""
     p = znajdz(a)
-    if a.id not in p.d["sessions"]:
+    if a.runner:
+        p.d["runner_session"] = a.runner
+        przejmij(p, a.runner, "runner")
+        p.zapisz(); p.log("session", f"runner {a.runner}", a.note or "", "", "")
+    elif not a.id:
+        sys.exit("session <id> albo session --runner <uuid>")
+    elif a.id not in p.d["sessions"]:
         p.d["sessions"].append(a.id)
         p.zapisz(); p.log("session", a.id, a.note or "", "", "")
 
 
 def werdykt(p, head):
-    """done = każde kryterium ma najnowszy dowód pass na HEAD ∧ zadania tylko merged/dropped
-    ∧ brak decyzji pending ∧ brak otwartych kroków ludzkich."""
+    """done = plan bez zmian od startu ∧ każde kryterium ma najnowszy dowód pass na HEAD
+    ∧ zadania tylko merged/dropped ∧ brak decyzji pending ∧ brak otwartych kroków ludzkich."""
     braki = []
     if not p.d["criteria"]:
         braki.append("brak kryteriów odbioru")
+    if blad := blad_planu(p):
+        braki.append(blad)
     braki += p.nieaktualne(head)
     braki += [f"{t['id']} {t['status']}" for t in p.d["tasks"] if t["status"] not in ("merged", "dropped")]
     braki += [f"decyzja {d['id']} pending" for d in p.decyzje() if d["status"] == "pending"]
@@ -664,6 +1311,15 @@ def werdykt(p, head):
     if not braki:
         return "done", braki
     return ("blocked" if any(t["status"] == "blocked" for t in p.d["tasks"]) else "partial"), braki
+
+
+def linia_pochodzenia(p, slowem=None):
+    """Jedno zdanie: które kryteria dowiodła wykonana komenda, a które stoją na słowie modelu."""
+    slowem = p.slowem_modelu() if slowem is None else slowem
+    dow = p.dowody()
+    komenda = [c["id"] for c in p.d["criteria"] if (e := p.ostatni_dowod(c["id"], dow)) and e["verdict"] == "pass" and e.get("by") == "tool"]
+    return (f"dowód pass: wykonana komenda zakończyła się powodzeniem: {', '.join(komenda) or '-'}; "
+            f"słowo modelu (weryfikator albo wpis ręczny): {', '.join(slowem) or '-'}")
 
 
 def sha_rowne(a, b):
@@ -676,16 +1332,20 @@ def cmd_close(a):
     p = znajdz(a)
     if p.d["state"] == "cancelled":
         sys.exit("przelot anulowany")
-    head = p.pelny_sha(a.head) if a.head else p.head()
+    head = p.head()
+    if a.head and not (head and sha_rowne(p.pelny_sha(a.head), head)):
+        sys.exit(f"--head {a.head} ≠ HEAD integracji {p.d['branch']} ({(head or 'nieznany')[:12]}); werdykt liczy się na rzeczywistym HEAD")
     stan, braki = werdykt(p, head)
     if a.state and a.state != stan:
         if a.state == "done":
             sys.exit("DONE niedozwolone: " + "; ".join(braki))
         stan = a.state
     p.d["state"] = stan
-    p.d["verdict"] = {"state": stan, "head": head, "missing": braki, "note": a.note or "", "ts": teraz()}
+    slowem = p.slowem_modelu()
+    p.d["verdict"] = {"state": stan, "head": head, "missing": braki, "by_model": slowem, "note": a.note or "", "ts": teraz()}
     p.zapisz(); p.log("close", stan, a.note or "", str(head)[:12], "; ".join(braki)[:200])
     print(stan + ("" if not braki else ": " + "; ".join(braki)))
+    print(linia_pochodzenia(p, slowem))
 
 
 def cmd_cancel(a):
@@ -697,15 +1357,16 @@ def cmd_cancel(a):
 
 
 def cmd_resume(a):
-    """Przekazanie do nowej sesji: stan z pliku, nie z pamięci."""
+    """Przekazanie do nowej sesji: stan z pliku, nie z pamięci. Sesja z id przejmuje przelot."""
     p = znajdz(a)
+    przejmij(p, sesja(), "resume")
     d = p.d
     head = p.head() or ""
     print(f"# Wznowienie przelotu {d['id']} (stan {d['state']})\nrepo {d['repo']}, gałąź {d['branch']} @ {head[:12] or '?'} (baza {str(d['base_sha'])[:12]}); plan: {d['plan']}")
     print(f"mandat: merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}; bez nadzoru: {d['unattended']}; budżet USD: {d['budget_usd']}; wydane: {(d.get('cost') or {}).get('usd_total')}")
     print("\nkryteria:", "; ".join(f"{c['id']} {c['status']}" for c in d["criteria"]) or "brak")
     zywe = [t for t in d["tasks"] if t["status"] in ("running", "fixing")]
-    print("\nzadania running/fixing (agenci poprzedniej sesji nie żyją; worktree trzyma robotę, nowy wykonawca od SHA z rejestru):")
+    print("\nzadania running/fixing (agenci poprzedniej sesji nie są osiągalni z tej sesji; zadania running wznawiasz nowym wykonawcą z worktree i SHA z rejestru):")
     for t in zywe:
         print(f"  {t['id']} {t['name']}: agent {t['agent']}, gałąź {t['branch']}, worktree {t['worktree']}, spawn {str(t['spawn_sha'])[:12]}")
     print("front:", ", ".join(t["id"] for t in p.front()) or "-", f"(wolne {p.wolne_miejsca()})")
@@ -722,17 +1383,23 @@ def cmd_stop_check(a):
     """Hook Stop brygadzisty. Blokuje koniec tury (JSON decision=block), gdy przelot ma robotę,
     którą da się ruszyć bez człowieka: (1) front ma gotowe zadania i wolne miejsca, (2) zadania
     running/fixing bez agentów w tle, (3) etap running/review/gate skończony bez `close`.
-    Ten sam powód blokuje najwyżej dwa razy. Nieczytelne wejście przepuszcza: strażnicy ruchu
-    (push, deploy) stoją w PreToolUse, hook Stop tylko ponagla."""
+    Ten sam powód blokuje najwyżej dwa razy. Nieczytelne wejście i kilka przelotów repo bez
+    mapowania sesji przepuszczają: strażnicy ruchu (push, deploy) stoją w PreToolUse, hook Stop
+    tylko ponagla."""
     try:
         wej = json.load(sys.stdin)
     except Exception:
         wej = {}
+    if not isinstance(wej, dict):
+        wej = {}
     repo = repo_root(wej.get("cwd") or os.getcwd())
-    rid = aktywne().get(repo)
-    if not rid:
+    ids, blad = rozwiaz(repo, wej.get("session_id"), None)
+    if blad or not ids:
         return
+    rid = ids[0]
     p = Przelot(os.path.join(HOME, "runs", rid))
+    if wej.get("session_id") and p.d.get("owner") != wej["session_id"]:
+        return  # sesja nie prowadzi przelotu (np. po `resume` w innej): bez zapisu
     if p.d["state"] in KONCOWE or p.d["state"] == "planning":
         p.log("stop", "przepuszczam", f"stan {p.d['state']}", "", "allow")
         return
@@ -752,7 +1419,7 @@ def cmd_stop_check(a):
             f"(protokół odbioru → `evidence add`, `task set --status merged`) albo wznów nowym wykonawcą od SHA z rejestru.")
     elif not otwarte and not tlo and p.d["state"] in ("running", "review", "gate"):
         klucz, powod = "etapy:" + p.d["state"], (
-            f"Przelot {rid}: front pusty w etapie {p.d['state']}. Dokończ etapy 6–7 (recenzja na SHA, brama, PR) i zamknij "
+            f"Przelot {rid}: front pusty w etapie {p.d['state']}. Dokończ etapy 5–6 (recenzja na SHA, brama, PR) i zamknij "
             f"`foreman2 close`; brak dowodu kończy się `partial`, nie ciszą.")
     else:
         p.log("stop", "przepuszczam", "tło pracuje" if tlo else "nic do ruszenia bez człowieka", "", "allow")
@@ -776,7 +1443,8 @@ def cmd_straz(a):
     człowiek (dla przelotu aktywnego i wskazanego `--run`) i `create` (zmiana aktywnego przelotu
     albo `--force` zdjęłyby flagę); w nadzorowanym człowiek odpowiada w czacie i brygadzista
     zapisuje `--by human:<imię>`. Po `cancel` także spawnu, powrotu zadań do running i ruchów
-    zakazanych flocie (bramka-floty.sh). Komenda Bash nieczytelna = odmowa."""
+    zakazanych flocie (bramka-floty.sh). Komenda Bash nieczytelna = odmowa. Przelot wybiera
+    `rozwiaz()` z `session_id` hooka; kilka przelotów repo bez mapowania = reguły każdego z nich."""
     def odmowa(powod):
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
                                                  "permissionDecisionReason": powod}}, ensure_ascii=False))
@@ -785,21 +1453,29 @@ def cmd_straz(a):
         wej = json.load(sys.stdin)
     except Exception:
         wej = {}
+    if not isinstance(wej, dict):
+        wej = {}
     narzedzie = wej.get("tool_name")
     wejscie = wej.get("tool_input") or {}
-    rid = aktywne().get(repo_root(wej.get("cwd") or os.getcwd()))
     def przelot(r):
         return (czytaj_json(os.path.join(HOME, "runs", r, "run.json"), {}) or {}) if r else {}
-    run = przelot(rid)
-    stan, bez_nadzoru = run.get("state"), bool(run.get("unattended"))
-    zywy_bez_nadzoru = bez_nadzoru and stan not in ("done", "partial", "cancelled")
+    ids, _ = rozwiaz(repo_root(wej.get("cwd") or os.getcwd()), wej.get("session_id"), None)
+    runy = {r: przelot(r) for r in ids}
+    bez_nadzoru = any(x.get("unattended") for x in runy.values())
+    zywy = [r for r, x in runy.items() if x.get("unattended") and x.get("state") not in ("done", "partial", "cancelled")]
+    anulowane = [r for r, x in runy.items() if x.get("state") == "cancelled"]
+    rid = ",".join(zywy or anulowane or ids)
     if narzedzie == "Agent":
-        if stan == "cancelled":
+        if anulowane:
             odmowa(f"Przelot {rid} anulowany: bez nowych agentów. Nowy przelot: `foreman2 create`.")
         return
     if narzedzie in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         sciezka = wejscie.get("file_path") or wejscie.get("notebook_path") or ""
-        if isinstance(sciezka, str) and sciezka and os.path.realpath(os.path.expanduser(sciezka)).startswith(os.path.realpath(HOME) + os.sep):
+        pelna = os.path.realpath(os.path.expanduser(sciezka)) if isinstance(sciezka, str) and sciezka else ""
+        runs = os.path.join(os.path.realpath(HOME), "runs") + os.sep
+        if pelna.startswith(runs) and re.fullmatch(r"[^/]+/kontrakt\.md", pelna[len(runs):]):
+            return  # ustalenia brygadzisty: jedyny plik przelotu pisany ręcznie
+        if pelna.startswith(os.path.realpath(HOME) + os.sep):
             odmowa("Pliki stanu i profile foremana zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
         return
     if narzedzie != "Bash":
@@ -810,16 +1486,15 @@ def cmd_straz(a):
     for seg in segmenty(cmd):
         if re.search(r"\bdecide +answer\b", seg) and re.search(r"--by[ =]+[\"']?human", seg):
             m = re.search(r"--run[ =]+[\"']?([\w.-]+)", seg)
-            cel = przelot(m.group(1)) if m else run
-            if bez_nadzoru or cel.get("unattended"):
+            if bez_nadzoru or (m and przelot(m.group(1)).get("unattended")):
                 odmowa("Przelot bez nadzoru: odpowiedź `--by human` wpisuje człowiek ze swojego terminala, sesja modelu nie autoryzuje decyzji approval.")
-        if zywy_bez_nadzoru and re.search(r"(foreman2|\$F2)\b.*\bcreate\b", seg):
+        if zywy and re.search(r"(foreman2|\$F2)\b.*\bcreate\b", seg):
             odmowa(f"Przelot {rid} biegnie bez nadzoru: `create` (nowy przelot albo `--force`) należy do runnera i człowieka, nie do sesji modelu.")
         if re.search(r"(run\.json|decisions\.jsonl|log\.tsv|evidence/E\d+\.json)\b", seg) and re.search(r">|\bsed +-i|\btee\b|\bmv\b|\bcp\b|\bpython3?\b|\bnode\b|\bperl\b|\bprintf\b|\becho\b", seg):
             odmowa("Pliki stanu przelotu zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
-        if stan == "cancelled" and re.search(r"\btask +set\b.*--status[ =]+[\"']?(running|fixing)", seg):
+        if anulowane and re.search(r"\btask +set\b.*--status[ =]+[\"']?(running|fixing)", seg):
             odmowa(f"Przelot {rid} anulowany: zadania nie wracają do running.")
-    if stan == "cancelled":
+    if anulowane:
         bramka = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bramka-floty.sh")
         r = subprocess.run(["bash", bramka], input=json.dumps(wej), capture_output=True, text=True)
         if r.stdout.strip():
@@ -898,8 +1573,9 @@ def cmd_report(a):
     for c in d["criteria"]:
         e = p.ostatni_dowod(c["id"])
         ev = f"{e['verdict']} `{e['cmd']}` @{e['sha'][:8]}: {e['result'][:90]}" if e else "brak dowodu"
-        md.append(f"- **{c['id']}** [{c['status']}] {c['text']} — odczyt: {c['read']} ⇒ {c['expected']}. Dowód: {ev}")
-    md += ["", "## Twoja uwaga"]
+        zrodlo = "" if not e or e["verdict"] != "pass" else " (wykonana komenda)" if e.get("by") == "tool" else " (słowo modelu)"
+        md.append(f"- **{c['id']}** [{c['status']}] {c['text']} — odczyt: {c['read']} ⇒ {c['expected']}. Dowód{zrodlo}: {ev}")
+    md += ["", linia_pochodzenia(p), "", "## Twoja uwaga"]
     pend = [x for x in dec if x["status"] == "pending"]
     md += [f"- decyzja {x['id']}: {x['question']} (opcje: {' | '.join(x['options'])}; rekomendacja: {x.get('rec') or '-'}; odpowiedź: `foreman2 --run {d['id']} decide answer {x['id']} rec --by human`)" for x in pend] or ["- brak decyzji do podjęcia"]
     md += [f"- krok tylko-ludzki {h['id']}: {h['text']}" for h in d["human_steps"] if not h["done"]]
@@ -909,8 +1585,16 @@ def cmd_report(a):
     auto = [x for x in dec if x["kind"] == "auto"]
     if auto:
         md += ["", "## Decyzje podjęte samodzielnie"] + [f"- {x['id']}: {x['question']} → {x['reply']}" for x in auto]
-    if d.get("cost"):
-        md += ["", "## Koszt", f"- {json.dumps(d['cost'], ensure_ascii=False)}"]
+    koszt = d.get("cost") or {}
+    if koszt:
+        md += ["", "## Koszt"]
+        if koszt.get("e"):
+            md += [f"- {l}" for l in linie_kosztu(koszt["e"])]
+        if koszt.get("sessions"):
+            md.append(f"- sesje runnera: {len(koszt['sessions'])}, USD wg `claude -p` (miara budżetu): {koszt.get('usd_total')}")
+        reszta = {k: v for k, v in koszt.items() if k not in ("e", "sessions", "usd_total")}
+        if reszta:
+            md.append(f"- {json.dumps(reszta, ensure_ascii=False)}")
     md += ["", f"Werdykt z pliku stanu: **{stan}**" + (f" (brakuje: {'; '.join(braki)})" if braki else ""), f"Log: `{os.path.join(p.katalog, 'log.tsv')}`"]
     if a.html:
         import html as H
@@ -931,12 +1615,25 @@ def cmd_report(a):
 
 
 def cmd_cost(a):
+    """`cost --scan [--od ISO]`: koszt E per sesja i agent z zapisów sesji, w `cost.e`.
+    `cost <JSON>`: zapis runnera (sesje `claude -p`, USD budżetu); `cost.e` zostaje."""
     p = znajdz(a)
+    if a.scan:
+        e = koszt_z_zapisow(p, a.od or "")
+        p.d["cost"] = dict(p.d.get("cost") or {}, e=e)
+        p.zapisz(); p.log("cost", "koszt z zapisów sesji", "", "", json.dumps(e["per_model"], ensure_ascii=False)[:120])
+        print("\n".join(linie_kosztu(e)))
+        return
     try:
-        p.d["cost"] = json.loads(a.json_)
+        nowy = json.loads(a.json_ or "")
     except ValueError:
-        sys.exit("cost oczekuje JSON")
-    p.zapisz(); p.log("cost", "koszt zapisany", "", "", a.json_[:120])
+        sys.exit("cost oczekuje JSON albo --scan")
+    if not isinstance(nowy, dict):
+        sys.exit("cost oczekuje obiektu JSON albo --scan")
+    if "e" not in nowy and (p.d.get("cost") or {}).get("e"):
+        nowy["e"] = p.d["cost"]["e"]
+    p.d["cost"] = nowy
+    p.zapisz(); p.log("cost", "koszt zapisany", "", "", (a.json_ or "")[:120])
 
 
 # ---------------------------------------------------------------- parser
@@ -949,7 +1646,7 @@ def main():
 
     s = sub.add_parser("create", help="nowy przelot (create_task)")
     s.add_argument("--repo", default=".")
-    s.add_argument("--slug", required=True)
+    s.add_argument("--slug")
     s.add_argument("--plan")
     s.add_argument("--branch")
     s.add_argument("--budget", type=float)
@@ -957,6 +1654,8 @@ def main():
     s.add_argument("--mandate", help="merge,deploy")
     s.add_argument("--unattended", action="store_true")
     s.add_argument("--force", action="store_true")
+    s.add_argument("--replan", action="store_true", help="istniejący przelot: wczytaj kryteria ze zmienionego planu (z --by human:<imię>)")
+    s.add_argument("--by", help="kto zatwierdził zmianę planu: human:<imię>")
     s.set_defaults(f=cmd_create)
 
     s = sub.add_parser("status", help="stan przelotu (get_status)"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_status)
@@ -968,13 +1667,19 @@ def main():
     s = sub.add_parser("task", help="graf zadań"); s.add_argument("op", choices=["add", "set", "bump", "list"]); s.add_argument("id", nargs="?"); s.add_argument("--id", dest="id_opt")
     for k in ("name", "files", "readers", "deps", "verify", "agent", "branch", "worktree", "spawn-sha", "note", "status"):
         s.add_argument("--" + k)
+    s.add_argument("--force", action="store_true", help="running poza frontem, z --note")
     s.add_argument("--variant", help="sonnet | opus | opus-high | fable (add: domyślnie opus)")
     s.add_argument("--field", choices=["rounds", "resumes", "findings"]); s.add_argument("--by", type=int, default=1)
     s.set_defaults(f=cmd_task)
 
     s = sub.add_parser("frontier", help="zadania do spawnu teraz"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_frontier)
+    s = sub.add_parser("accept", help="odbiór zadania z worktree agenta (bez merge): dowód na przypiętym SHA")
+    s.add_argument("id"); s.add_argument("--worktree", required=True); s.add_argument("--timeout", type=int, default=900)
+    s.add_argument("--merge", action="store_true", help="po pass: git merge --no-ff w katalogu sesji (gałąź integracji), status merged, front")
+    s.set_defaults(f=cmd_accept)
 
-    s = sub.add_parser("evidence", help="dowody (get_evidence)"); s.add_argument("op", choices=["add", "list", "show", "check"]); s.add_argument("id", nargs="?")
+    s = sub.add_parser("evidence", help="dowody (get_evidence)"); s.add_argument("op", choices=["add", "run", "list", "show", "check"]); s.add_argument("ids", nargs="*", help="show: id dowodu; run: kryteria (domyślnie wszystkie z komendą)")
+    s.add_argument("--timeout", type=int, default=900, help="run: sekund na komendę")
     s.add_argument("--for", dest="for_"); s.add_argument("--cmd"); s.add_argument("--sha"); s.add_argument("--result", default=""); s.add_argument("--file"); s.add_argument("--verdict")
     s.add_argument("--head"); s.add_argument("--ref")
     s.set_defaults(f=cmd_evidence)
@@ -993,15 +1698,17 @@ def main():
     s = sub.add_parser("log", help="wiersz logu: faza decyzja [powód] [dowód] [wynik]"); s.add_argument("phase"); s.add_argument("decision"); s.add_argument("why", nargs="?"); s.add_argument("evidence", nargs="?"); s.add_argument("result", nargs="?"); s.set_defaults(f=cmd_log)
 
     s = sub.add_parser("state", help="zmiana etapu przelotu"); s.add_argument("state"); s.add_argument("--note"); s.set_defaults(f=cmd_state)
-    s = sub.add_parser("session", help="dopisz id sesji Claude"); s.add_argument("id"); s.add_argument("--note"); s.set_defaults(f=cmd_session)
-    s = sub.add_parser("close", help="werdykt końcowy z pliku stanu (done tylko z dowodami na HEAD)"); s.add_argument("--state", choices=["done", "partial", "blocked"]); s.add_argument("--note"); s.add_argument("--head"); s.set_defaults(f=cmd_close)
+    s = sub.add_parser("session", help="dopisz id sesji Claude; --runner <uuid>: sesja runnera i właściciel"); s.add_argument("id", nargs="?"); s.add_argument("--runner"); s.add_argument("--note"); s.set_defaults(f=cmd_session)
+    s = sub.add_parser("close", help="werdykt końcowy z pliku stanu (done tylko z dowodami na HEAD)"); s.add_argument("--state", choices=["done", "partial", "blocked"]); s.add_argument("--note"); s.add_argument("--head", help="asercja: HEAD integracji ma być tym SHA"); s.set_defaults(f=cmd_close)
     s = sub.add_parser("cancel", help="przerwanie przelotu (cancel_task)"); s.add_argument("--note"); s.set_defaults(f=cmd_cancel)
     s = sub.add_parser("resume", help="przekazanie do nowej sesji"); s.set_defaults(f=cmd_resume)
     s = sub.add_parser("stop-check", help="hook Stop brygadzisty (stdin JSON)"); s.set_defaults(f=cmd_stop_check)
     s = sub.add_parser("straz", help="hook PreToolUse brygadzisty: Bash i Agent (stdin JSON)"); s.set_defaults(f=cmd_straz)
     s = sub.add_parser("profile", help="konwencje repo jako JSON"); s.add_argument("--repo"); s.set_defaults(f=cmd_profile)
     s = sub.add_parser("report", help="raport z pliku stanu (markdown albo --html plik)"); s.add_argument("--html"); s.set_defaults(f=cmd_report)
-    s = sub.add_parser("cost", help="zapis kosztu (JSON)"); s.add_argument("json_"); s.set_defaults(f=cmd_cost)
+    s = sub.add_parser("cost", help="--scan: koszt E per agent z zapisów sesji; <JSON>: zapis runnera"); s.add_argument("json_", nargs="?")
+    s.add_argument("--scan", action="store_true"); s.add_argument("--od", help="ISO UTC: licz odpowiedzi od tej chwili (sesja niosąca dwa przeloty)")
+    s.set_defaults(f=cmd_cost)
 
     a = ap.parse_args()
     a.f(a)

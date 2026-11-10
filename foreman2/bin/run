@@ -5,8 +5,12 @@ Mac nie zaśnie (caffeinate).
 
   run --repo <dir> --slug <nazwa> --plan <plan.md> [--budget 40] [--model opus]
       [--mandate merge,deploy] [--unattended] [--max-live 3] [--effort high] [--dry]
-  run --resume <run-id> [--budget 20]   # nowa tura w tej samej sesji Claude; bez --budget
-                                        # dostaje resztę budżetu przelotu
+  run --resume <run-id> [--budget 20]   # nowa tura w sesji runnera (run.json: runner_session);
+                                        # bez --budget dostaje resztę budżetu przelotu
+
+Sesja `claude -p` dostaje UUID wyznaczony tutaj i zapisany przed startem jako właściciel
+przelotu (`foreman2 session --runner`); runner odpalony z Basha innej sesji nie przekazuje
+CLI jej id.
 
 Wynik: ~/.foreman2/runs/<id>/sessions/<ts>.json (pełne JSON `claude -p`), koszt
 dopisany do run.json, meldunek `foreman2 status` na stdout. Kod wyjścia = claude."""
@@ -26,9 +30,18 @@ SKILL = os.path.join(SKILL_DIR, "SKILL.md")
 HOME = os.path.expanduser(os.environ.get("FOREMAN2_HOME") or "~/.foreman2")
 
 
+def env_bez_sesji():
+    """Środowisko bez id sesji rodzica: runner pisze stan jak terminal człowieka, a `claude -p`
+    dostaje własny UUID."""
+    env = dict(os.environ, FOREMAN2_HOME=HOME)
+    for k in ("CLAUDE_CODE_SESSION_ID", "CLAUDE_SESSION_ID"):
+        env.pop(k, None)
+    return env
+
+
 def f2(*a, run=None, check=True):
     cmd = [sys.executable, "-I", F2] + (["--run", run] if run else []) + list(a)
-    r = subprocess.run(cmd, capture_output=True, text=True, env=dict(os.environ, FOREMAN2_HOME=HOME))
+    r = subprocess.run(cmd, capture_output=True, text=True, env=env_bez_sesji())
     if check and r.returncode:
         sys.exit(f"{' '.join(a)}: {r.stderr.strip()}")
     return r.stdout.strip()
@@ -88,9 +101,9 @@ def main():
             if budzet <= 0:
                 sys.exit(f"budżet przelotu wyczerpany ({d['budget_usd']} USD); podaj --budget")
         prompt = (f"Wznów przelot {rid} foremana 2.0: najpierw `foreman2 --run {rid} resume`, potem kontynuuj "
-                  f"od stanu w pliku (front, decyzje, dowody nieaktualne). Agenci poprzedniej sesji nie żyją: "
-                  f"zadania running wznawiasz nowym wykonawcą z worktree i SHA z rejestru. " + (a.prompt or ""))
-        poprzednia = d["sessions"][-1] if d["sessions"] else None
+                  f"od stanu w pliku (front, decyzje, dowody nieaktualne). Agenci poprzedniej sesji nie są osiągalni "
+                  f"z tej sesji: zadania running wznawiasz nowym wykonawcą z worktree i SHA z rejestru. " + (a.prompt or ""))
+        poprzednia = d.get("runner_session")
     else:
         if not (a.slug and a.plan):
             ap.error("--slug i --plan (albo --resume)")
@@ -138,12 +151,12 @@ def main():
     if a.dry:
         print(json.dumps({"run": rid, "cwd": repo, "budget": budzet, "preflight": braki, "cmd": cmd}, ensure_ascii=False, indent=1))
         return
-    f2("session", sid, "--note", "runner", run=rid)
+    f2("session", "--runner", sid, run=rid)
     f2("log", "run", "start sesji claude -p", f"model {a.model}, budżet {budzet}", "", sid, run=rid)
     ts = dt.datetime.now().strftime("%Y%m%dT%H%M%S")
     wyj = os.path.join(kat, "sessions", f"{ts}.json")
     with open(wyj, "w") as out, open(wyj + ".err", "w") as err:
-        r = subprocess.run(cmd, cwd=repo, stdout=out, stderr=err, env=dict(os.environ, FOREMAN2_HOME=HOME), stdin=subprocess.DEVNULL)
+        r = subprocess.run(cmd, cwd=repo, stdout=out, stderr=err, env=env_bez_sesji(), stdin=subprocess.DEVNULL)
     try:
         with open(wyj) as f:
             wynik = json.load(f)
@@ -152,10 +165,12 @@ def main():
     koszt = wynik.get("total_cost_usd")
     d = json.loads(f2("status", "--json", run=rid))
     cost = d.get("cost") or {}
-    cost.setdefault("sessions", []).append({"ts": ts, "usd": koszt, "turns": wynik.get("num_turns"), "ms": wynik.get("duration_ms"),
-                                            "subtype": wynik.get("subtype"), "error": wynik.get("is_error"), "exit": r.returncode})
+    # bez num_turns i duration_ms: `claude -p` liczy je bez agentów w tle; tury i E daje `cost --scan`
+    cost.setdefault("sessions", []).append({"ts": ts, "usd": koszt, "subtype": wynik.get("subtype"),
+                                            "error": wynik.get("is_error"), "exit": r.returncode})
     cost["usd_total"] = round(sum((s.get("usd") or 0) for s in cost["sessions"]), 2)
     f2("cost", json.dumps(cost), run=rid)
+    f2("cost", "--scan", run=rid, check=False)
     f2("log", "run", f"koniec sesji exit={r.returncode}", f"subtype={wynik.get('subtype')}", wyj, f"usd={koszt}", run=rid)
     print(f"sesja {sid} exit={r.returncode} subtype={wynik.get('subtype')} usd={koszt} wynik={wyj}")
     print(f2("status", run=rid, check=False))

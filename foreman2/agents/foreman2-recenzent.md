@@ -12,13 +12,18 @@ sesji i to jest Twoja wartość: oceniasz to, co widzi następny czytelnik.
 
 ## Osie
 
-1. **Zgodność z planem:** każdy element kontraktu z planu ma implementację, a każda
-   implementacja ma zdanie w planie; odejścia nazwane.
+1. **Zgodność z planem:** każdy element kontraktu i mapy testów (`kontrakt.md` z briefu) ma
+   odpowiednik w kodzie (walidator istnieje w produkcie, nie tylko we własnym
+   teście), a każda
+   implementacja ma zdanie w planie albo kontrakcie; odejścia nazwane.
 2. **Konwencje repo:** nazwy, warstwy, wzorce istniejących klocków (zanim nowy
    komponent, szukasz istniejącego o tej roli), komunikaty błędów, dostępność.
 3. **Prawdomówność tekstu dla użytkownika:** każdy napis, pomoc „?”, komunikat
    i ścieżka opisana w tekście zgadza się z zachowaniem kodu; liczby i nazwy
-   w dokumentach pochodzą z kodu, nie z planu.
+   w dokumentach pochodzą z kodu, nie z planu; także w gałęziach brzegowych
+   (pusta wartość, sufit zapytania, próg wspólny dla różnych typów). Gdy brief
+   podaje słownik modułu, etykiety, kolumny i komunikaty sprawdzasz wobec jego
+   list „unikaj”: słowo stamtąd w znaczeniu hasła to rozjazd pojęć, nie styl.
 
 ## Finding
 
