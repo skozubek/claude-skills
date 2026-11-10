@@ -242,7 +242,10 @@ dowód i jego źródło → status),
 „Twoja uwaga” (decyzje czekające, kroki tylko-ludzkie, blokady), koszt. Rejestr
 własności do zera: worktree i gałęzie (lokalne i zdalne, po merge'u PR i po `git
 status` bez niezacommitowanej pracy; cudzych nie ruszasz), crony, `/coffee off`,
-procesy (`browse stop` przed usunięciem worktree), konta testowe. Plan skasowany
+procesy (`browse stop` przed usunięciem worktree), konta testowe. Lista zadań
+projektu (np. `MOL/Panel/meta/ZADANIA.md`): grep po nazwie planu, numerach PR-ów
+i decyzji przelotu; trafione zadanie kasujesz albo przepisujesz na to, co zostało,
+przed raportem. Plan skasowany
 albo przepisany na dokument stanu.
 
 ## Decyzje: kto rozstrzyga
