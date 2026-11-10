@@ -780,6 +780,19 @@ class Integracja(Baza):
         self.assertIn("poza zakresem zadania: z.ts", r.stdout)
 
 
+class PlikiZadania(Baza):
+    def test_task_add_odrzuca_katalog(self):
+        self.nowy()
+        os.makedirs(os.path.join(self.repo, "src", "crm"))
+        for f in ("src/crm", "lib/"):
+            r = self.f2("task", "add", "--id", "T9", "--name", "x", "--files", f"z.ts,{f}", "--verify", "true", ok=False)
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("nie katalogi", r.stderr)
+        self.assertFalse(any(t["id"] == "T9" for t in self.run_json()["tasks"]))
+        r = self.f2("task", "set", "T1", "--files", "src/crm", ok=False)
+        self.assertIn("nie katalogi", r.stderr)
+
+
 class Odbior(Baza):
     """`accept`: dowód na przypiętym SHA worktree agenta, pełny zakres, pomiar poza blokadą."""
 
@@ -820,6 +833,17 @@ class Odbior(Baza):
         self.assertEqual(self.t1()["status"], "merged")
         self.assertEqual(self.g("rev-parse", "HEAD^2"), sha, "merge --no-ff przypiętego SHA")
         self.assertIn("gotowe: T2, T3", r.stdout)
+    def test_accept_merge_z_worktree_sesji(self):
+        """Sesja w worktree repo przelotu (nie w głównym klonie) scala tak samo."""
+        sha = self.commit("a.ts")
+        sesja_wt = os.path.join(self.tmp, "sesja")
+        self.g("worktree", "add", "-q", "-b", "integracja/test-przelotu", sesja_wt, self.head)
+        r = self.f2("accept", "T1", "--worktree", self.wt, "--merge", ok=False, cwd=sesja_wt)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.t1()["status"], "merged")
+        self.assertEqual(self.g("rev-parse", "HEAD^2", repo=sesja_wt), sha)
+        self.assertEqual(self.g("rev-parse", "HEAD"), self.head, "główny klon nietknięty")
+
     def test_accept_merge_poza_galezia_integracji_odmawia_przed_pomiarem(self):
         self.commit("a.ts")
         r = self.accept("--merge")

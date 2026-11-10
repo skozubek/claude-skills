@@ -63,6 +63,17 @@ def kanon(sciezka):
     return os.path.normpath(sciezka)
 
 
+def pliki_zadania(p, files):
+    """Pliki zadania jako dokładne ścieżki: `accept` porównuje diff plik po pliku, więc katalog
+    na liście odrzuciłby poprawną robotę jako „poza zakresem”."""
+    surowe = lista(files)
+    katalogi = [f for f in surowe if f.endswith("/") or os.path.isdir(os.path.join(p.d["repo"], kanon(f)))]
+    if katalogi:
+        sys.exit("--files przyjmuje pliki, nie katalogi: " + ", ".join(katalogi) +
+                 " → wypisz pliki (`git ls-files <katalog>`)")
+    return [kanon(f) for f in surowe]
+
+
 def sha256_pliku(p):
     try:
         with open(p, "rb") as f:
@@ -798,7 +809,7 @@ def cmd_task(a):
             if not any(t["id"] == dep for t in p.d["tasks"]):
                 sys.exit(f"zależność {dep} nie istnieje")
         zajete = {kanon(f): t["id"] for t in p.d["tasks"] if t["status"] not in ("merged", "dropped") for f in t["files"]}
-        pliki = [kanon(f) for f in lista(a.files)]
+        pliki = pliki_zadania(p, a.files)
         kolizje = [f"{f} ({zajete[f]})" for f in pliki if f in zajete]
         if kolizje:
             sys.exit("plik ma już właściciela: " + ", ".join(kolizje))
@@ -853,7 +864,7 @@ def cmd_task(a):
                 if gal:
                     p.posiadaj("branch", gal)
             if a.files is not None:
-                t["files"] = [kanon(f) for f in lista(a.files)]
+                t["files"] = pliki_zadania(p, a.files)
             if a.readers is not None:
                 t["readers"] = lista(a.readers)
             if a.deps is not None:
@@ -909,8 +920,8 @@ def blad_katalogu_integracji(p):
     """None, gdy katalog sesji to repo przelotu na gałęzi integracji, bez scalenia w toku."""
     b = p.d["branch"]
     top = git(os.getcwd(), "rev-parse", "--show-toplevel", ok=False)
-    if not top or os.path.realpath(top) != os.path.realpath(p.d["repo"]):
-        return f"--merge: katalog sesji ({os.getcwd()}) nie jest repo przelotu {p.d['repo']}"
+    if not top or repo_root(top) != os.path.realpath(p.d["repo"]):  # worktree tego repo też
+        return f"--merge: katalog sesji ({os.getcwd()}) nie należy do repo przelotu {p.d['repo']}"
     tu = git(os.getcwd(), "symbolic-ref", "-q", "HEAD", ok=False)
     if tu != (b if b.startswith("refs/") else "refs/heads/" + b):
         return f"--merge: katalog sesji stoi na {tu or 'odłączonym HEAD'}, nie na {b}; `git checkout {b}` albo odbiór bez --merge"
@@ -924,7 +935,7 @@ def scal(p, tid, sha):
     sukcesie, inaczej powód."""
     if blad := blad_katalogu_integracji(p):  # katalog mógł się zmienić w trakcie pomiaru
         return blad
-    top = p.d["repo"]  # katalog sesji to ten klon (sprawdzone wyżej); ścieżki od korzenia
+    top = git(os.getcwd(), "rev-parse", "--show-toplevel")  # klon albo worktree repo przelotu (sprawdzone wyżej)
     przed = git(top, "rev-parse", "HEAD")
     wnoszone = [x for x in git(top, "diff", "--name-only", "-z", f"{przed}...{sha}").split("\0") if x]
     # git merge nadpisuje nieśledzone pliki ignorowane (--no-overwrite-ignore nie działa w 2.50)
