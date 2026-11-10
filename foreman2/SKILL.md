@@ -32,7 +32,7 @@ każdy segment.
 
 | Co | Komenda |
 |---|---|
-| przelot | `$F2 create --slug <nazwa> --plan <plik> [--branch <gałąź integracji>] [--budget USD] [--max-live 3] [--mandate merge,deploy] [--unattended] [--force]`; plan zmieniony za zgodą człowieka: `create --plan <plik> --replan --by human:<imię>` (ten sam przelot); `$F2 status`; `$F2 state planning\|running\|review\|gate\|deploy` |
+| przelot | `$F2 create --slug <nazwa> --plan <plik> [--branch <gałąź integracji>] [--budget USD] [--max-live 3] [--mandate merge,deploy] [--unattended] [--force]`; plan zmieniony za zgodą człowieka: `create --plan <plik> --replan --by human:<imię>` (ten sam przelot); `$F2 status`; `$F2 state planning\|running\|review\|gate` |
 | kryteria | `$F2 criteria list`: kryteria wczytane z planu przez `create --plan` (z komendą albo bez; `$F2 plan check <plik>` pokazuje podział). `criteria add --text <co> --read <co odczytać> --expected <wynik>` tylko w przelocie bez planu |
 | graf | `$F2 task add --id T1 --name <co> --files a,b --readers T3 --deps T0 --variant sonnet\|opus\|opus-high --verify "<komenda>"`; `task set T1,T2 --status running --spawn-sha <sha>` (rezerwacja frontu przed spawnem; `--force --note <powód>` poza frontem); `task set <id> --agent <id> --worktree <dir>` (rejestruje też worktree i jego gałąź do sprzątania); `task set <id> --status fixing\|dropped [--note]`; `task bump <id> --field rounds\|resumes`; `task list` |
 | front | `$F2 frontier`: zadania gotowe w wolnych miejscach (≤ 3 żywych agentów) |
