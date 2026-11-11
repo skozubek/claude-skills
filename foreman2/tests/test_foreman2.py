@@ -834,6 +834,19 @@ class Odbior(Baza):
         self.assertEqual(self.t1()["status"], "merged")
         self.assertEqual(self.g("rev-parse", "HEAD^2"), sha, "merge --no-ff przypiętego SHA")
         self.assertIn("gotowe: T2, T3", r.stdout)
+    def test_accept_agent_wciagnal_nowsza_integracje(self):
+        """Agent na polecenie scala nowszą integrację: pliki innych zadań nie są „poza zakresem”."""
+        self.g("checkout", "-q", "-b", "integracja/test-przelotu")
+        with open(os.path.join(self.repo, "inny.ts"), "w") as f:
+            f.write("inne zadanie")
+        self.g("add", "inny.ts")
+        self.g("commit", "-qm", "inne zadanie scalone")
+        self.g("merge", "-q", "--no-edit", "integracja/test-przelotu", repo=self.wt)
+        self.commit("a.ts")
+        r = self.accept()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.commit("poza.ts")
+        self.assertIn("poza zakresem zadania: poza.ts", self.accept().stdout, "kontrola zakresu zostaje")
     def test_reczne_merged_po_nieudanym_odbiorze_odrzucone(self):
         """`accept … | tail && git merge && task set --status merged`: pipe zjada kod wyjścia,
         zadanie z odbiorem fail nie może wejść jako merged bez --force --note."""

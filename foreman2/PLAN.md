@@ -32,7 +32,7 @@ odbioru`, `## Poza zakresem`, `## Pojęcia`, `## Granice`), ścieżkę użytkown
 
 ## Granice
 - Zakres: zadania i pliki z grafu; poza grafem nic.
-- Dane: <które projekty, konta i marki wolno czytać; w które wolno pisać; zapisy do usunięcia po przelocie>.
+- Dane: <które projekty, konta i marki wolno czytać; w które wolno pisać; zapisy do usunięcia po przelocie; skutki automatyczne zapisów testowych (etap startowy, triggery, sygnały, wysyłki, zadania w tle): które są dozwolone i jak je sprzątasz>. Skutek niewymieniony wymaga `approval` przed zapisem.
 - Tożsamość poświadczeń: <komenda dająca klucz; funkcja, która go przyjmuje; czego nie otworzy; odbiór zastępczy>.
 - Koszt: budżet <N> USD; limit wywołań płatnych per obiekt: <N albo „brak”>.
 - Kroki tylko-ludzkie: <lista albo „żadne”>; odbiór zastępczy: <jak>.

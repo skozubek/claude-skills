@@ -25,6 +25,9 @@ import uuid
 
 TU = os.path.dirname(os.path.abspath(__file__))
 F2 = os.path.join(TU, "foreman2")
+# `claude -p` kończy proces razem z turą i zabija agentów w tle (hook Stop przepuszcza żywe tło)
+BEZ_TLA = ("Sesja `claude -p` kończy się razem z turą i zabija agentów w tle: wykonawców, recenzentów "
+           "i weryfikatora spawnujesz bez `run_in_background`, całą falę frontu w jednej wiadomości. ")
 SKILL_DIR = os.path.dirname(TU)
 SKILL = os.path.join(SKILL_DIR, "SKILL.md")
 HOME = os.path.expanduser(os.environ.get("FOREMAN2_HOME") or "~/.foreman2")
@@ -102,7 +105,7 @@ def main():
                 sys.exit(f"budżet przelotu wyczerpany ({d['budget_usd']} USD); podaj --budget")
         prompt = (f"Wznów przelot {rid} foremana 2.0: najpierw `foreman2 --run {rid} resume`, potem kontynuuj "
                   f"od stanu w pliku (front, decyzje, dowody nieaktualne). Agenci poprzedniej sesji nie są osiągalni "
-                  f"z tej sesji: zadania running wznawiasz nowym wykonawcą z worktree i SHA z rejestru. " + (a.prompt or ""))
+                  f"z tej sesji: zadania running wznawiasz nowym wykonawcą z worktree i SHA z rejestru. " + BEZ_TLA + (a.prompt or ""))
         poprzednia = d.get("runner_session")
     else:
         if not (a.slug and a.plan):
@@ -124,7 +127,7 @@ def main():
                     "Działasz według poniższego skilla (treść SKILL.md foremana 2.0).\n\n" + tresc_skilla() + "\n\n---\n")
         prompt = (f"{naglowek}\nPrzelot {rid} jest już utworzony (`foreman2 status`); plan: {os.path.abspath(a.plan)}. "
                   f"Tryb bez nadzoru: {'tak, czytasz BEZ-NADZORU.md przed pierwszym spawnem' if a.unattended else 'nie'}. "
-                  f"Mandat: {a.mandate or 'brak (PR bez merge i deployu)'}. Narzędzie stanu: `python3 {F2}`. " + (a.prompt or ""))
+                  f"Mandat: {a.mandate or 'brak (PR bez merge i deployu)'}. Narzędzie stanu: `python3 {F2}`. " + BEZ_TLA + (a.prompt or ""))
 
     kat = os.path.join(HOME, "runs", rid)
     os.makedirs(os.path.join(kat, "sessions"), exist_ok=True)

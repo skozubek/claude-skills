@@ -14,6 +14,12 @@ Warunki:
 Weryfikacja: <dokładne komendy, uruchamialne z worktree>
 ```
 
+Komenda weryfikacji zadania (`task add --verify` i linia „Weryfikacja” briefu) to kroki CI,
+które odpalą się na plikach zadania, z tymi samymi parametrami: `profile.verify` i każdy
+workflow z pasującym filtrem ścieżek (odczyt pliku workflowu i skryptów, które woła), bez
+kroków publikacji i zapisu na produkcji. Podzbiór przepuszcza czerwień do CI na PR-ze,
+gdzie runda kosztuje kilka minut zegara.
+
 Brief wskazuje zakresy do przeczytania (plik i funkcja), nie całe pliki. Każdy
 warunek niesie powód: warunek bez powodu wykonawca „poprawia”. Dowód ekranu: jeden
 skrypt `$B js` z `/browse` albo komenda skilla z profilu. Spawn:

@@ -107,8 +107,8 @@ zamienić na komendę; brakujący czytelnicy (konsument schematu, stare wiersze,
 czy Granice pokrywają dane i koszt>" < plan.md`. Bez Codexa: `foreman2-recenzent` z planem
 i wskazanymi plikami kodu. Finding to hipoteza: odtwarzasz go w kodzie (wejście → zły
 wynik), nieodtworzony odrzucasz z powodem. Przyjęte findingi i braki z `plan check`
-pokazujesz człowiekowi; plan poprawia on albo Ty na jego słowo, nie obchodzisz. Przelot
-utworzony przez runner dostał tę opinię przed startem i jej nie powtarzasz.
+pokazujesz człowiekowi; plan poprawia on albo Ty na jego słowo, nie obchodzisz. Runner
+(`bin/run`) tej opinii nie robi: człowiek uruchamia go na planie z przyjętą opinią.
 `$F2 create --plan <plik>` po zgodzie człowieka wczytuje kryteria. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
 w bazie, czas mierzony tym samym narzędziem i kontem) i jaki wynik ma wyjść. „Testy
 zielone” nie jest kryterium. Plan ma ścieżkę użytkownika jednym zdaniem i „poza

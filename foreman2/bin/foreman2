@@ -1007,7 +1007,14 @@ def cmd_accept(a):
     if subprocess.run(["git", "-C", wt, "merge-base", "--is-ancestor", spawn, sha], capture_output=True).returncode:
         werdykt, wynik = "fail", f"SHA spawnu {spawn[:12]} nie jest przodkiem {sha[:12]}"
     else:
-        zmiany = zmiany_zakresu(wt, spawn, sha)
+        # agent wciągnął nowszą integrację: zakres od merge-base z nią, gdy ta leży za SHA spawnu,
+        # inaczej scalone pliki innych zadań wychodzą „poza zakresem”
+        baza, integ = spawn, p.head()
+        mb = integ and git(wt, "merge-base", sha, integ, ok=False)
+        if mb and mb != spawn and not subprocess.run(
+                ["git", "-C", wt, "merge-base", "--is-ancestor", spawn, mb], capture_output=True).returncode:
+            baza = mb
+        zmiany = zmiany_zakresu(wt, baza, sha)
         poza = sorted({x for x in zmiany if x not in pliki})
         if poza:
             werdykt, wynik = "fail", "poza zakresem zadania: " + ", ".join(poza)
@@ -1450,7 +1457,7 @@ def cmd_stop_check(a):
     elif zywe and not tlo:
         klucz, powod = "zywe:" + ",".join(zywe), (
             f"Przelot {rid}: zadania {', '.join(zywe)} są running/fixing, a w tle nie ma agentów. Odbierz ich wynik "
-            f"(protokół odbioru → `evidence add`, `task set --status merged`) albo wznów nowym wykonawcą od SHA z rejestru.")
+            f"(`accept <id> --worktree <dir> --merge`) albo wznów nowym wykonawcą od SHA z rejestru.")
     elif not otwarte and not tlo and p.d["state"] in ("running", "review", "gate"):
         klucz, powod = "etapy:" + p.d["state"], (
             f"Przelot {rid}: front pusty w etapie {p.d['state']}. Dokończ etapy 5–6 (recenzja na SHA, brama, PR) i zamknij "
