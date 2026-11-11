@@ -25,7 +25,7 @@ import uuid
 
 TU = os.path.dirname(os.path.abspath(__file__))
 F2 = os.path.join(TU, "foreman2")
-# `claude -p` kończy proces razem z turą i zabija agentów w tle (hook Stop przepuszcza żywe tło)
+# `claude -p` kończy proces razem z turą i zabija agentów w tle (hook Stop przepuszcza żywe tło)  # LC-125
 BEZ_TLA = ("Sesja `claude -p` kończy się razem z turą i zabija agentów w tle: wykonawców, recenzentów "
            "i weryfikatora spawnujesz bez `run_in_background`, całą falę frontu w jednej wiadomości. ")
 SKILL_DIR = os.path.dirname(TU)
