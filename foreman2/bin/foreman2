@@ -31,7 +31,7 @@ STANY_ZADANIA = ("ready", "running", "accepted", "fixing", "blocked", "merged", 
 RODZAJE_DECYZJI = ("auto", "approval", "challenge")
 KONCOWE = ("done", "partial", "blocked", "cancelled")
 CZLOWIEK = re.compile(r"^human(:[\w.-]+)?$")
-PROG_KONTEKSTU = 200_000  # automatyczna kompakcja stoi na 250k
+PROG_KONTEKSTU = 200_000  # automatyczna kompakcja odpala przy ~218k (12 kompakcji przelotu 11.11)
 
 
 def teraz():
