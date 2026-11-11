@@ -33,7 +33,6 @@ link "$REPO/devils-advocate" "$SKILLS/devils-advocate"
 link "$REPO/reflect"         "$SKILLS/reflect"
 link "$REPO/transcribe"      "$SKILLS/transcribe"
 link "$REPO/verify-admotiv"  "$SKILLS/verify-admotiv"
-link "$REPO/foreman"         "$SKILLS/foreman"
 link "$REPO/audyt-wygladu"   "$SKILLS/audyt-wygladu"
 
 echo "== git-synced agents =="

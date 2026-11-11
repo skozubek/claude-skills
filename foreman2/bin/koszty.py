@@ -5,7 +5,7 @@ Użycie: koszty.py [--od=ISO] [--do=ISO] <sesja.jsonl> [<sesja.jsonl> ...]  > ko
        koszty.py --kontekst=<id agenta>   (kontekst ostatniej odpowiedzi agenta)
 --od/--do (UTC, np. 2026-10-16T07:51) liczą tylko odpowiedzi w oknie: sesja niosąca
 dwa przeloty. Kolumna kontekst=ost/max to tokeny wejścia ostatniej i największej
-odpowiedzi: próg nowego wykonawcy i przekazania sesji z SKILL.md.
+odpowiedzi: próg nowego wykonawcy z SKILL.md foremana 2.0.
 Katalog `<sesja>/subagents/` obok każdego zapisu wchodzi sam.
 
 Liczy ostatni `usage` każdej unikalnej odpowiedzi (`message.id`): ta sama

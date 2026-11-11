@@ -200,7 +200,11 @@ integracji (`profile.verify`) zielona; `$F2 evidence run` na HEAD integracji.
 katalog odbioru `git worktree add <tmp>/odbior $SHA` (`own add worktree`). <!-- LC-116 --> Na tym
 samym SHA: Codex (`codex exec -s read-only … < diff.patch`) i `foreman2-recenzent`
 bez parametru `model` (definicja agenta: opus; oś tekstu dla użytkownika, gdy zmiana
-ma napisy). Bez Codexa: `/code-review high` zamiast niego, recenzent sprawdza także
+ma napisy). Recenzent dostaje diff bez plików testów (`-- . ':!*.test.*'`); test
+czyta wtedy, gdy sprawdza, czy test utrwala zły napis. Diff recenzenta ponad 1500
+linii dzielisz na grupy zadań do ~1500 linii: każda grupa ma własnego recenzenta
+z diffem jej plików i regułami planu tych zadań, w limicie żywych agentów. Jeden
+recenzent na większym diffie wchodzi w kompakcję w trakcie czytania. <!-- LC-126 --> Bez Codexa: `/code-review high` zamiast niego, recenzent sprawdza także
 poprawność, a PR dostaje notkę „bez drugiego modelu”. Findingi łączysz w jedną rundę
 poprawek: finding w plikach jednego zadania wraca SendMessage do jego agenta (`task
 set <id> --status fixing` przestawia bazę odbioru na HEAD integracji, `task bump <id>

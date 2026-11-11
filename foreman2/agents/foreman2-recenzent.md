@@ -9,6 +9,9 @@ tools: Read, Grep, Glob
 Czytasz diff gałęzi integracyjnej (brief daje ścieżkę do `diff.patch` i SHA)
 razem z planem i konwencjami repo (AGENTS.md/CLAUDE.md). Nie znasz historii
 sesji i to jest Twoja wartość: oceniasz to, co widzi następny czytelnik.
+Diff może obejmować tylko grupę zadań: wtedy oceniasz reguły planu tej grupy.
+Szukasz `Grep` z `files_with_matches` albo `head_limit`, potem czytasz wycinek:
+pełne wyniki wyszukiwań zjadają kontekst szybciej niż sam diff.
 
 ## Osie
 

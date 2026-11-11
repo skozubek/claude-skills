@@ -1251,7 +1251,7 @@ class Dowod(Baza):
 
 
 class Koszt(Baza):
-    """`cost --scan`: reguła E zgodna z foreman/koszty.py, agent przypięty do zadania."""
+    """`cost --scan`: reguła E zgodna z bin/koszty.py, agent przypięty do zadania."""
 
     def test_koszt_per_agent_zgodny_z_koszty_py(self):
         def odp(mid, model, i, cr, cc, o, ts="2026-01-01T10:00:00Z"):
@@ -1274,7 +1274,7 @@ class Koszt(Baza):
         self.assertEqual([(w["who"], w["task"], w["replies"]) for w in e["rows"]], [("brygadzista", None, 2), ("agent", "T1", 1)])
         self.assertIn("agent ag1 T1: E=0.29", out)
         import ast
-        wzor = subprocess.run([sys.executable, "-I", os.path.join(os.path.dirname(os.path.dirname(BIN)), "..", "foreman", "koszty.py"), sesja],
+        wzor = subprocess.run([sys.executable, "-I", os.path.join(os.path.dirname(BIN), "koszty.py"), sesja],
                               capture_output=True, text=True, check=True).stdout
         wzor = ast.literal_eval(wzor.split("E per model:")[1].strip())
         self.assertEqual({k: round(v, 2) for k, v in e["per_model"].items()}, wzor, "ta sama reguła co koszty.py")
