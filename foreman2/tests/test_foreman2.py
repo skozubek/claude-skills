@@ -11,7 +11,6 @@ import unittest
 
 BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "foreman2")
 BRAMKA = os.path.join(os.path.dirname(BIN), "bramka-floty.sh")
-RUN = os.path.join(os.path.dirname(BIN), "run")
 SKROT = ("--force", "--note", "skrót testu: stan bez odbioru")
 
 PLAN_OK = """# Eksport listy do CSV
@@ -320,7 +319,6 @@ class TestPrzelot(Baza):
         self.assertIn("anulowany", self.hook("Agent"), "spawn po cancel odmówiony")
         self.assertIn("deny", self.hook("Bash", "git push origin x"), "push po cancel odmówiony przez bramkę floty")
         self.assertEqual(self.hook("Bash", "git status"), "", "odczyt po cancel wolny")
-        self.assertNotEqual(subprocess.run([sys.executable, "-I", RUN, "--resume", rid, "--dry"], capture_output=True, text=True, env=self.env).returncode, 0, "runner nie wznawia anulowanego")
 
     ODPOWIEDZI_CZLOWIEKA = ("foreman2 decide answer D1 rec --by human", "python3 -I /x/bin/foreman2 --run r decide answer D1 tak --by=human:serge",
                             "cd /tmp && $F2 decide answer D1 rec --by 'human'")
@@ -386,32 +384,6 @@ class TestPrzelot(Baza):
         for cmd in dobre:
             self.assertEqual(bramka(cmd), "", cmd)
         self.assertIn('"deny"', subprocess.run(["bash", BRAMKA], input="nie json", capture_output=True, text=True).stdout, "nieczytelne wejście = odmowa")
-
-    def test_runner_dry_i_reszta_budzetu(self):
-        plan = os.path.join(self.tmp, "plan.md")
-        with open(plan, "w") as f:
-            f.write(PLAN_OK)
-        r = subprocess.run([sys.executable, "-I", RUN, "--repo", self.repo, "--slug", "lab", "--plan", plan, "--budget", "10", "--dry"],
-                           capture_output=True, text=True, env=self.env)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        d = json.loads(r.stdout)
-        self.assertIn("--max-budget-usd", d["cmd"])
-        self.assertEqual(d["cmd"][d["cmd"].index("--max-budget-usd") + 1], "10.0")
-        settings = json.loads(self.czytaj(os.path.join(self.home, "runs", d["run"], "settings.json")))
-        agents = json.loads(self.czytaj(os.path.join(self.home, "runs", d["run"], "agents.json")))
-        self.assertIn("foreman2-wykonawca", agents)
-        self.assertNotIn("$HOME/.claude/skills/foreman2", json.dumps(agents), "ścieżka strażnika wskazuje ten katalog")
-        self.assertIn(os.path.dirname(BRAMKA), json.dumps(agents))
-        if not os.path.isdir(os.path.expanduser("~/.claude/skills/foreman2")):
-            self.assertIn("PreToolUse", settings["hooks"])
-            self.assertIn("Stop", settings["hooks"])
-        self.f2("--run", d["run"], "cost", json.dumps({"sessions": [{"usd": 7.5}], "usd_total": 7.5})).stdout
-        r = subprocess.run([sys.executable, "-I", RUN, "--resume", d["run"], "--dry"], capture_output=True, text=True, env=self.env)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        self.assertEqual(json.loads(r.stdout)["budget"], 2.5, "wznowienie dostaje resztę budżetu")
-        self.f2("--run", d["run"], "cost", json.dumps({"sessions": [{"usd": 10}], "usd_total": 10}))
-        r = subprocess.run([sys.executable, "-I", RUN, "--resume", d["run"], "--dry"], capture_output=True, text=True, env=self.env)
-        self.assertNotEqual(r.returncode, 0, "budżet wyczerpany bez --budget odmawia")
 
     def test_profile_czyta_repo(self):
         p = json.loads(self.f2("profile", "--repo", self.repo).stdout)
@@ -591,7 +563,7 @@ class Bledy(Baza):
         with open(plan, "a") as f:
             f.write("\n- nowe kryterium → wynik\n")
         r = self.f2("create", "--slug", "p", "--repo", self.repo, "--plan", plan)
-        self.assertEqual(r.stdout.strip(), a, "stdout to nadal samo id (runner czyta je wprost)")
+        self.assertEqual(r.stdout.strip(), a, "stdout to nadal samo id (skrypt czyta je wprost)")
         self.assertIn("plan zmieniony po starcie", r.stderr)
         self.assertIn("plan zmieniony", self.czytaj(os.path.join(self.home, "runs", a, "log.tsv")))
 
@@ -1015,20 +987,17 @@ class Odbior(Baza):
         self.assertEqual(r.returncode, 1)
         self.assertIn("timeout 1 s", r.stdout)
 
-    def test_kontekst_agenta_i_brygadzisty(self):
+    def test_kontekst_agenta_prog_wykonawcy(self):
         def jsonl(p, tokeny):
             os.makedirs(os.path.dirname(p), exist_ok=True)
             with open(p, "w") as f:
                 f.write(json.dumps({"type": "assistant", "message": {"model": "m", "usage": {"input_tokens": 10, "cache_read_input_tokens": tokeny, "cache_creation_input_tokens": 0}}}) + "\n")
         proj = os.path.join(self.tmp, "claude", "projects", "-repo")
         jsonl(os.path.join(proj, "S", "subagents", "agent-ag1.jsonl"), 210_000)
-        jsonl(os.path.join(proj, "S.jsonl"), 230_000)
         self.commit("a.ts")
         out = self.accept(sesja="S").stdout
         self.assertIn("kontekst agenta ag1: 210k", out)
         self.assertIn("następna poprawka: nowy wykonawca (kontekst 210k)", out)
-        self.assertIn("nowego frontu nie spawnuj", out)
-        self.assertIn("nowego frontu nie spawnuj", self.f2("frontier", sesja="S").stdout)
         self.assertNotIn("kontekst", self.f2("frontier").stdout, "bez sesji i transkryptu bez linii")
 
 
@@ -1061,48 +1030,6 @@ class Kontekst(unittest.TestCase):
         self.assertEqual(k(self.plik(self.odp(), komp, self.odp(cr=20_000))), 21_100, "pomiar po kompakcji liczy się")
         self.assertEqual(k(self.plik({"type": "user"})), "?", "brak pomiaru")
         self.assertIsNone(k("/nie/ma/takiego.jsonl"))
-
-
-class Runner(Baza):
-    """`bin/run` z atrapą `claude`: właściciel = UUID sesji runnera przed startem, wznowienie po runner_session."""
-
-    @unittest.skipUnless(shutil.which("jq"), "preflight runnera wymaga jq")
-    def test_runner_ustawia_wlasciciela_przed_startem(self):
-        atrapa = os.path.join(self.tmp, "bin")
-        os.makedirs(atrapa)
-        slad = os.path.join(self.tmp, "slad.jsonl")
-        with open(os.path.join(atrapa, "claude"), "w") as f:
-            f.write(f"""#!{sys.executable} -I
-import glob, json, os, sys
-a = sys.argv[1:]
-sid = a[a.index("--session-id") + 1] if "--session-id" in a else a[a.index("--resume") + 1]
-run = json.load(open(glob.glob(os.path.join(os.environ["FOREMAN2_HOME"], "runs", "*", "run.json"))[0]))
-with open({slad!r}, "a") as f:
-    f.write(json.dumps({{"sid": sid, "resume": "--resume" in a, "owner": run["owner"], "env_sid": os.environ.get("CLAUDE_CODE_SESSION_ID")}}) + "\\n")
-print(json.dumps({{"total_cost_usd": 0.1, "num_turns": 1, "subtype": "success"}}))
-""")
-        os.chmod(os.path.join(atrapa, "claude"), 0o755)
-        plan = os.path.join(self.tmp, "plan.md")
-        with open(plan, "w") as f:
-            f.write(PLAN_OK)
-        env = dict(self.env, PATH=atrapa + os.pathsep + os.environ["PATH"], CLAUDE_CODE_SESSION_ID="sesja-rodzica")
-        r = subprocess.run([sys.executable, "-I", RUN, "--repo", self.repo, "--slug", "lab", "--plan", plan], capture_output=True, text=True, env=env)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        start = json.loads(self.czytaj(slad).splitlines()[0])
-        self.assertEqual(start["owner"], start["sid"], "właściciel ustawiony przed startem claude -p")
-        self.assertIsNone(start["env_sid"], "claude -p nie dziedziczy id sesji rodzica")
-        d = self.run_json()
-        self.assertEqual(d["runner_session"], start["sid"])
-        self.assertNotIn("sesja-rodzica", self.czytaj(os.path.join(self.home, "active.json")))
-        self.f2("--run", d["id"], "resume", sesja="interaktywna")
-        r = subprocess.run([sys.executable, "-I", RUN, "--resume", d["id"]], capture_output=True, text=True, env=env)
-        self.assertEqual(r.returncode, 0, r.stderr)
-        wzn = json.loads(self.czytaj(slad).splitlines()[1])
-        self.assertEqual((wzn["sid"], wzn["resume"]), (start["sid"], True), "wznowienie sesji runnera, nie ostatniej interaktywnej")
-        self.assertEqual(wzn["owner"], start["sid"], "runner odzyskuje własność przed startem")
-        koszt = d["cost"]
-        self.assertFalse({"turns", "ms"} & set(koszt["sessions"][0]), "tury i czas `claude -p` nie liczą agentów w tle")
-        self.assertIn(start["sid"], koszt["e"]["missing"], "koszt E liczony z zapisu sesji; atrapa go nie zostawia")
 
 
 PLAN_CMD = PLAN_OK.replace(
@@ -1356,6 +1283,4 @@ class Koszt(Baza):
             zapis(os.path.join(proj, f"R{i}.jsonl"), odp(f"r{i}", "claude-haiku", 101_499, 0, 0, 0))
             self.f2("session", f"R{i}", sesja="S")
         self.assertIn("claude-haiku 1.12", self.f2("cost", "--scan", sesja="S").stdout)
-        self.f2("cost", json.dumps({"usd_total": 1, "sessions": []}), sesja="S")
-        self.assertIn("e", self.run_json()["cost"], "zapis runnera nie kasuje kosztu E")
 

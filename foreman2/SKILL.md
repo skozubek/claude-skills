@@ -107,8 +107,7 @@ zamienić na komendę; brakujący czytelnicy (konsument schematu, stare wiersze,
 czy Granice pokrywają dane i koszt>" < plan.md`. Bez Codexa: `foreman2-recenzent` z planem
 i wskazanymi plikami kodu. Finding to hipoteza: odtwarzasz go w kodzie (wejście → zły
 wynik), nieodtworzony odrzucasz z powodem. Przyjęte findingi i braki z `plan check`
-pokazujesz człowiekowi; plan poprawia on albo Ty na jego słowo, nie obchodzisz. Runner
-(`bin/run`) tej opinii nie robi: człowiek uruchamia go na planie z przyjętą opinią.
+pokazujesz człowiekowi; plan poprawia on albo Ty na jego słowo, nie obchodzisz.
 `$F2 create --plan <plik>` po zgodzie człowieka wczytuje kryteria. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
 w bazie, czas mierzony tym samym narzędziem i kontem) i jaki wynik ma wyjść. „Testy
 zielone” nie jest kryterium. Plan ma ścieżkę użytkownika jednym zdaniem i „poza
@@ -192,10 +191,6 @@ SendMessage). Konflikt przy merge = błąd podziału grafu: ten sam agent przez
 SendMessage dociąga integrację i rozwiązuje. Robota > 2× zapowiedzianej albo mała
 prośba, która odsłania dług → `decide ask --kind approval --rec <cięcie> --blocks
 <zadanie>`, reszta frontu idzie, bo to zakres. <!-- LC-036 -->
-`frontier` i `accept` wypisują „nowego frontu nie spawnuj” przy kontekście brygadzisty
-> 200k (kompakcja stoi na 250k): domykasz rundy poprawek zadań tej sesji, `$F2
-resume`, przekazanie nowej sesji; czego nie domkniesz, przekazanie wymienia jako
-worktree wejściowe nowego wykonawcy, bo SendMessage nie sięga agentów innej sesji.
 Gotowe, gdy: brak zadań `ready`/`running`/`fixing`; pełna weryfikacja repo na
 integracji (`profile.verify`) zielona; `$F2 evidence run` na HEAD integracji.
 
@@ -243,7 +238,8 @@ bez nadzoru, zadziałała drabina albo była blokada.
 dowód i jego źródło → status),
 „Twoja uwaga” (decyzje czekające, kroki tylko-ludzkie, blokady), koszt. Rejestr
 własności do zera: worktree i gałęzie (lokalne i zdalne, po merge'u PR i po `git
-status` bez niezacommitowanej pracy; cudzych nie ruszasz), crony, `/coffee off`,
+status` bez niezacommitowanej pracy; cudzych nie ruszasz; gałąź integracji po `close`,
+bo `close` czyta jej HEAD), crony, `/coffee off`,
 procesy (`browse stop` przed usunięciem worktree), konta testowe. Lista zadań
 projektu (np. `MOL/Panel/meta/ZADANIA.md`): grep po nazwie planu, numerach PR-ów
 i decyzji przelotu; trafione zadanie kasujesz albo przepisujesz na to, co zostało,

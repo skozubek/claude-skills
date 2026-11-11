@@ -153,7 +153,7 @@ def koszt_z_zapisow(p, od=""):
     agent przypięty do zadania po `task.agent`. Sesja bez zapisu trafia do `missing`."""
     import glob
     zadania = {str(t["agent"]): t["id"] for t in p.d["tasks"] if t.get("agent")}
-    sesje = list(dict.fromkeys([s for s in p.d["sessions"] + [p.d.get("runner_session"), p.d.get("owner")] if s]))
+    sesje = list(dict.fromkeys([s for s in p.d["sessions"] + [p.d.get("owner")] if s]))
     wiersze, brak, per_model = [], [], {}
     for sid in sesje:
         zapis = transkrypt(f"*/{sid}.jsonl")
@@ -185,8 +185,8 @@ def linie_kosztu(e):
 
 
 def linie_kontekstu(agent=None):
-    """Linie o kontekście dla brygadzisty: agenta (próg nowego wykonawcy) i bieżącej sesji
-    (próg przekazania). Brak transkryptu = brak linii."""
+    """Linie o kontekście agenta dla brygadzisty: próg nowego wykonawcy. Brak transkryptu
+    = brak linii."""
     out = []
     if agent:
         k = kontekst(transkrypt(f"*/*/subagents/agent-{agent}.jsonl") or "")
@@ -194,13 +194,6 @@ def linie_kontekstu(agent=None):
             out.append(f"kontekst agenta {agent}: {k if k == '?' else f'{k // 1000}k'}")
             if k != "?" and k > PROG_KONTEKSTU:
                 out.append(f"następna poprawka: nowy wykonawca (kontekst {k // 1000}k)")
-    sid = sesja()
-    if sid:
-        k = kontekst(transkrypt(f"*/{sid}.jsonl") or "")
-        if k is not None:
-            out.append(f"kontekst brygadzisty: {k if k == '?' else f'{k // 1000}k'}")
-            if k != "?" and k > PROG_KONTEKSTU:
-                out.append("nowego frontu nie spawnuj: domknij poprawki, `foreman2 resume`, nowa sesja")
     return out
 
 
@@ -691,7 +684,7 @@ def cmd_create(a):
         p = Przelot(kat)
         sprawdz_wlasciciela(p)  # także przed --force: cudzego przelotu nie kasujesz
         if a.force and p.d.get("unattended") and sesja():
-            sys.exit("przelot bez nadzoru: `--force` kasuje stan i zamrożony plan, więc należy do człowieka i runnera, nie do sesji modelu")
+            sys.exit("przelot bez nadzoru: `--force` kasuje stan i zamrożony plan, więc należy do człowieka, nie do sesji modelu")
         if not a.force:  # idempotentnie: ten sam przelot
             if blad := blad_planu(p):
                 print(blad, file=sys.stderr)
@@ -724,7 +717,7 @@ def cmd_create(a):
             "gstack": czytaj_txt(os.path.expanduser("~/.claude/skills/gstack/VERSION")),
         },
         "criteria": [], "tasks": [], "owned": [], "human_steps": [], "sessions": [], "cost": {},
-        "verdict": None, "stop_blocks": {}, "seq": 0, "owner": None, "runner_session": None,
+        "verdict": None, "stop_blocks": {}, "seq": 0, "owner": None,
     }
     zapisz_json(os.path.join(kat, "run.json"), d)
     p = Przelot(kat)
@@ -1323,16 +1316,9 @@ def cmd_state(a):
 
 
 def cmd_session(a):
-    """Historia sesji (`session <id>`) albo sesja runnera (`session --runner <uuid>`): runner
-    staje się właścicielem przed startem `claude -p`, a `run --resume` wznawia właśnie ją."""
+    """Historia sesji: `session <id>` dopisuje id sesji Claude do przelotu."""
     p = znajdz(a)
-    if a.runner:
-        p.d["runner_session"] = a.runner
-        przejmij(p, a.runner, "runner")
-        p.zapisz(); p.log("session", f"runner {a.runner}", a.note or "", "", "")
-    elif not a.id:
-        sys.exit("session <id> albo session --runner <uuid>")
-    elif a.id not in p.d["sessions"]:
+    if a.id not in p.d["sessions"]:
         p.d["sessions"].append(a.id)
         p.zapisz(); p.log("session", a.id, a.note or "", "", "")
 
@@ -1404,7 +1390,7 @@ def cmd_resume(a):
     d = p.d
     head = p.head() or ""
     print(f"# Wznowienie przelotu {d['id']} (stan {d['state']})\nrepo {d['repo']}, gałąź {d['branch']} @ {head[:12] or '?'} (baza {str(d['base_sha'])[:12]}); plan: {d['plan']}")
-    print(f"mandat: merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}; bez nadzoru: {d['unattended']}; budżet USD: {d['budget_usd']}; wydane: {(d.get('cost') or {}).get('usd_total')}")
+    print(f"mandat: merge={d['mandate']['merge']} deploy={d['mandate']['deploy']}; bez nadzoru: {d['unattended']}; budżet USD (deklaracja): {d['budget_usd']}")
     print("\nkryteria:", "; ".join(f"{c['id']} {c['status']}" for c in d["criteria"]) or "brak")
     zywe = [t for t in d["tasks"] if t["status"] in ("running", "fixing")]
     print("\nzadania running/fixing (agenci poprzedniej sesji nie są osiągalni z tej sesji; zadania running wznawiasz nowym wykonawcą z worktree i SHA z rejestru):")
@@ -1530,7 +1516,7 @@ def cmd_straz(a):
             if bez_nadzoru or (m and przelot(m.group(1)).get("unattended")):
                 odmowa("Przelot bez nadzoru: odpowiedź `--by human` wpisuje człowiek ze swojego terminala, sesja modelu nie autoryzuje decyzji approval.")
         if zywy and re.search(r"(foreman2|\$F2)\b.*\bcreate\b", seg):
-            odmowa(f"Przelot {rid} biegnie bez nadzoru: `create` (nowy przelot albo `--force`) należy do runnera i człowieka, nie do sesji modelu.")
+            odmowa(f"Przelot {rid} biegnie bez nadzoru: `create` (nowy przelot albo `--force`) należy do człowieka, nie do sesji modelu.")
         if re.search(r"(run\.json|decisions\.jsonl|log\.tsv|evidence/E\d+\.json)\b", seg) and re.search(r">|\bsed +-i|\btee\b|\bmv\b|\bcp\b|\bpython3?\b|\bnode\b|\bperl\b|\bprintf\b|\becho\b", seg):
             odmowa("Pliki stanu przelotu zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
         if anulowane and re.search(r"\btask +set\b.*--status[ =]+[\"']?(running|fixing)", seg):
@@ -1631,9 +1617,7 @@ def cmd_report(a):
         md += ["", "## Koszt"]
         if koszt.get("e"):
             md += [f"- {l}" for l in linie_kosztu(koszt["e"])]
-        if koszt.get("sessions"):
-            md.append(f"- sesje runnera: {len(koszt['sessions'])}, USD wg `claude -p` (miara budżetu): {koszt.get('usd_total')}")
-        reszta = {k: v for k, v in koszt.items() if k not in ("e", "sessions", "usd_total")}
+        reszta = {k: v for k, v in koszt.items() if k != "e"}
         if reszta:
             md.append(f"- {json.dumps(reszta, ensure_ascii=False)}")
     md += ["", f"Werdykt z pliku stanu: **{stan}**" + (f" (brakuje: {'; '.join(braki)})" if braki else ""), f"Log: `{os.path.join(p.katalog, 'log.tsv')}`"]
@@ -1656,25 +1640,12 @@ def cmd_report(a):
 
 
 def cmd_cost(a):
-    """`cost --scan [--od ISO]`: koszt E per sesja i agent z zapisów sesji, w `cost.e`.
-    `cost <JSON>`: zapis runnera (sesje `claude -p`, USD budżetu); `cost.e` zostaje."""
+    """`cost --scan [--od ISO]`: koszt E per sesja i agent z zapisów sesji, w `cost.e`."""
     p = znajdz(a)
-    if a.scan:
-        e = koszt_z_zapisow(p, a.od or "")
-        p.d["cost"] = dict(p.d.get("cost") or {}, e=e)
-        p.zapisz(); p.log("cost", "koszt z zapisów sesji", "", "", json.dumps(e["per_model"], ensure_ascii=False)[:120])
-        print("\n".join(linie_kosztu(e)))
-        return
-    try:
-        nowy = json.loads(a.json_ or "")
-    except ValueError:
-        sys.exit("cost oczekuje JSON albo --scan")
-    if not isinstance(nowy, dict):
-        sys.exit("cost oczekuje obiektu JSON albo --scan")
-    if "e" not in nowy and (p.d.get("cost") or {}).get("e"):
-        nowy["e"] = p.d["cost"]["e"]
-    p.d["cost"] = nowy
-    p.zapisz(); p.log("cost", "koszt zapisany", "", "", (a.json_ or "")[:120])
+    e = koszt_z_zapisow(p, a.od or "")
+    p.d["cost"] = dict(p.d.get("cost") or {}, e=e)
+    p.zapisz(); p.log("cost", "koszt z zapisów sesji", "", "", json.dumps(e["per_model"], ensure_ascii=False)[:120])
+    print("\n".join(linie_kosztu(e)))
 
 
 # ---------------------------------------------------------------- parser
@@ -1690,7 +1661,7 @@ def main():
     s.add_argument("--slug")
     s.add_argument("--plan")
     s.add_argument("--branch")
-    s.add_argument("--budget", type=float)
+    s.add_argument("--budget", type=float, help="budżet USD jako deklaracja w run.json; nic go nie egzekwuje")
     s.add_argument("--max-live", type=int, default=3)
     s.add_argument("--mandate", help="merge,deploy")
     s.add_argument("--unattended", action="store_true")
@@ -1739,7 +1710,7 @@ def main():
     s = sub.add_parser("log", help="wiersz logu: faza decyzja [powód] [dowód] [wynik]"); s.add_argument("phase"); s.add_argument("decision"); s.add_argument("why", nargs="?"); s.add_argument("evidence", nargs="?"); s.add_argument("result", nargs="?"); s.set_defaults(f=cmd_log)
 
     s = sub.add_parser("state", help="zmiana etapu przelotu"); s.add_argument("state"); s.add_argument("--note"); s.set_defaults(f=cmd_state)
-    s = sub.add_parser("session", help="dopisz id sesji Claude; --runner <uuid>: sesja runnera i właściciel"); s.add_argument("id", nargs="?"); s.add_argument("--runner"); s.add_argument("--note"); s.set_defaults(f=cmd_session)
+    s = sub.add_parser("session", help="dopisz id sesji Claude"); s.add_argument("id"); s.add_argument("--note"); s.set_defaults(f=cmd_session)
     s = sub.add_parser("close", help="werdykt końcowy z pliku stanu (done tylko z dowodami na HEAD)"); s.add_argument("--state", choices=["done", "partial", "blocked"]); s.add_argument("--note"); s.add_argument("--head", help="asercja: HEAD integracji ma być tym SHA"); s.set_defaults(f=cmd_close)
     s = sub.add_parser("cancel", help="przerwanie przelotu (cancel_task)"); s.add_argument("--note"); s.set_defaults(f=cmd_cancel)
     s = sub.add_parser("resume", help="przekazanie do nowej sesji"); s.set_defaults(f=cmd_resume)
@@ -1747,8 +1718,8 @@ def main():
     s = sub.add_parser("straz", help="hook PreToolUse brygadzisty: Bash i Agent (stdin JSON)"); s.set_defaults(f=cmd_straz)
     s = sub.add_parser("profile", help="konwencje repo jako JSON"); s.add_argument("--repo"); s.set_defaults(f=cmd_profile)
     s = sub.add_parser("report", help="raport z pliku stanu (markdown albo --html plik)"); s.add_argument("--html"); s.set_defaults(f=cmd_report)
-    s = sub.add_parser("cost", help="--scan: koszt E per agent z zapisów sesji; <JSON>: zapis runnera"); s.add_argument("json_", nargs="?")
-    s.add_argument("--scan", action="store_true"); s.add_argument("--od", help="ISO UTC: licz odpowiedzi od tej chwili (sesja niosąca dwa przeloty)")
+    s = sub.add_parser("cost", help="--scan: koszt E per agent z zapisów sesji")
+    s.add_argument("--scan", action="store_true", required=True); s.add_argument("--od", help="ISO UTC: licz odpowiedzi od tej chwili (sesja niosąca dwa przeloty)")
     s.set_defaults(f=cmd_cost)
 
     a = ap.parse_args()

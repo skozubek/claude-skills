@@ -14,7 +14,7 @@ idzie) albo krok tylko-ludzki (`human add`). Przelot bez człowieka kończy się
 - Tożsamość poświadczeń: która komenda daje klucz, która funkcja go przyjmuje,
   czego klucz nie otworzy (np. starter wymagający tokenu użytkownika) i jaki jest
   wtedy odbiór zastępczy.
-- Koszt: budżet USD (`create --budget`, runner `--max-budget-usd`) i limit wywołań
+- Koszt: budżet USD jako deklaracja w `create --budget` (nic go nie egzekwuje) i limit wywołań
   płatnych (sędzia, API) per obiekt, zsumowany z całym planem przed pierwszym
   wywołaniem i liczony w trakcie w pliku licznika w katalogu przelotu, bo zadania,
   smoke i porównania biją w ten sam limit. <!-- LC-099 -->
@@ -27,7 +27,7 @@ kontekstu (klucz do pliku tymczasowego, kolumny poświadczeń wybierasz po nazwi
 
 Cały przelot staje (`close --state partial --note <powód>`) przy zmianie zakresu,
 findingu bezpieczeństwa, produkcji zachowującej się inaczej niż plan zakładał
-i wyczerpaniu budżetu. Pojedyncze zadanie blokujesz przy tym samym czerwonym CI po
+i wyczerpaniu limitu wywołań płatnych z Granic. Pojedyncze zadanie blokujesz przy tym samym czerwonym CI po
 dwóch poprawkach albo zmianie kontraktu bez czytelników. Po merge'u nieudany krok
 odbioru to PR poprawki, nie stop.
 
@@ -56,12 +56,12 @@ Krok, którego nie da się przejść → `human add` i kryterium `unverified` z 
 - Limit konta Claude: sesja czeka na reset; `CronCreate` budzik godzinę po resecie
   jako zapas. Sieć pada częściej niż limit, a sesja po awarii sieci nie wraca
   sama: drugi budzik `CronCreate` stawiasz na starcie, na porę, o której człowiek
-  wstaje. `/coffee` na start sesji interaktywnej; runner daje `caffeinate`.
+  wstaje. `/coffee` na start sesji interaktywnej.
 - Po odzyskaniu sieci: `git status` w każdym worktree z rejestru; SendMessage do
   żywych agentów „dokończ i raportuj”; agent bez odpowiedzi dostaje następcę z SHA
   z rejestru.
-- Koszt: `foreman2 cost --scan` (zużycie per sesja i agent z zapisów sesji; runner
-  woła je sam i dopisuje USD budżetu z `claude -p`).
+- Koszt: `foreman2 cost --scan` (zużycie per sesja i agent z zapisów sesji, w tokenach
+  ważonych, nie w USD).
 
 ## Sędzia próbki (zmiana masowa oceniana modelem)
 

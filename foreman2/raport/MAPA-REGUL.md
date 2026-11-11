@@ -32,7 +32,6 @@ użytkownika/AGENTS.md repo; **−** celowo usunięte (powód w kolumnie).
 | zależne czekają, reszta frontu idzie | — | `frontier` liczy zależności ze stanu | + |
 | odejście z powodem = poprawka planu; odejście kontraktu dostaje czytelników | LC-093 | etap 5 | = |
 | robota > 2× zapowiedzianej wraca do decyzji | LC-036 | etap 5 `decide ask` | = |
-| od ~250k kontekstu bez nowego frontu, przekazanie sesji | LC-106 | etap 5 `resume` (przekazanie z pliku, nie z pamięci) | + |
 | recenzja na przypiętym SHA: diff do pliku, recenzent trzy osie, Codex na tym samym SHA, jedna runda poprawek, delta bez drugiego Codexa poza migracją/uprawnieniami, tekst ≤2 rundy | LC-100 LC-117 | etap 6; recenzent (agents/foreman2-recenzent.md) | = |
 | odbiór na żywo z checkoutu przypiętego SHA; liczby z DOM; progi na opublikowanej wersji | LC-116 | etap 6 `git worktree add odbior $SHA`; weryfikator | = |
 | weryfikator AdMotiv raz na PR z ekranem; `bin/sesja` + Supabase przed spawnem | — | BRIEF „Weryfikator” (raz na PR); sprawdzenia produktu w skillu `verify-admotiv` i `profile.notes` | profil |
@@ -50,9 +49,9 @@ użytkownika/AGENTS.md repo; **−** celowo usunięte (powód w kolumnie).
 | stop całego przelotu: zmiana zakresu, finding bezpieczeństwa, produkcja inaczej, koszt; blokada zadania: ten sam czerwony CI po 2 poprawkach, kontrakt bez czytelników; po merge'u PR poprawki | — | BEZ-NADZORU „Zatrzymanie” | = |
 | merge, deploy, odbiór produkcyjny = trzy kamienie | — | etap 7 + BEZ-NADZORU | = |
 | ścieżka odbioru jako operator: bypass, próbny wykonawca per klasa komend, środowisko raz, hooki, konta ról 200/4xx, dane po drucie, dane testowe bez SQL prod, ekran bez przeglądarki człowieka, dev czyta prod | LC-077 LC-104 | BEZ-NADZORU „Ścieżka odbioru” | = |
-| licznik wywołań płatnych per obiekt | LC-099 | BEZ-NADZORU „Granice/Koszt” + `--budget`/`--max-budget-usd` | + |
+| licznik wywołań płatnych per obiekt | LC-099 | BEZ-NADZORU „Granice/Koszt” + `create --budget` (deklaracja) | + |
 | Codex nocą dzieli limit: próbne wywołanie, recenzent na delcie, PR „bez Codexa od SHA”, merge po Codexie | LC-118 | BEZ-NADZORU „Rachuba” | = |
-| sieć i limit: `/coffee`, budzik `CronCreate` po resecie, po powrocie `git status` worktree i SendMessage | LC-038 | BEZ-NADZORU; runner `caffeinate` | = (jeden budzik zamiast dwóch) |
+| sieć i limit: `/coffee`, budzik `CronCreate` po resecie, po powrocie `git status` worktree i SendMessage | LC-038 | BEZ-NADZORU | = (jeden budzik zamiast dwóch) |
 | sędzia próbki: etykiety z ludzkiego śladu, stałe ziarno, kontrole, punktacja per pole, Codex z tym samym przydziałem, druga runda | LC-101 | BEZ-NADZORU „Sędzia” | = |
 | wykonawca: tylko pliki briefu; commit per zielony wycinek; warunki niespełnione w raporcie; komentarze; lint z powodem; klucze słownikowe; bez imion; NUL i gitleaks; pliki tymczasowe; kontekst to koszt; nie kończy wcześnie; kształt raportu | LC-016 LC-039 | agents/foreman2-wykonawca.md | = |
 | strażnik komend floty (push, PR, deploy, kill, claude, codex) | LC-062 | `bin/bramka-floty.sh` na wykonawcy **i weryfikatorze**: także opcje git przed `push`, `gh api`/`workflow run`, `npm run deploy`, zdalna baza, zapis HTTP poza localhost; test czułości | + |
@@ -67,7 +66,7 @@ użytkownika/AGENTS.md repo; **−** celowo usunięte (powód w kolumnie).
 | PULAPKI produktowe: Turbopack, `bun install --frozen-lockfile`, strażnik dokumentów, okno crona, `migration-drift`, `konsumenci.json`, `supabase link` | LC-076 | `profile.install` (lockfile) + `profiles/admotiv.example.json` | profil |
 | „czego nie dokładać”: tdd, freeze, canary, bramka testu, zespoły agentów, Workflow | LC-092 | SKILL „Czego nie dokładać” (+ gstack review/ship) | = |
 | warianty wykonawcy + reguła „od trzech zadań w kategorii” | — | tabela wariantów; reguła pomiaru usunięta | − (nigdy nie zmierzona; dane per przelot w `run.json`) |
-| koszt w meldunku (`koszty.py`) | — | etap 8; runner zapisuje `cost` z `claude -p` | = |
+| koszt w meldunku (`koszty.py`) | — | etap 8; `cost --scan` z zapisów sesji | = |
 
 Luki do zamknięcia przy wdrożeniu (nie w rdzeniu): profil użytkownika dla AdMotiv
 (`~/.foreman2/profiles/<klucz>.json` z `profiles/admotiv.example.json`), wpis
