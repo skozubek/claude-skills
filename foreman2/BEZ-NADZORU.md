@@ -60,6 +60,11 @@ Krok, którego nie da się przejść → `human add` i kryterium `unverified` z 
 - Po odzyskaniu sieci: `git status` w każdym worktree z rejestru; SendMessage do
   żywych agentów „dokończ i raportuj”; agent bez odpowiedzi dostaje następcę z SHA
   z rejestru.
+- Żywy w tle to nie pracujący: hook Stop widzi obecność agenta, nie postęp. Każdy
+  budzik i każdy powrót do pętli sprawdza wiek ostatniego commitu i pliku wyjścia
+  agentów `running`. Agent bez obu przez 60 min dostaje SendMessage o stan; bez
+  odpowiedzi w 30 min: diff jego worktree do pliku, `TaskStop`, następca z SHA
+  i łatką. Dwóch wykonawców jednego zadania naraz nie ma.
 - Koszt: `foreman2 cost --scan` (zużycie per sesja i agent z zapisów sesji, w tokenach
   ważonych, nie w USD).
 
