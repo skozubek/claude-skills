@@ -110,7 +110,12 @@ wynik), nieodtworzony odrzucasz z powodem. Przyjęte findingi i braki z `plan ch
 pokazujesz człowiekowi; plan poprawia on albo Ty na jego słowo, nie obchodzisz.
 `$FM create --plan <plik> --gate "<profile.verify złączone &&>"` po zgodzie człowieka wczytuje
 kryteria i ustawia bramkę repo: jedyny pełny przebieg testów na integracji, warunek
-`close` i siatka pod `accept --reported-sha`. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
+`close` i siatka pod `accept --reported-sha`. Repo bez skryptu `verify` dostaje od
+profilu zgadnięte skrypty (`test`, `lint`, `build`), więc bramkę składasz z kroków CI
+na PR. Przed `create` puszczasz ją raz na gałęzi domyślnej: test czerwony także tam
+wyłączasz w `--gate` z nazwą i powodem w `kontrakt.md`, bo bramka czerwona na bazie
+nie da `pass` żadnej integracji, a po `create` zmienia ją tylko człowiek. <!-- LC-128 -->
+Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
 w bazie, czas mierzony tym samym narzędziem i kontem) i jaki wynik ma wyjść. „Testy
 zielone” nie jest kryterium. Plan ma ścieżkę użytkownika jednym zdaniem i „poza
 zakresem”. Fala większego planu: kryteria tej fali, pozostałe obietnice w planie
