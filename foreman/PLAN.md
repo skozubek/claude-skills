@@ -1,8 +1,8 @@
-# Plan pod foremana 2.0
+# Plan pod foremana
 
 Plan to kontrakt etapu 0: `create --plan` wczytuje z niego kryteria odbioru, a brygadzista
 buduje na nim graf zadań i trzyma się jego Granic. Od `create` plan jest zamrożony: zmianę
-wpisuje człowiek i zatwierdza `create --replan --by human:<imię>`. `foreman2 plan check <plik>
+wpisuje człowiek i zatwierdza `create --replan --by human:<imię>`. `foreman plan check <plik>
 [--unattended]` wylicza braki, a `create --plan` odmawia startu z brakami, więc
 plan niepełny nie kosztuje tokenów. Sekcje poznaje po nagłówkach (`## Kryteria
 odbioru`, `## Poza zakresem`, `## Pojęcia`, `## Granice`), ścieżkę użytkownika po linii
@@ -46,7 +46,7 @@ odbioru`, `## Poza zakresem`, `## Pojęcia`, `## Granice`), ścieżkę użytkown
   pomiar) i narzędzie; wynik jest rozstrzygalny bez dyskusji. Dwa do pięciu;
   większy plan dzielisz na fale, reszta idzie do „Otwarte”. „Testy zielone”,
   „kod zrefaktorowany”, „działa” nie są kryteriami.
-- Kryterium z komendą: lewa strona w całości w grawisach. `foreman2 evidence run`
+- Kryterium z komendą: lewa strona w całości w grawisach. `foreman evidence run`
   wykonuje ją w repo na końcowym SHA; spełnione = kod wyjścia 0, a gdy prawa strona
   też jest w całości w grawisach, także stdout równy jej treści (po obcięciu białych
   znaków z brzegów). Jedna linia; dłuższy odczyt to skrypt w repo. Kryterium bez

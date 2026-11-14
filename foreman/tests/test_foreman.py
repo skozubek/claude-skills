@@ -1,6 +1,6 @@
-"""Testy kontraktu stanu foreman2: create → kryteria → graf → front → dowody → decyzje →
+"""Testy kontraktu stanu foreman: create → kryteria → graf → front → dowody → decyzje →
 hooki (stop-check, straz, bramka-floty.sh) → close/resume. Każdy strażnik ma kontrolę
-czułości: znana zła komenda musi go zapalić. Uruchom: python3 -I -m unittest discover -s foreman2/tests."""
+czułości: znana zła komenda musi go zapalić. Uruchom: python3 -I -m unittest discover -s foreman/tests."""
 import json
 import os
 import shutil
@@ -9,7 +9,7 @@ import sys
 import tempfile
 import unittest
 
-BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "foreman2")
+BIN = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "bin", "foreman")
 BRAMKA = os.path.join(os.path.dirname(BIN), "bramka-floty.sh")
 SKROT = ("--force", "--note", "skrót testu: stan bez odbioru")
 
@@ -43,7 +43,7 @@ class Baza(unittest.TestCase):
         self.home = os.path.join(self.tmp, "home")
         self.repo = self.git_repo("repo")
         self.head = self.g("rev-parse", "HEAD")
-        self.env = dict(os.environ, FOREMAN2_HOME=self.home, CLAUDE_CONFIG_DIR=os.path.join(self.tmp, "claude"))
+        self.env = dict(os.environ, FOREMAN_HOME=self.home, CLAUDE_CONFIG_DIR=os.path.join(self.tmp, "claude"))
         self.env.pop("CLAUDE_SESSION_ID", None)
         self.env.pop("CLAUDE_CODE_SESSION_ID", None)
 
@@ -68,7 +68,7 @@ class Baza(unittest.TestCase):
         env = dict(self.env, CLAUDE_CODE_SESSION_ID=sesja) if sesja else self.env
         r = subprocess.run([sys.executable, "-I", BIN, *a], capture_output=True, text=True, cwd=cwd or self.repo, env=env, input=stdin)
         if ok and r.returncode:
-            self.fail(f"foreman2 {' '.join(a)} → {r.returncode}: {r.stderr}")
+            self.fail(f"foreman {' '.join(a)} → {r.returncode}: {r.stderr}")
         return r
 
     def czytaj(self, p):
@@ -111,7 +111,7 @@ class TestPrzelot(Baza):
         d = self.run_json()
         self.assertEqual(d["base_sha"], self.head)
         self.assertEqual(d["state"], "planning")
-        self.assertIn("foreman2", d["sources"])
+        self.assertIn("foreman", d["sources"])
 
     def test_ten_sam_slug_inne_repo_dostaje_osobny_przelot(self):
         a = self.f2("create", "--slug", "x", "--repo", self.repo).stdout.strip()
@@ -320,17 +320,17 @@ class TestPrzelot(Baza):
         self.assertIn("deny", self.hook("Bash", "git push origin x"), "push po cancel odmówiony przez bramkę floty")
         self.assertEqual(self.hook("Bash", "git status"), "", "odczyt po cancel wolny")
 
-    ODPOWIEDZI_CZLOWIEKA = ("foreman2 decide answer D1 rec --by human", "python3 -I /x/bin/foreman2 --run r decide answer D1 tak --by=human:serge",
-                            "cd /tmp && $F2 decide answer D1 rec --by 'human'")
+    ODPOWIEDZI_CZLOWIEKA = ("foreman decide answer D1 rec --by human", "python3 -I /x/bin/foreman --run r decide answer D1 tak --by=human:serge",
+                            "cd /tmp && $FM decide answer D1 rec --by 'human'")
 
     def test_straz_odmawia_odpowiedzi_jako_czlowiek_bez_nadzoru_i_zapisu_stanu(self):
         self.nowy("--unattended")
         self.f2("state", "running")
-        for cmd in self.ODPOWIEDZI_CZLOWIEKA + ("echo '{}' >> ~/.foreman2/runs/r/decisions.jsonl",
+        for cmd in self.ODPOWIEDZI_CZLOWIEKA + ("echo '{}' >> ~/.foreman/runs/r/decisions.jsonl",
                     "sed -i '' 's/pending/approved/' /h/runs/r/decisions.jsonl", "python3 -c 'open(\"run.json\",\"w\")'"):
             self.assertIn('"deny"', self.hook("Bash", cmd), cmd)
-        for cmd in ("foreman2 decide answer D1 rec --by codex", "foreman2 decide ask --kind approval --question q --options 'a | b' --rec a",
-                    "cat ~/.foreman2/runs/r/decisions.jsonl", "jq . run.json", "git push origin integracja", "npm test"):
+        for cmd in ("foreman decide answer D1 rec --by codex", "foreman decide ask --kind approval --question q --options 'a | b' --rec a",
+                    "cat ~/.foreman/runs/r/decisions.jsonl", "jq . run.json", "git push origin integracja", "npm test"):
             self.assertEqual(self.hook("Bash", cmd), "", cmd)
         self.assertEqual(self.hook("Agent"), "", "spawn w żywym przelocie wolny")
         self.assertIn('"deny"', self.hook("Bash", None), "komenda nieczytelna = odmowa")
@@ -339,25 +339,25 @@ class TestPrzelot(Baza):
     def test_straz_bez_nadzoru_nie_da_sie_obejsc_innym_przelotem_ani_edytorem(self):
         u = self.nowy("--unattended")
         self.f2("state", "running")
-        for cmd in ("foreman2 create --slug inny --repo .", "$F2 create --slug 'Test przelotu' --repo . --force"):
+        for cmd in ("foreman create --slug inny --repo .", "$FM create --slug 'Test przelotu' --repo . --force"):
             self.assertIn('"deny"', self.hook("Bash", cmd), cmd)
         self.assertIn('"deny"', self.hook("Write", file_path=os.path.join(self.home, "runs", u, "run.json")), "Write w run.json odmówiony")
         self.assertIn('"deny"', self.hook("Edit", file_path=os.path.join(self.home, "profiles", "x.json")), "Edit profilu odmówiony")
         self.assertEqual(self.hook("Write", file_path=os.path.join(self.repo, "a.ts")), "", "Write w repo wolny")
         drugi = self.git_repo("drugi")
         s = self.f2("create", "--slug", "Nadzorowany", "--repo", drugi, cwd=drugi).stdout.strip()
-        self.assertIn('"deny"', self.hook("Bash", f"foreman2 --run {u} decide answer D1 rec --by human:serge", cwd=drugi), "cel --run bez nadzoru odmówiony mimo nadzorowanego aktywnego")
-        self.assertEqual(self.hook("Bash", f"foreman2 --run {s} decide answer D1 rec --by human:serge", cwd=drugi), "", "nadzorowany cel z nadzorowanego cwd wolny")
+        self.assertIn('"deny"', self.hook("Bash", f"foreman --run {u} decide answer D1 rec --by human:serge", cwd=drugi), "cel --run bez nadzoru odmówiony mimo nadzorowanego aktywnego")
+        self.assertEqual(self.hook("Bash", f"foreman --run {s} decide answer D1 rec --by human:serge", cwd=drugi), "", "nadzorowany cel z nadzorowanego cwd wolny")
         self.f2("close", "--note", "koniec", ok=False)
         self.f2("cancel", "--note", "stop")
-        self.assertEqual(self.hook("Bash", "foreman2 create --slug nowy --repo ."), "", "po zakończeniu przelotu bez nadzoru create wolny")
+        self.assertEqual(self.hook("Bash", "foreman create --slug nowy --repo ."), "", "po zakończeniu przelotu bez nadzoru create wolny")
 
     def test_straz_pod_nadzorem_przepuszcza_odpowiedz_z_czatu(self):
         self.nowy()
         self.f2("state", "running")
-        for cmd in self.ODPOWIEDZI_CZLOWIEKA + ("foreman2 create --slug inny --repo .",):
+        for cmd in self.ODPOWIEDZI_CZLOWIEKA + ("foreman create --slug inny --repo .",):
             self.assertEqual(self.hook("Bash", cmd), "", cmd)
-        self.assertIn('"deny"', self.hook("Bash", "echo '{}' >> ~/.foreman2/runs/r/decisions.jsonl"), "zapis stanu nadal odmówiony")
+        self.assertIn('"deny"', self.hook("Bash", "echo '{}' >> ~/.foreman/runs/r/decisions.jsonl"), "zapis stanu nadal odmówiony")
         did = self.f2("decide", "ask", "--kind", "approval", "--question", "czytać prod?", "--options", "tak | nie", "--rec", "nie").stdout.strip()
         self.assertIn("approval", self.f2("decide", "answer", did, "rec", "--by", "codex", ok=False).stderr, "agent nie autoryzuje także pod nadzorem")
         self.f2("decide", "answer", did, "rec", "--by", "human:serge")
@@ -567,6 +567,14 @@ class Bledy(Baza):
         self.assertIn("plan zmieniony po starcie", r.stderr)
         self.assertIn("plan zmieniony", self.czytaj(os.path.join(self.home, "runs", a, "log.tsv")))
 
+    def test_fixing_podbija_resumes(self):
+        self.nowy()
+        self.f2("task", "set", "T1", "--status", "running", "--spawn-sha", self.head)
+        self.assertEqual(next(t for t in self.run_json()["tasks"] if t["id"] == "T1")["resumes"], 0, "running nie jest wznowieniem")
+        self.f2("task", "set", "T1", "--status", "fixing")
+        self.f2("task", "set", "T1", "--status", "fixing", "--note", "ta sama runda")
+        self.assertEqual(next(t for t in self.run_json()["tasks"] if t["id"] == "T1")["resumes"], 1)
+
     def test_zmiana_wariantu_zeruje_rundy(self):
         self.nowy()
         self.f2("task", "bump", "T1", "--field", "rounds", "--by", "2")
@@ -617,7 +625,7 @@ class Sesje(Baza):
         self.assertEqual([c["text"] for c in json.loads(self.f2("--run", b, "status", "--json").stdout)["criteria"]], ["z S2"])
         r = self.f2("status", ok=False)
         self.assertIn("kilka przelotów w repo", r.stderr, "terminal bez sesji nie zgaduje")
-        odp = "foreman2 decide answer D1 rec --by human"
+        odp = "foreman decide answer D1 rec --by human"
         self.assertIn('"deny"', self.hook("Bash", odp, sesja="S1"), "S1 prowadzi przelot bez nadzoru")
         self.assertEqual(self.hook("Bash", odp, sesja="S2"), "", "S2 prowadzi nadzorowany")
         self.assertIn('"deny"', self.hook("Bash", odp), "bez sesji: reguły każdego niezakończonego przelotu")
@@ -945,7 +953,84 @@ class Odbior(Baza):
         r = self.accept()
         self.assertEqual(r.returncode, 1)
         self.assertIn("poza zakresem zadania: z.ts", r.stdout)
+        self.assertEqual(self.t1()["rounds"], 0, "porażka księgowa nie podbija rund")
+
+    def test_rounds_liczy_tylko_fail_komendy(self):
+        """Kontrola czułości: ta sama ścieżka z padającą komendą podbija rounds; zakres,
+        przodek i drzewo zmienione w trakcie nie."""
+        self.commit("a.ts")
+        self.f2("task", "set", "T1", "--verify", "false")
+        self.assertEqual(self.accept().returncode, 1)
+        self.assertEqual(self.t1()["rounds"], 1, "fail komendy podbija")
+        self.f2("task", "set", "T1", "--verify", "true")
+        self.commit("z.ts")
+        self.assertIn("poza zakresem", self.accept().stdout)
+        self.assertEqual(self.t1()["rounds"], 1, "zakres nie podbija")
+        self.f2("task", "set", "T1", "--spawn-sha", self.g("commit-tree", "HEAD^{tree}", "-m", "obok"))
+        self.assertIn("nie jest przodkiem", self.accept().stdout)
+        self.assertEqual(self.t1()["rounds"], 1, "przodek nie podbija")
+        self.assertIn("rounds bez zmian", self.czytaj(os.path.join(self.home, "runs", self.rid, "log.tsv")))
+
+    def test_fail_komendy_po_porazce_ksiegowej_na_tym_samym_sha(self):
+        """Odbiór odrzucony za zakres, zakres poszerzony, komenda pada na tym samym SHA:
+        to nowy pomiar (inny wynik), więc nowy dowód i rounds +1."""
+        self.commit("a.ts", "z.ts")
+        self.f2("task", "set", "T1", "--verify", "false")
+        self.assertIn("poza zakresem", self.accept().stdout)
+        self.f2("task", "set", "T1", "--files", "a.ts,z.ts")
+        r = self.accept()
+        self.assertIn("fail: T1 exit 1", r.stdout)
         self.assertEqual(self.t1()["rounds"], 1)
+        self.assertEqual([e["result"][:13] for e in self.dowody_t1()], ["poza zakresem", "exit 1"])
+
+    def test_plik_testu_obok_pliku_zadania(self):
+        self.commit("a.ts", "a.test.ts")
+        self.f2("task", "set", "T1", "--verify", "test -f a.test.ts")
+        r = self.accept()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.t1()["files"], ["a.ts", "a.test.ts"], "test dopisany do zakresu po pass")
+        self.assertIn("pliki testów obok plików zadania", self.czytaj(os.path.join(self.home, "runs", self.rid, "log.tsv")))
+        # kontrola czułości: test pliku spoza zadania i test, który ma inne zadanie, zostają poza zakresem
+        self.commit("b.test.ts")
+        self.assertIn("poza zakresem zadania: b.test.ts", self.accept().stdout)
+        self.f2("task", "add", "--id", "T9", "--name", "testy", "--files", "a.spec.ts")
+        self.g("rm", "-q", "b.test.ts", repo=self.wt)
+        self.commit("a.spec.ts")
+        self.assertIn("poza zakresem zadania: a.spec.ts", self.accept().stdout, "plik wspólny ma jednego właściciela")
+        self.f2("task", "set", "T9", "--status", "dropped")
+        self.assertEqual(self.accept().returncode, 0, "zadanie dropped nie trzyma pliku")
+
+    def test_towarzysz_testu(self):
+        from importlib.machinery import SourceFileLoader
+        t = SourceFileLoader("foreman_cli", BIN).load_module().towarzysz_testu
+        pliki = {"src/x.ts", "lib/y.py"}
+        for test, cel in (("src/x.test.ts", "src/x.ts"), ("src/x.spec.tsx", "src/x.ts"), ("src/__tests__/x.test.ts", "src/x.ts"),
+                          ("lib/test_y.py", "lib/y.py"), ("x.test.ts", None), ("src/z.test.ts", None), ("src/x.ts.bak", None),
+                          ("lib/tests/test_y.py", None), ("src/xtest.ts", None)):
+            self.assertEqual(t(test, pliki), cel, test)
+
+    def test_reported_sha(self):
+        sha = self.commit("a.ts")
+        self.f2("task", "set", "T1", "--verify", "false")
+        r = self.accept("--reported-sha", sha)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("create --gate", r.stderr, "bez bramki repo słowo agenta nie ma siatki")
+        self.assertEqual(self.dowody_t1(), [])
+        self.f2("create", "--slug", "Test przelotu", "--repo", self.repo, "--gate", "true")
+        r = self.accept("--reported-sha", self.head)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("raport nie dotyczy tego commita", r.stderr)
+        self.assertEqual(self.dowody_t1(), [], "SHA inny niż HEAD worktree: bez dowodu")
+        r = self.accept("--reported-sha", sha[:10])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        e = self.dowody_t1()[-1]
+        self.assertEqual((e["verdict"], e["by"], e["sha"], e["file"]), ("pass", "model", sha, None), "komenda `false` niepuszczona")
+        self.assertIn("raport agenta", e["result"])
+        self.assertNotEqual(self.accept().returncode, 0, "kontrola czułości: bez --reported-sha komenda pada")
+        self.f2("task", "set", "T1", "--verify", "true")
+        self.commit("z.ts")
+        r = self.accept("--reported-sha", self.g("rev-parse", "HEAD", repo=self.wt))
+        self.assertIn("poza zakresem zadania: z.ts", r.stdout, "zakres sprawdzany także na słowo agenta")
 
     def test_rename_spoza_zakresu(self):
         self.g("mv", "x.ts", "a.ts", repo=self.wt)
@@ -1007,7 +1092,7 @@ class Kontekst(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         from importlib.machinery import SourceFileLoader
-        cls.m = SourceFileLoader("foreman2_cli", BIN).load_module()
+        cls.m = SourceFileLoader("foreman_cli", BIN).load_module()
 
     def plik(self, *rekordy, ogon=""):
         fd, p = tempfile.mkstemp(suffix=".jsonl")
@@ -1062,7 +1147,7 @@ class Dowod(Baza):
 
     def test_rozklad_kryterium(self):
         from importlib.machinery import SourceFileLoader
-        r = SourceFileLoader("foreman2_cli", BIN).load_module().rozloz_kryterium
+        r = SourceFileLoader("foreman_cli", BIN).load_module().rozloz_kryterium
         self.assertEqual((r("`cat n.txt` → `2`")["cmd"], r("`cat n.txt` → `2`")["expect_out"]), ("cat n.txt", "2"))
         self.assertEqual((r("`npm test` → zielone")["cmd"], r("`npm test` → zielone")["expect_out"]), ("npm test", None))
         self.assertEqual(r("`printf 'a->b'` → `a->b`")["cmd"], "printf 'a->b'", "strzałka w komendzie nie rozcina kryterium")
@@ -1153,9 +1238,12 @@ class Dowod(Baza):
         dow = self.run_json()["evidence"]
         self.assertEqual([(e["for"], e["by"], e["verdict"], e["sha"]) for e in dow], [("C1", "tool", "pass", self.head), ("C2", "tool", "pass", self.head)])
         self.assertEqual(self.czytaj(os.path.join(kat, dow[0]["file"])), "2\n", "stdout komendy drutem do pliku")
-        self.f2("evidence", "run", "C1")
+        r = self.f2("evidence", "run", "C1")
+        self.assertIn("pass bez ponownego pomiaru: C1", r.stdout)
+        self.assertEqual(len([e for e in self.run_json()["evidence"] if e["for"] == "C1"]), 1, "pass na tym samym SHA nie mierzy się drugi raz")
+        self.f2("evidence", "run", "C1", "--again")
         dow = [e for e in self.run_json()["evidence"] if e["for"] == "C1"]
-        self.assertEqual(len({e["file"] for e in dow}), 2, "powtórzony pomiar to nowy wpis z własnym logiem")
+        self.assertEqual(len({e["file"] for e in dow}), 2, "--again: nowy wpis z własnym logiem")
         # wstrzyknięty defekt: licznik 3 zamiast 2
         sha = self.plik("n.txt", "3\n")
         self.assertIn("C1 dowód", self.f2("close").stdout, "dowód na starym SHA nie liczy się na nowym HEAD")
@@ -1170,6 +1258,38 @@ class Dowod(Baza):
         r = self.f2("evidence", "add", "--for", "C1", "--cmd", "cat n.txt", "--sha", sha, "--result", "2", "--verdict", "pass", ok=False)
         self.assertIn("evidence run C1", r.stderr)
         self.assertIn("kryterium bez komendy", self.f2("evidence", "run", "C3", ok=False).stderr)
+
+    def test_bramka_repo(self):
+        self.start()
+        self.assertIn("bramka repo: brak", self.f2("status").stdout)
+        self.f2("create", "--slug", "licznik", "--repo", self.repo, "--gate", "grep -q 2 n.txt")
+        self.assertEqual(self.run_json()["gate"], "grep -q 2 n.txt", "idempotentny create ustawia bramkę")
+        self.f2("evidence", "run", "C1", "C2")
+        self.f2("evidence", "add", "--for", "C3", "--cmd", "weryfikator", "--sha", self.head, "--result", "ok", "--verdict", "pass")
+        out = self.f2("close").stdout
+        self.assertTrue(out.startswith("partial: G (bramka repo) bez dowodu"), out)
+        self.assertIn("evidence run G", self.f2("evidence", "add", "--for", "G", "--cmd", "x", "--sha", self.head, "--verdict", "pass", ok=False).stderr)
+        r = self.f2("evidence", "run")
+        self.assertIn("pass bez ponownego pomiaru: C1", r.stdout)
+        self.assertIn("pass: G exit 0", r.stdout)
+        self.assertEqual(self.f2("evidence", "check").returncode, 0)
+        self.assertEqual(self.f2("close").stdout.splitlines()[0], "done")
+        # wstrzyknięty defekt łamie bramkę, a nowy HEAD unieważnia jej stary pass
+        self.plik("n.txt", "3\n")
+        self.assertIn("G (bramka repo) dowód", self.f2("evidence", "check", ok=False).stdout)
+        r = self.f2("evidence", "run", "G", ok=False)
+        self.assertIn("fail: G exit 1", r.stdout)
+        self.assertIn("G (bramka repo) fail", self.f2("close").stdout)
+        # bramkę raz ustawioną zmienia albo zdejmuje człowiek: inaczej model zdejmuje ją przed `close`
+        for nowa in ("", "true"):
+            r = self.f2("create", "--slug", "licznik", "--repo", self.repo, "--gate", nowa, ok=False)
+            self.assertIn("--by human", r.stderr)
+            self.assertEqual(self.run_json()["gate"], "grep -q 2 n.txt")
+        self.f2("create", "--slug", "licznik", "--repo", self.repo, "--gate", "grep -q 3 n.txt", "--by", "human:tester")
+        self.assertEqual(self.run_json()["gate"], "grep -q 3 n.txt")
+        # replan niesie bramkę, nie gubi jej po cichu
+        self.f2("create", "--repo", self.repo, "--plan", self.planp, "--replan", "--by", "human:tester", "--gate", "true")
+        self.assertEqual(self.run_json()["gate"], "true")
 
     def test_dowod_komendy_tylko_od_narzedzia(self):
         rid = self.start()
@@ -1204,7 +1324,7 @@ class Dowod(Baza):
         self.f2("evidence", "run")
         wt = os.path.join(self.tmp, "wt")
         self.g("worktree", "add", "-q", "--detach", wt, "main")
-        self.assertIn("pass: C1", self.f2("evidence", "run", "C1", cwd=wt).stdout, "worktree repo przelotu na HEAD integracji")
+        self.assertIn("pass: C1", self.f2("evidence", "run", "C1", "--again", cwd=wt).stdout, "worktree repo przelotu na HEAD integracji")
         with open(os.path.join(self.repo, "n.txt"), "w") as f:
             f.write("2\n\n")
         r = self.f2("evidence", "run", ok=False)

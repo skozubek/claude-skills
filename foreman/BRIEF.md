@@ -23,12 +23,12 @@ gdzie runda kosztuje kilka minut zegara.
 Brief wskazuje zakresy do przeczytania (plik i funkcja), nie całe pliki. Każdy
 warunek niesie powód: warunek bez powodu wykonawca „poprawia”. Dowód ekranu: jeden
 skrypt `$B js` z `/browse` albo komenda skilla z profilu. Spawn:
-`Agent(subagent_type="foreman2-wykonawca", model=<sonnet|opus>, run_in_background=true)`;
+`Agent(subagent_type="foreman-wykonawca", model=<sonnet|opus>, run_in_background=true)`;
 wariant opus-high to `model=opus` z `effort: high` w wywołaniu. SHA ze spawnu
 to HEAD integracji (`git -C <katalog integracji> rev-parse HEAD`), także gdy integracja
 stoi w osobnym worktree, a sesja w głównym klonie: worktree agentów wyrastają z HEAD
 katalogu sesji i wykonawca dociąga je `merge --ff-only` do SHA ze spawnu; rezerwacja
-`$F2 task set <ids> --status running --spawn-sha <sha>`. Po spawnie `$F2 task set <id>
+`$FM task set <ids> --status running --spawn-sha <sha>`. Po spawnie `$FM task set <id>
 --agent <id> --worktree <dir>` (rejestruje worktree i gałąź do sprzątania).
 
 ## Pułapki środowiska (do briefu, gdy dotyczą zadania)
@@ -67,12 +67,20 @@ katalogu sesji i wykonawca dociąga je `merge --ff-only` do SHA ze spawnu; rezer
 
 ## Protokół odbioru (brygadzista, na integracji)
 
-`$F2 accept <T> --worktree <dir> --merge` przypina HEAD agenta, wymaga czystego drzewa,
+`$FM accept <T> --worktree <dir> --merge` przypina HEAD agenta, wymaga czystego drzewa,
 sprawdza przodka i pełny diff od SHA spawnu (obie strony rename) wobec plików zadania,
 uruchamia komendę weryfikacji w worktree z timeoutem i zapisuje dowód `--for <T>` na
-przypiętym SHA (fail podbija `rounds`). Po `pass` scala przypięty SHA (`--no-ff`)
+przypiętym SHA. `rounds` podbija tylko fail komendy (exit, timeout); zakres, przodek
+i drzewo zmienione w trakcie to porażka księgowa, którą naprawiasz grafem albo
+SendMessage, bez rundy. Plik testu obok pliku zadania (`X.test.*`, `X.spec.*`,
+`__tests__/X.test.*`, `test_X.py` przy `X.py`) przechodzi, gdy nie ma go inne zadanie,
+i po `pass` trafia do plików zadania; plik wspólny dalej ma jednego właściciela.
+Raport agenta podaje SHA weryfikacji: `--reported-sha <SHA>` (przelot z `create --gate`),
+gdy SHA = HEAD worktree przy czystym drzewie, sprawdza zakres i przodka bez drugiego
+przebiegu komendy; dowód `pass` stoi na słowie agenta, a pełne testy idą bramką repo
+na integracji. Po `pass` scala przypięty SHA (`--no-ff`)
 w katalogu sesji, który stoi na gałęzi integracji, ustawia `merged` i wypisuje front:
-w tym samym wywołaniu Bash rezerwujesz następne zadanie (`&& $F2 task set <T2> --status
+w tym samym wywołaniu Bash rezerwujesz następne zadanie (`&& $FM task set <T2> --status
 running --spawn-sha $(git rev-parse HEAD)`). Przekroczony limit tur = odbiór nieprzyjęty.
 Konflikt: scalenie cofnięte, SendMessage „dociągnij <integracja>, rozwiąż, raport”;
 konflikt to błąd podziału grafu, który zapisujesz w `kontrakt.md`.
@@ -84,7 +92,7 @@ Odbiór nieprzyjęty na <SHA>: <komenda> → <wynik>, oczekiwane <wynik>.
 Popraw w swoich plikach, powtórz weryfikację, raport w tym samym kształcie.
 ```
 
-`rounds` podbił już `accept`. Nowy wykonawca (`resumes` = 3, kontekst > 200k,
+`rounds` podbija `accept` przy failu komendy. Nowy wykonawca (`resumes` = 3, kontekst > 200k,
 drabina) dostaje SHA, poprzedni raport i dowód nieprzyjęcia; `task bump --field resumes`.
 
 ## Agenci tylko do odczytu
@@ -97,7 +105,7 @@ SendMessage „dokończ w tej turze bez delegowania”.
 
 ## Weryfikator na żywo
 
-`foreman2-weryfikator` dostaje: SHA i katalog odbioru, kryteria (odczyt →
+`foreman-weryfikator` dostaje: SHA i katalog odbioru, kryteria (odczyt →
 oczekiwane), narzędzie (skill z `profile.live_verify_skill` albo `/browse <adres>`),
 konto roli, listę zapisów zakazanych. Jeden weryfikator na PR, który zmienia ekran
 albo to, co ekran czyta (uprawnienia, funkcja, schemat); PR bez wpływu na żaden

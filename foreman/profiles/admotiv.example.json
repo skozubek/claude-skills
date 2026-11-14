@@ -1,5 +1,5 @@
 {
- "_opis": "Przykład profilu użytkownika dla repo, które nie może nieść własnej konfiguracji foremana. Aktywacja: `bin/foreman2 profile --repo <klon>` podaje ścieżkę docelową (~/.foreman2/profiles/<klucz>.json); tam kopiujesz ten plik bez pola _opis.",
+ "_opis": "Przykład profilu użytkownika dla repo, które nie może nieść własnej konfiguracji foremana. Aktywacja: `bin/foreman profile --repo <klon>` podaje ścieżkę docelową (~/.foreman/profiles/<klucz>.json); tam kopiujesz ten plik bez pola _opis.",
  "live_verify_skill": "verify-admotiv",
  "shared_clone": true,
  "notes": [

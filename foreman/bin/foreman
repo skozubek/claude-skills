@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stan przelotu foremana 2.0: jeden katalog na przelot, jeden piszący (brygadzista).
+"""Stan przelotu foremana: jeden katalog na przelot, jeden piszący (brygadzista).
 
 Kontrakt (także dla cudzego sterownika albo głosu, przez ten sam plik stanu):
   create   = create_task      status   = get_status       decisions = list_decisions
@@ -7,11 +7,11 @@ Kontrakt (także dla cudzego sterownika albo głosu, przez ten sam plik stanu):
 Pozostałe podkomendy (task, frontier, accept, own, human, log, state, close, resume,
 report, stop-check, straz, profile, session, cost) obsługują przelot od środka.
 
-Dom przelotów: $FOREMAN2_HOME (domyślnie ~/.foreman2). active.json mapuje repo i parę
+Dom przelotów: $FOREMAN_HOME (domyślnie ~/.foreman). active.json mapuje repo i parę
 „repo|sesja” na przelot; run.json trzyma właściciela (id sesji Claude), a zapis z innej
 sesji jest odrzucany. Każdy zapis dopisuje wiersz do log.tsv (append-only). Każde
 wywołanie trzyma blokadę pliku przelotu na czas odczyt–zmiana–zapis.
-`foreman2 -h` albo `foreman2 <podkomenda> -h`.
+`foreman -h` albo `foreman <podkomenda> -h`.
 """
 import argparse
 import datetime as dt
@@ -24,7 +24,7 @@ import shutil
 import subprocess
 import sys
 
-HOME = os.path.expanduser(os.environ.get("FOREMAN2_HOME") or "~/.foreman2")
+HOME = os.path.expanduser(os.environ.get("FOREMAN_HOME") or "~/.foreman")
 SCHEMA = 2
 STANY = ("planning", "running", "review", "gate", "done", "partial", "blocked", "cancelled")
 STANY_ZADANIA = ("ready", "running", "accepted", "fixing", "blocked", "merged", "dropped")
@@ -72,6 +72,36 @@ def pliki_zadania(p, files):
         sys.exit("--files przyjmuje pliki, nie katalogi: " + ", ".join(katalogi) +
                  " → wypisz pliki (`git ls-files <katalog>`)")
     return [kanon(f) for f in surowe]
+
+
+def towarzysz_testu(sciezka, pliki):
+    """Plik zadania, którego testem jest `sciezka` (X.test.*, X.spec.*, __tests__/X.test.*,
+    test_X.py przy X.py, obok pliku zadania); None, gdy żadnego."""
+    kat, nazwa = os.path.split(sciezka)
+    if m := re.match(r"test_(.+\.py)$", nazwa):
+        cel = kanon(os.path.join(kat, m.group(1)))
+        return cel if cel in pliki else None
+    m = re.match(r"(.+)\.(test|spec)\.[^./]+$", nazwa)
+    if not m:
+        return None
+    katalogi = {kat} | ({os.path.dirname(kat)} if os.path.basename(kat) == "__tests__" else set())
+    for f in sorted(pliki):
+        fk, fn = os.path.split(f)
+        if fk in katalogi and os.path.splitext(fn)[0] == m.group(1):
+            return f
+    return None
+
+
+def poza_zakresem(p, tid, zmiany):
+    """(poza, testy) dla zmian zadania: `testy` to pliki testów obok plików zadania, których
+    nie ma żadne inne zadanie (poza dropped); przechodzą i po pass trafiają do files.
+    Plik testu cudzego zadania zostaje poza zakresem: wspólny plik ma jednego właściciela."""
+    pliki = {kanon(f) for f in p.zadanie(tid)["files"]}
+    cudze = {kanon(f) for t in p.d["tasks"] if t["id"] != tid and t["status"] != "dropped" for f in t["files"]}
+    poza, testy = [], []
+    for x in sorted(set(zmiany) - pliki):
+        (testy if x not in cudze and towarzysz_testu(x, pliki) else poza).append(x)
+    return poza, testy
 
 
 def sha256_pliku(p):
@@ -294,11 +324,12 @@ class Przelot:
 
     def dodaj_dowod(self, cel, cmd, sha, wynik, werdykt, zrodlo=None, plik=None, seq=None, by="model", zawsze=False):
         """Nowy pomiar celu → (id, nowy). Idempotentnie tylko wobec NAJNOWSZEGO dowodu celu:
-        ten sam SHA, komenda, werdykt i pochodzenie zwraca jego id bez wpisu; każdy inny wynik
-        to nowy wpis. `by`: tool = komendę wykonało narzędzie (accept, evidence run), model =
+        ten sam SHA, komenda, werdykt, wynik i pochodzenie zwraca jego id bez wpisu; każdy inny
+        wynik to nowy wpis (fail zakresu i fail komendy na jednym SHA to dwa pomiary). `by`: tool = komendę wykonało narzędzie (accept, evidence run), model =
         wpis ręczny. `zawsze` zapisuje pomiar także wtedy, gdy powtarza poprzedni (własny log)."""
         lista = [e for e in self.dowody() if e["for"] == cel]
         if (not zawsze and lista and lista[-1]["cmd"] == cmd and lista[-1]["verdict"] == werdykt
+                and lista[-1]["result"] == wynik
                 and (lista[-1].get("by") or "model") == by and sha_rowne(lista[-1]["sha"], sha)):
             return lista[-1]["id"], False
         n = seq or self.nowy_seq()
@@ -318,11 +349,18 @@ class Przelot:
         Kryterium z komendą dowodzi tylko pomiar narzędzia (`by` = tool) tą samą komendą: wpis
         ręczny i dowód sprzed pola `by` są dla niego słowem modelu i się nie liczą."""
         lista = [e for e in (dow if dow is not None else self.dowody()) if e["for"] == cel]
-        c = next((c for c in self.d["criteria"] if c["id"] == cel), None)
-        if c and c.get("cmd"):
-            lista = [e for e in lista if e.get("by") == "tool" and e["cmd"] == c["cmd"]]
+        if cmd := self.komenda_celu(cel):
+            lista = [e for e in lista if e.get("by") == "tool" and e["cmd"] == cmd]
         pomiary = [e for e in lista if e["verdict"] in ("pass", "fail")]
         return (pomiary or lista or [None])[-1]
+
+    def komenda_celu(self, cel):
+        """Komenda, której dowód daje tylko narzędzie: bramka repo (cel G) albo kryterium
+        z komendą w planie; None dla kryterium bez komendy i zadania."""
+        if cel == "G":
+            return self.d.get("gate")
+        c = next((c for c in self.d["criteria"] if c["id"] == cel), None)
+        return c.get("cmd") if c else None
 
     def slowem_modelu(self):
         """Kryteria, których liczący się dowód pass wpisał model, a nie wykonało narzędzie."""
@@ -361,15 +399,17 @@ class Przelot:
         return git(self.d["repo"], "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}", ok=False) or sha
 
     def nieaktualne(self, head):
-        """Kryteria bez ważnego dowodu: brak pomiaru, ostatni pomiar fail, albo pass na innym SHA."""
+        """Kryteria (i bramka repo G, gdy ustawiona) bez ważnego dowodu: brak pomiaru, ostatni
+        pomiar fail, albo pass na innym SHA. Bramkę dowodzi tylko pomiar narzędzia."""
         dow = self.dowody()
         braki = [] if head else ["HEAD integracji nieznany"]
-        for c in self.d["criteria"]:
-            e = self.ostatni_dowod(c["id"], dow)
+        for cel in [c["id"] for c in self.d["criteria"]] + (["G"] if self.d.get("gate") else []):
+            e = self.ostatni_dowod(cel, dow)
+            nazwa = "G (bramka repo)" if cel == "G" else cel
             if e is None or e["verdict"] != "pass":
-                braki.append(f"{c['id']} {('bez dowodu' if e is None else e['verdict'])}")
+                braki.append(f"{nazwa} {('bez dowodu' if e is None else e['verdict'])}")
             elif head and not sha_rowne(e["sha"], head):
-                braki.append(f"{c['id']} dowód {e['id']} na {e['sha'][:12]}, HEAD {head[:12]}")
+                braki.append(f"{nazwa} dowód {e['id']} na {e['sha'][:12]}, HEAD {head[:12]}")
         return braki
 
     def wolne_miejsca(self):
@@ -455,7 +495,7 @@ def sprawdz_wlasciciela(p):
     pierwsza sesja, która pisze. Terminal człowieka (bez id) wolny."""
     sid, wl = sesja(), p.d.get("owner")
     if sid and wl and wl != sid:
-        sys.exit(f"przelot {p.d['id']} prowadzi inna sesja; `foreman2 --run {p.d['id']} resume`, żeby przejąć")
+        sys.exit(f"przelot {p.d['id']} prowadzi inna sesja; `foreman --run {p.d['id']} resume`, żeby przejąć")
     if sid and not wl:
         p.log("session", f"właściciel: {sid} (pierwszy zapis)", "", "", "")
         przejmij(p, sid, "pierwszy zapis")
@@ -482,7 +522,7 @@ def znajdz(args):
     if blad:
         sys.exit(blad)
     if not ids:
-        sys.exit(f"brak przelotu dla {repo}; `foreman2 create` albo `--run <id>`")
+        sys.exit(f"brak przelotu dla {repo}; `foreman create` albo `--run <id>`")
     p = Przelot(os.path.join(HOME, "runs", ids[0]))
     if args.cmd not in ODCZYTY and getattr(args, "op", None) not in ("list", "show", "check"):
         sprawdz_wlasciciela(p)
@@ -529,7 +569,7 @@ def blad_planu(p):
     kopia = os.path.join(p.katalog, "plan.md")
     roznica = f"`diff {kopia} {plan}`; " if sha256_pliku(kopia) == zapisany else ""
     return (f"plan zmieniony po starcie przelotu: {roznica}przywróć plik z kopii albo, gdy zmianę zatwierdził człowiek, "
-            f"`foreman2 --run {p.d['id']} create --plan {plan} --replan --by human:<imię>`. Ustalenia i graf piszesz do {os.path.join(p.katalog, 'kontrakt.md')}, nie do planu.")
+            f"`foreman --run {p.d['id']} create --plan {plan} --replan --by human:<imię>`. Ustalenia i graf piszesz do {os.path.join(p.katalog, 'kontrakt.md')}, nie do planu.")
 
 
 def importuj_kryteria(p, sciezka):
@@ -635,6 +675,20 @@ def cmd_plan(a):
         print(("  komenda, stdout: " if k["expect_out"] is not None else "  komenda, kod 0: " if k["cmd"] else "  słowo modelu:    ") + k["text"][:100])
 
 
+def ustaw_bramke(p, a):
+    """`create --gate` na istniejącym przelocie. Pierwsze ustawienie wolne; zmianę i zdjęcie
+    zatwierdza człowiek jak zmianę planu, bo zdjęta bramka przepuszcza `close` bez pomiaru."""
+    if a.gate is None or a.gate == p.d.get("gate"):
+        return
+    if p.d.get("gate"):
+        if not re.match(r"human:\S", a.by or ""):
+            sys.exit("bramkę repo zmienia albo zdejmuje człowiek: `create … --gate <cmd|\"\"> --by human:<imię>`")
+        if p.d.get("unattended") and sesja():
+            sys.exit("przelot bez nadzoru: bramkę zmienia człowiek ze swojego terminala, nie sesja modelu")
+    p.d["gate"] = a.gate or None
+    p.zapisz(); p.log("create", "bramka repo", a.gate or "(zdjęta)", "", f"zatwierdził {a.by}" if a.by else "")
+
+
 def replan(a):
     """`create --replan --plan <plik> --by human:<imię>`: istniejący przelot (`--run` albo aktywny
     dla repo) wczytuje kryteria ze zmienionego planu. Id przelotu niesie datę startu, więc cel
@@ -643,7 +697,7 @@ def replan(a):
         sys.exit("--replan wymaga --plan")
     bledy, _ = sprawdz_plan(a.plan, a.unattended)
     if bledy:
-        sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman2 plan check`, szablon PLAN.md")
+        sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman plan check`, szablon PLAN.md")
     ids, blad = rozwiaz(repo_root(a.repo), sesja(), a.run)
     if blad or not ids:
         sys.exit(blad or "--replan: brak przelotu dla tego repo; podaj `--run <id>`")
@@ -658,6 +712,7 @@ def replan(a):
     przed = p.d.get("plan_sha256")
     p.d["plan"] = os.path.abspath(a.plan)
     importuj_kryteria(p, a.plan)
+    ustaw_bramke(p, a)
     p.log("create", "replan: kryteria z planu wczytane ponownie", f"{a.plan}; zatwierdził {a.by}", str(p.d["plan_sha256"])[:12], f"poprzedni skrót {str(przed)[:12]}")
     print(p.d["id"])
 
@@ -670,7 +725,7 @@ def cmd_create(a):
     if a.plan:
         bledy, info_planu = sprawdz_plan(a.plan, a.unattended)
         if bledy:
-            sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman2 plan check`, szablon PLAN.md")
+            sys.exit("plan " + a.plan + ": " + "; ".join(bledy) + " → `foreman plan check`, szablon PLAN.md")
     repo = repo_root(a.repo)
     slug = re.sub(r"[^a-z0-9]+", "-", a.slug.lower()).strip("-")[:40]
     rid = f"{dt.date.today().isoformat()}-{slug}"
@@ -689,6 +744,7 @@ def cmd_create(a):
             if blad := blad_planu(p):
                 print(blad, file=sys.stderr)
                 p.log("create", "plan zmieniony po starcie przelotu", p.d["plan"], "", "kryteria bez zmian do --replan")
+            ustaw_bramke(p, a)
             ustaw_aktywny(repo, rid)
             przejmij(p, sesja(), "create")
             print(rid)
@@ -710,8 +766,9 @@ def cmd_create(a):
         "budget_usd": a.budget, "max_live": a.max_live,
         "mandate": {"merge": "merge" in (a.mandate or ""), "deploy": "deploy" in (a.mandate or ""), "note": ""},
         "unattended": bool(a.unattended),
+        "gate": a.gate or None,
         "sources": {
-            "foreman2": {"path": tu, "sha": subprocess.run(["git", "-C", tu, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or None},
+            "foreman": {"path": tu, "sha": subprocess.run(["git", "-C", tu, "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip() or None},
             "claude": wersja(["claude", "--version"]),
             "codex": wersja(["codex", "--version"]),
             "gstack": czytaj_txt(os.path.expanduser("~/.claude/skills/gstack/VERSION")),
@@ -751,6 +808,11 @@ def cmd_status(a):
     print("kryteria:")
     for c in d["criteria"]:
         print(f"  {c['id']} [{c['status']}] {c['text']}  ← {c['read']} ⇒ {c['expected']}  dowody: {','.join(c['evidence']) or '-'}")
+    if d.get("gate"):
+        e = p.ostatni_dowod("G")
+        print(f"bramka repo G: `{d['gate']}`  " + (f"{e['verdict']} {e['id']} na {e['sha'][:12]}" if e else "bez dowodu"))
+    else:
+        print("bramka repo: brak (`create --gate`); `accept --reported-sha` niedostępny")
     print(f"zadania ({len(d['tasks'])}), wolne miejsca {p.wolne_miejsca()}/{d['max_live']}:")
     for t in d["tasks"]:
         extra = []
@@ -777,7 +839,7 @@ def cmd_status(a):
 
 def cmd_criteria(a):
     p = znajdz(a)
-    zmiana_planu = "kryteria przelotu z planem pochodzą z planu: zmianę wpisuje do planu człowiek, potem `foreman2 create --plan <plan> --replan --by human:<imię>`"
+    zmiana_planu = "kryteria przelotu z planem pochodzą z planu: zmianę wpisuje do planu człowiek, potem `foreman create --plan <plan> --replan --by human:<imię>`"
     if a.op == "add":
         if not a.text:
             sys.exit("criteria add --text ... --read ... --expected ...")
@@ -843,7 +905,7 @@ def cmd_task(a):
                 front = {t["id"] for t in p.front()}
                 poza = [t["id"] for t in nowe if t["id"] not in front]
                 if poza and not a.force:
-                    sys.exit(f"{', '.join(poza)} poza frontem (zależności niescalone, decyzja pending albo stan nie ready): `foreman2 frontier`; świadomy wyjątek: --force --note <powód>")
+                    sys.exit(f"{', '.join(poza)} poza frontem (zależności niescalone, decyzja pending albo stan nie ready): `foreman frontier`; świadomy wyjątek: --force --note <powód>")
                 if poza and not a.note:
                     sys.exit("--force wymaga --note <powód>")
                 if poza:
@@ -856,12 +918,15 @@ def cmd_task(a):
             # wyjścia w `accept | tail && git merge`) wpuszczało nieprzyjętą robotę do integracji (LC-124)
             bez_pass = [t["id"] for t in zad if t["status"] != "merged" and (p.ostatni_dowod(t["id"]) or {}).get("verdict") != "pass"]
             if bez_pass and not a.force:
-                sys.exit(f"{', '.join(bez_pass)} bez odbioru pass: scalasz przez `foreman2 accept <T> --worktree <dir> --merge`; świadomy wyjątek: --force --note <powód>")
+                sys.exit(f"{', '.join(bez_pass)} bez odbioru pass: scalasz przez `foreman accept <T> --worktree <dir> --merge`; świadomy wyjątek: --force --note <powód>")
             if bez_pass and not a.note:
                 sys.exit("--force wymaga --note <powód>")
             if bez_pass:
                 p.log("front", f"{','.join(bez_pass)} → merged mimo odbioru (--force)", a.note, "", "")
+        wznowione = [t["id"] for t in zad if a.status == "fixing" and t["status"] != "fixing"]
         for t in zad:
+            if t["id"] in wznowione:  # runda poprawek = wznowienie agenta (próg nowego wykonawcy)
+                t["resumes"] = t.get("resumes", 0) + 1
             if a.status == "fixing" and t["status"] == "merged" and a.spawn_sha is None:
                 # runda poprawek po scaleniu startuje z integracji: odbiór liczy od niej, nie od
                 # pierwszego spawnu (inaczej scalone cudze zadania wychodzą „poza zakresem”)
@@ -888,6 +953,8 @@ def cmd_task(a):
         p.zapisz()
         for t in zad:
             p.log("front", f"zadanie {t['id']} → {t['status']}", a.note or "", t.get("spawn_sha") or "", t["status"])
+            if t["id"] in wznowione:
+                p.log("front", f"zadanie {t['id']} resumes={t['resumes']}", "fixing", "", "")
     elif a.op == "bump":
         t = p.zadanie(a.id)
         t[a.field] = t.get(a.field, 0) + a.by
@@ -973,30 +1040,40 @@ def cmd_accept(a):
     SHA spawnu przodkiem, każda zmieniona ścieżka (pełny diff, obie strony rename) w plikach
     zadania, komenda weryfikacji w worktree z timeoutem, poza blokadą stanu, wyjście drutem
     do evidence/<T>-<n>.log. Po pomiarze HEAD i czystość jeszcze raz. Dowód --for <T> na
-    przypiętym SHA; fail podbija rounds. Kod wyjścia 0 tylko przy pass."""
+    przypiętym SHA; rounds podbija tylko fail komendy (exit, timeout), nie porażka księgowa
+    (zakres, przodek, drzewo zmienione w trakcie). Plik testu obok pliku zadania, którego nie
+    ma inne zadanie, przechodzi i po pass trafia do files. `--reported-sha` (raport agenta
+    podał SHA weryfikacji, równy HEAD worktree): zakres i przodek bez komendy, dowód pass
+    `by` = model; tylko z bramką repo przelotu. Kod wyjścia 0 tylko przy pass."""
     p = znajdz(a)
     t = p.zadanie(a.id)
     if not t.get("spawn_sha"):
         sys.exit(f"{t['id']} bez --spawn-sha: odbiór nie ma od czego liczyć zakresu")
     if not t.get("verify"):
-        sys.exit(f"{t['id']} bez komendy weryfikacji: `foreman2 task set {t['id']} --verify \"<komenda>\"`")
+        sys.exit(f"{t['id']} bez komendy weryfikacji: `foreman task set {t['id']} --verify \"<komenda>\"`")
     if blad := blad_planu(p):
         sys.exit(blad)
     wt = os.path.abspath(a.worktree)
+    if a.reported_sha and not p.d.get("gate"):
+        sys.exit("--reported-sha wymaga bramki repo (`create --gate \"<komenda>\"`): bramka na HEAD integracji "
+                 "jest jedyną siatką pod słowem agenta (mógł testować z niezacommitowaną poprawką)")
     if a.merge and (blad := blad_katalogu_integracji(p)):  # przed pomiarem, żeby go nie marnować
         sys.exit(blad)
     sha, czyste = stan_drzewa(wt)
     if not czyste:
         sys.exit(f"{wt}: niezacommitowane zmiany; agent commituje robotę, odbiór mierzy commit")
+    if a.reported_sha and git(wt, "rev-parse", "--verify", "--quiet", f"{a.reported_sha}^{{commit}}", ok=False) != sha:
+        sys.exit(f"agent zgłosił weryfikację na {a.reported_sha}, worktree stoi na {sha[:12]}: "
+                 "raport nie dotyczy tego commita; odbiór bez --reported-sha puszcza komendę")
     n = p.nowy_seq()
     p.zapisz()
     kat, tid, spawn, verify, agent = p.katalog, t["id"], t["spawn_sha"], t["verify"], t.get("agent")
-    pliki = {kanon(f) for f in t["files"]}
-    p._lock.zwolnij()  # pomiar poza blokadą: komenda może sama wołać foreman2, cancel nie czeka
+    p._lock.zwolnij()  # pomiar poza blokadą: komenda może sama wołać foreman, cancel nie czeka
 
     log = f"{tid}-{n}.log"
     sciezka_logu = os.path.join(kat, "evidence", log)
     zmiany = None
+    komenda_padla = False  # rounds liczy tylko fail komendy; porażka księgowa nie jest winą wykonawcy
     if subprocess.run(["git", "-C", wt, "merge-base", "--is-ancestor", spawn, sha], capture_output=True).returncode:
         werdykt, wynik = "fail", f"SHA spawnu {spawn[:12]} nie jest przodkiem {sha[:12]}"
     else:
@@ -1008,9 +1085,11 @@ def cmd_accept(a):
                 ["git", "-C", wt, "merge-base", "--is-ancestor", spawn, mb], capture_output=True).returncode:
             baza = mb
         zmiany = zmiany_zakresu(wt, baza, sha)
-        poza = sorted({x for x in zmiany if x not in pliki})
+        poza, _ = poza_zakresem(p, tid, zmiany)
         if poza:
             werdykt, wynik = "fail", "poza zakresem zadania: " + ", ".join(poza)
+        elif a.reported_sha:
+            werdykt, wynik = "pass", f"raport agenta: `{verify}` na {sha[:12]}, komenda niepuszczona (bramka repo na integracji)"
         else:
             with open(sciezka_logu, "w") as out:
                 proc = subprocess.Popen(verify, shell=True, cwd=wt, stdout=out, stderr=subprocess.STDOUT,
@@ -1022,8 +1101,10 @@ def cmd_accept(a):
                     os.killpg(proc.pid, 9)
                     proc.wait()
                     werdykt, wynik = "fail", f"timeout {a.timeout} s"
+            komenda_padla = werdykt == "fail"
             po, czyste = stan_drzewa(wt)
             if po != sha or not czyste:
+                komenda_padla = False
                 werdykt, wynik = "fail", f"drzewo zmieniło się w trakcie pomiaru (HEAD {po[:12]}, czyste={czyste}); {wynik}"
             if os.path.exists(sciezka_logu):
                 with open(sciezka_logu, errors="replace") as f:
@@ -1035,15 +1116,25 @@ def cmd_accept(a):
     sprawdz_wlasciciela(p)
     if blad := blad_planu(p):  # plan mógł się zmienić w trakcie pomiaru
         sys.exit(f"pomiar {tid} niezapisany: {blad}")
+    testy = []
     if zmiany is not None:  # zakres mógł się zmienić w trakcie pomiaru: aktualne pliki zadania
-        poza = sorted({x for x in zmiany if x not in {kanon(f) for f in p.zadanie(tid)["files"]}})
-        if poza:
+        poza, testy = poza_zakresem(p, tid, zmiany)
+        if poza and not wynik.startswith("poza zakresem"):
+            komenda_padla = False
             werdykt, wynik = "fail", "poza zakresem zadania: " + ", ".join(poza) + f"; {wynik}"
-    eid, nowy = p.dodaj_dowod(tid, verify, sha, wynik, werdykt, plik=log if os.path.exists(sciezka_logu) else None, seq=n)
+    if werdykt == "pass" and testy:
+        t = p.zadanie(tid)
+        t["files"] = t["files"] + testy
+        p.zapisz(); p.log("front", f"zadanie {tid}: pliki testów obok plików zadania w zakresie", ", ".join(testy), "", "")
+    eid, nowy = p.dodaj_dowod(tid, verify, sha, wynik, werdykt, plik=log if os.path.exists(sciezka_logu) else None,
+                              seq=n, by="model" if a.reported_sha else "tool")
     if nowy and werdykt == "fail":
         t = p.zadanie(tid)
-        t["rounds"] = t.get("rounds", 0) + 1
-        p.zapisz(); p.log("front", f"zadanie {tid} rounds={t['rounds']}", wynik[:120], eid, "")
+        if komenda_padla:
+            t["rounds"] = t.get("rounds", 0) + 1
+            p.zapisz(); p.log("front", f"zadanie {tid} rounds={t['rounds']}", wynik[:120], eid, "")
+        else:
+            p.log("front", f"zadanie {tid}: nieprzyjęte księgowo, rounds bez zmian ({t.get('rounds', 0)})", wynik[:120], eid, "")
     print(f"{werdykt}: {tid} {wynik}; dowód {eid}")
     if werdykt == "pass" and a.merge:
         if blad := scal(p, tid, sha):
@@ -1085,23 +1176,35 @@ def pomiar_kryteriow(p, a):
     """`evidence run [C…]`: komendy kryteriów wykonuje narzędzie, w worktree sesji na HEAD
     integracji, poza blokadą stanu, z timeoutem. stdout do evidence/<C>-<n>.log, stderr do
     <C>-<n>.err. pass = kod 0, a przy oczekiwanym stdout także jego zgodność (po strip).
-    Dowód `by` = tool, każdy pomiar osobnym wpisem. Kod wyjścia 0 tylko, gdy wszystkie pass."""
+    Dowód `by` = tool, każdy pomiar osobnym wpisem. Bramka repo (`create --gate`) to cel G
+    obok kryteriów. Cel, którego ostatni dowód narzędzia to pass tej samej komendy na HEAD,
+    nie mierzy się drugi raz (`--again` wymusza). Kod wyjścia 0 tylko, gdy wszystkie pass."""
     if blad := blad_planu(p):
         sys.exit(blad)
-    cele = [p.kryterium(c) for c in a.ids] if a.ids else [c for c in p.d["criteria"] if c.get("cmd")]
-    bez = [c["id"] for c in cele if not c.get("cmd")]
+    if "G" in (a.ids or []) and not p.d.get("gate"):
+        sys.exit("G: przelot bez bramki repo; ustawia ją `create --gate \"<komenda>\"`")
+    ids = a.ids or [c["id"] for c in p.d["criteria"] if c.get("cmd")] + (["G"] if p.d.get("gate") else [])
+    cele = [("G", p.d["gate"], None) if x == "G" else (x, p.kryterium(x).get("cmd"), p.kryterium(x).get("expect_out")) for x in ids]
+    bez = [cid for cid, cmd, _ in cele if not cmd]
     if bez:
         sys.exit(f"{', '.join(bez)}: kryterium bez komendy w planie; jego dowód daje weryfikator (`evidence add`)")
     if not cele:
-        print("żadne kryterium nie ma komendy (lewa strona w całości w grawisach): dowody daje weryfikator przez `evidence add`")
+        print("żadne kryterium nie ma komendy (lewa strona w całości w grawisach) i brak bramki repo: dowody daje weryfikator przez `evidence add`")
         return
     top, head, blad = miejsce_pomiaru(p)
     if blad:
         sys.exit(blad)
-    plan = [(c["id"], c["cmd"], c.get("expect_out"), p.nowy_seq()) for c in cele]
+    dow = p.dowody()
+    plan = []
+    for cid, cmd, oczek in cele:
+        e = p.ostatni_dowod(cid, dow)
+        if not a.again and e and e.get("by") == "tool" and e["cmd"] == cmd and e["verdict"] == "pass" and sha_rowne(e["sha"], head):
+            print(f"pass bez ponownego pomiaru: {cid} dowód {e['id']} na {head[:12]}; `{cmd}` (--again wymusza)")
+            continue
+        plan.append((cid, cmd, oczek, p.nowy_seq()))
     p.zapisz()
     kat, przed = p.katalog, p  # `przed` po zwolnieniu blokady służy tylko do odczytu repo i gałęzi
-    p._lock.zwolnij()  # pomiar poza blokadą: komenda może sama wołać foreman2, cancel nie czeka
+    p._lock.zwolnij()  # pomiar poza blokadą: komenda może sama wołać foreman, cancel nie czeka
 
     wyniki = []
     for cid, cmd, oczek, n in plan:
@@ -1139,9 +1242,8 @@ def pomiar_kryteriow(p, a):
         sys.exit(f"pomiary niezapisane: HEAD integracji zmienił się w trakcie ({head[:12]} → {str(p.head())[:12]})")
     zle = len(plan) - len(wyniki)
     for cid, cmd, n, w, wynik in wyniki:
-        c = next((c for c in p.d["criteria"] if c["id"] == cid), None)
-        if not c or c.get("cmd") != cmd:
-            print(f"{cid}: kryterium zmienione w trakcie pomiaru, wynik pominięty")
+        if p.komenda_celu(cid) != cmd:
+            print(f"{cid}: kryterium albo bramka zmienione w trakcie pomiaru, wynik pominięty")
             zle += 1
             continue
         eid, _ = p.dodaj_dowod(cid, cmd, head, wynik, w, plik=f"{cid}-{n}.log", seq=n, by="tool", zawsze=True)
@@ -1162,8 +1264,10 @@ def cmd_evidence(a):
             sys.exit("evidence add --for <C|T> --cmd <komenda> --sha <sha> --result <wynik> --verdict <w>")
         if blad := blad_planu(p):
             sys.exit(blad)
+        if a.for_ == "G":
+            sys.exit("bramkę repo mierzy narzędzie: `foreman evidence run G`, nie wpis ręczny")
         if a.for_.startswith("C") and p.kryterium(a.for_).get("cmd") and a.verdict != "unverified":
-            sys.exit(f"{a.for_} ma komendę w planie: dowód zapisuje `foreman2 evidence run {a.for_}`, nie wpis ręczny")
+            sys.exit(f"{a.for_} ma komendę w planie: dowód zapisuje `foreman evidence run {a.for_}`, nie wpis ręczny")
         eid, _ = p.dodaj_dowod(a.for_, a.cmd, p.pelny_sha(a.sha), a.result, a.verdict, zrodlo=a.file)
         print(eid)
     elif a.op == "run":
@@ -1307,7 +1411,7 @@ def cmd_state(a):
     if p.d["state"] == "cancelled":
         sys.exit("przelot anulowany; nowy przelot przez `create`")
     if a.state in KONCOWE:
-        sys.exit(f"stan {a.state} wynika z werdyktu: `foreman2 close` (done tylko z dowodami na HEAD) albo `foreman2 cancel`")
+        sys.exit(f"stan {a.state} wynika z werdyktu: `foreman close` (done tylko z dowodami na HEAD) albo `foreman cancel`")
     p.d["state"] = a.state
     sid = sesja()
     if sid and sid not in p.d["sessions"]:
@@ -1438,8 +1542,8 @@ def cmd_stop_check(a):
     if fr and wolne and not tlo:
         klucz, powod = "front:" + ",".join(t["id"] for t in fr), (
             f"Przelot {rid}: zadania {', '.join(t['id'] for t in fr)} są gotowe, {wolne} wolne miejsca, nic nie biegnie w tle. "
-            f"Spawnuj je teraz (BRIEF.md) albo `foreman2 task set <id> --status blocked --note <czego brakuje>`; "
-            f"decyzja dla człowieka: `foreman2 decide ask --kind approval ... --blocks <id> --unblock-on <opcja>`.")
+            f"Spawnuj je teraz (BRIEF.md) albo `foreman task set <id> --status blocked --note <czego brakuje>`; "
+            f"decyzja dla człowieka: `foreman decide ask --kind approval ... --blocks <id> --unblock-on <opcja>`.")
     elif zywe and not tlo:
         klucz, powod = "zywe:" + ",".join(zywe), (
             f"Przelot {rid}: zadania {', '.join(zywe)} są running/fixing, a w tle nie ma agentów. Odbierz ich wynik "
@@ -1447,7 +1551,7 @@ def cmd_stop_check(a):
     elif not otwarte and not tlo and p.d["state"] in ("running", "review", "gate"):
         klucz, powod = "etapy:" + p.d["state"], (
             f"Przelot {rid}: front pusty w etapie {p.d['state']}. Dokończ etapy 5–6 (recenzja na SHA, brama, PR) i zamknij "
-            f"`foreman2 close`; brak dowodu kończy się `partial`, nie ciszą.")
+            f"`foreman close`; brak dowodu kończy się `partial`, nie ciszą.")
     else:
         p.log("stop", "przepuszczam", "tło pracuje" if tlo else "nic do ruszenia bez człowieka", "", "allow")
         return
@@ -1494,7 +1598,7 @@ def cmd_straz(a):
     rid = ",".join(zywy or anulowane or ids)
     if narzedzie == "Agent":
         if anulowane:
-            odmowa(f"Przelot {rid} anulowany: bez nowych agentów. Nowy przelot: `foreman2 create`.")
+            odmowa(f"Przelot {rid} anulowany: bez nowych agentów. Nowy przelot: `foreman create`.")
         return
     if narzedzie in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         sciezka = wejscie.get("file_path") or wejscie.get("notebook_path") or ""
@@ -1503,7 +1607,7 @@ def cmd_straz(a):
         if pelna.startswith(runs) and re.fullmatch(r"[^/]+/kontrakt\.md", pelna[len(runs):]):
             return  # ustalenia brygadzisty: jedyny plik przelotu pisany ręcznie
         if pelna.startswith(os.path.realpath(HOME) + os.sep):
-            odmowa("Pliki stanu i profile foremana zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
+            odmowa("Pliki stanu i profile foremana zmienia tylko `foreman <komenda>`; ręczny zapis omija dziennik.")
         return
     if narzedzie != "Bash":
         return
@@ -1515,10 +1619,10 @@ def cmd_straz(a):
             m = re.search(r"--run[ =]+[\"']?([\w.-]+)", seg)
             if bez_nadzoru or (m and przelot(m.group(1)).get("unattended")):
                 odmowa("Przelot bez nadzoru: odpowiedź `--by human` wpisuje człowiek ze swojego terminala, sesja modelu nie autoryzuje decyzji approval.")
-        if zywy and re.search(r"(foreman2|\$F2)\b.*\bcreate\b", seg):
+        if zywy and re.search(r"(foreman|\$FM)\b.*\bcreate\b", seg):
             odmowa(f"Przelot {rid} biegnie bez nadzoru: `create` (nowy przelot albo `--force`) należy do człowieka, nie do sesji modelu.")
         if re.search(r"(run\.json|decisions\.jsonl|log\.tsv|evidence/E\d+\.json)\b", seg) and re.search(r">|\bsed +-i|\btee\b|\bmv\b|\bcp\b|\bpython3?\b|\bnode\b|\bperl\b|\bprintf\b|\becho\b", seg):
-            odmowa("Pliki stanu przelotu zmienia tylko `foreman2 <komenda>`; ręczny zapis omija dziennik.")
+            odmowa("Pliki stanu przelotu zmienia tylko `foreman <komenda>`; ręczny zapis omija dziennik.")
         if anulowane and re.search(r"\btask +set\b.*--status[ =]+[\"']?(running|fixing)", seg):
             odmowa(f"Przelot {rid} anulowany: zadania nie wracają do running.")
     if anulowane:
@@ -1604,7 +1708,7 @@ def cmd_report(a):
         md.append(f"- **{c['id']}** [{c['status']}] {c['text']} — odczyt: {c['read']} ⇒ {c['expected']}. Dowód{zrodlo}: {ev}")
     md += ["", linia_pochodzenia(p), "", "## Twoja uwaga"]
     pend = [x for x in dec if x["status"] == "pending"]
-    md += [f"- decyzja {x['id']}: {x['question']} (opcje: {' | '.join(x['options'])}; rekomendacja: {x.get('rec') or '-'}; odpowiedź: `foreman2 --run {d['id']} decide answer {x['id']} rec --by human`)" for x in pend] or ["- brak decyzji do podjęcia"]
+    md += [f"- decyzja {x['id']}: {x['question']} (opcje: {' | '.join(x['options'])}; rekomendacja: {x.get('rec') or '-'}; odpowiedź: `foreman --run {d['id']} decide answer {x['id']} rec --by human`)" for x in pend] or ["- brak decyzji do podjęcia"]
     md += [f"- krok tylko-ludzki {h['id']}: {h['text']}" for h in d["human_steps"] if not h["done"]]
     md += [f"- blokada {t['id']} {t['name']}: {t['note']}" for t in d["tasks"] if t["status"] == "blocked"]
     md += ["", "## Zadania"]
@@ -1650,7 +1754,7 @@ def cmd_cost(a):
 
 # ---------------------------------------------------------------- parser
 def main():
-    ap = argparse.ArgumentParser(prog="foreman2", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(prog="foreman", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run", help="id przelotu (domyślnie aktywny dla repo w cwd)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
@@ -1667,7 +1771,8 @@ def main():
     s.add_argument("--unattended", action="store_true")
     s.add_argument("--force", action="store_true")
     s.add_argument("--replan", action="store_true", help="istniejący przelot: wczytaj kryteria ze zmienionego planu (z --by human:<imię>)")
-    s.add_argument("--by", help="kto zatwierdził zmianę planu: human:<imię>")
+    s.add_argument("--by", help="kto zatwierdził zmianę planu albo bramki: human:<imię>")
+    s.add_argument("--gate", help="bramka repo (zwykle profile.verify złączone &&): cel G w `evidence run`, warunek `close`; na istniejącym przelocie pierwsze ustawienie wolne, zmiana i zdjęcie z --by human")
     s.set_defaults(f=cmd_create)
 
     s = sub.add_parser("status", help="stan przelotu (get_status)"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_status)
@@ -1688,12 +1793,14 @@ def main():
     s = sub.add_parser("accept", help="odbiór zadania z worktree agenta (bez merge): dowód na przypiętym SHA")
     s.add_argument("id"); s.add_argument("--worktree", required=True); s.add_argument("--timeout", type=int, default=900)
     s.add_argument("--merge", action="store_true", help="po pass: git merge --no-ff w katalogu sesji (gałąź integracji), status merged, front")
+    s.add_argument("--reported-sha", help="SHA, na którym agent puścił weryfikację (z raportu): równy HEAD worktree → zakres bez komendy; wymaga bramki repo")
     s.set_defaults(f=cmd_accept)
 
     s = sub.add_parser("evidence", help="dowody (get_evidence)"); s.add_argument("op", choices=["add", "run", "list", "show", "check"]); s.add_argument("ids", nargs="*", help="show: id dowodu; run: kryteria (domyślnie wszystkie z komendą)")
     s.add_argument("--timeout", type=int, default=900, help="run: sekund na komendę")
     s.add_argument("--for", dest="for_"); s.add_argument("--cmd"); s.add_argument("--sha"); s.add_argument("--result", default=""); s.add_argument("--file"); s.add_argument("--verdict")
     s.add_argument("--head"); s.add_argument("--ref")
+    s.add_argument("--again", action="store_true", help="run: mierz także cele z pass tej samej komendy na HEAD")
     s.set_defaults(f=cmd_evidence)
 
     s = sub.add_parser("decisions", help="lista decyzji (list_decisions)"); s.add_argument("--pending", action="store_true"); s.add_argument("--json", action="store_true"); s.set_defaults(f=cmd_decisions)

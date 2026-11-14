@@ -1,6 +1,6 @@
 ---
-name: foreman2-recenzent
-description: Recenzent świeżym okiem dla foremana 2.0; czyta gałąź integracyjną na przypiętym SHA względem planu i konwencji repo. Tylko czyta. Spawnuje go wyłącznie brygadzista foremana 2.0.
+name: foreman-recenzent
+description: Recenzent świeżym okiem dla foremana; czyta gałąź integracyjną na przypiętym SHA względem planu i konwencji repo. Tylko czyta. Spawnuje go wyłącznie brygadzista foremana.
 model: opus
 effort: high
 tools: Read, Grep, Glob

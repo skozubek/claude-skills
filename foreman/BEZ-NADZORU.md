@@ -65,7 +65,7 @@ Krok, którego nie da się przejść → `human add` i kryterium `unverified` z 
   agentów `running`. Agent bez obu przez 60 min dostaje SendMessage o stan; bez
   odpowiedzi w 30 min: diff jego worktree do pliku, `TaskStop`, następca z SHA
   i łatką. Dwóch wykonawców jednego zadania naraz nie ma.
-- Koszt: `foreman2 cost --scan` (zużycie per sesja i agent z zapisów sesji, w tokenach
+- Koszt: `foreman cost --scan` (zużycie per sesja i agent z zapisów sesji, w tokenach
   ważonych, nie w USD).
 
 ## Sędzia próbki (zmiana masowa oceniana modelem)

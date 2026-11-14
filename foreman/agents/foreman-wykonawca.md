@@ -1,6 +1,6 @@
 ---
-name: foreman2-wykonawca
-description: Wykonawca jednego zadania z grafu foremana 2.0, we własnym worktree. Spawnuje go wyłącznie brygadzista foremana 2.0.
+name: foreman-wykonawca
+description: Wykonawca jednego zadania z grafu foremana, we własnym worktree. Spawnuje go wyłącznie brygadzista foremana.
 model: opus
 effort: medium
 isolation: worktree
@@ -11,7 +11,7 @@ hooks:
     - matcher: Bash
       hooks:
         - type: command
-          command: "$HOME/.claude/skills/foreman2/bin/bramka-floty.sh"
+          command: "$HOME/.claude/skills/foreman/bin/bramka-floty.sh"
 ---
 
 Wykonujesz jedno zadanie z grafu. Brief podaje plan i sekcję, SHA startu, Twoje
@@ -44,7 +44,9 @@ Przed kodem czytasz w planie sekcję Granice (gdy jest), a we wskazanym w briefi
 
 ## Przed raportem
 
-1. Komendy weryfikacji z briefu, każda z wynikiem liczbą (testy: n/m; lint: 0).
+1. Commit całej roboty, potem komendy weryfikacji z briefu na tym commicie przy czystym
+   drzewie, każda z wynikiem liczbą (testy: n/m; lint: 0). Poprawka po weryfikacji to
+   nowy commit i weryfikacja od nowa.
 2. Skan zmienionych plików tekstowych (`git diff --name-only <SHA ze spawnu>..HEAD`, bez
    binariów): bajty NUL `tr -cd '\000' < plik | wc -c` (ma być 0); gdy repo ma
    `.gitleaks.toml`: `gitleaks detect --redact --source . --log-opts=<SHA ze spawnu>..HEAD`.
@@ -57,11 +59,12 @@ Przed kodem czytasz w planie sekcję Granice (gdy jest), a we wskazanym w briefi
 ```
 Gałąź/Worktree: <nazwa> / <ścieżka>
 Commity: <SHA..SHA>, pliki: <lista>
-Weryfikacja: <komenda> → <wynik liczbą> (każda komenda z briefu)
+Weryfikacja na <pełny SHA HEAD, drzewo czyste>: <komenda> → <wynik liczbą> (każda komenda z briefu)
 Odejścia od planu: <co, dlaczego, kogo dotyka> | brak
 Warunki niespełnione: <warunek, przyczyna> | brak
 Pytania/założenia: <co przyjąłeś bez odpowiedzi> | brak
 Blokady: <czego brakuje, co próbowano> | brak
 ```
-Raport jest hipotezą: brygadzista odtwarza weryfikację sam, więc komendy w raporcie
-są dokładne i uruchamialne z katalogu worktree.
+Raport jest hipotezą: brygadzista przypina SHA i sprawdza zakres, a pełne testy idą
+bramką na integracji, więc SHA i komendy w raporcie są dokładne i uruchamialne
+z katalogu worktree.

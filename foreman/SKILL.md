@@ -1,21 +1,21 @@
 ---
-name: foreman2
-description: Brygadzista 2.0. Prowadzi robotę implementacyjną od planu do PR-a flotą subagentów, ze stanem przelotu w pliku (kryteria odbioru, graf zadań, dowody na SHA, kolejka decyzji), także bez nadzoru i w dowolnym repo. Wyzwalacze: "foreman2", "przelot", "zaimplementuj autonomicznie 2.0".
+name: foreman
+description: Brygadzista. Prowadzi robotę implementacyjną od planu do PR-a flotą subagentów, ze stanem przelotu w pliku (kryteria odbioru, graf zadań, dowody na SHA, kolejka decyzji), także bez nadzoru i w dowolnym repo. Wyzwalacze: "foreman", "przelot", "zaimplementuj autonomicznie".
 effort: high
 allowed-tools: Agent, SendMessage, Bash, Read, Write, Edit, Grep, Glob, AskUserQuestion, Skill
 hooks:
   Stop:
     - hooks:
         - type: command
-          command: python3 -I "$HOME/.claude/skills/foreman2/bin/foreman2" stop-check
+          command: python3 -I "$HOME/.claude/skills/foreman/bin/foreman" stop-check
   PreToolUse:
     - matcher: Bash|Agent|Write|Edit|MultiEdit|NotebookEdit
       hooks:
         - type: command
-          command: python3 -I "$HOME/.claude/skills/foreman2/bin/foreman2" straz
+          command: python3 -I "$HOME/.claude/skills/foreman/bin/foreman" straz
 ---
 
-# Foreman 2.0: brygadzista
+# Foreman: brygadzista
 
 Prowadzisz przelot: od zdania zadania do PR-a z dowodami, flotą subagentów. Kod
 produktu piszesz sam tylko w kontrakcie w kodzie (etap 3) i poprawkach bramy
@@ -23,7 +23,7 @@ produktu piszesz sam tylko w kontrakcie w kodzie (etap 3) i poprawkach bramy
 
 ## Stan przelotu
 
-Jedno źródło prawdy: `F2="$HOME/.claude/skills/foreman2/bin/foreman2"`. Ty jesteś
+Jedno źródło prawdy: `FM="$HOME/.claude/skills/foreman/bin/foreman"`. Ty jesteś
 jedynym piszącym; agenci oddają tekst, Ty zapisujesz. Każda komenda dopisuje wiersz
 do `log.tsv` (czas, faza, decyzja, powód, dowód, wynik). Tabela niżej ma wszystkie
 flagi potrzebne w przelocie, bez `-h`. Każda tura brygadzisty kosztuje cały kontekst,
@@ -32,16 +32,16 @@ każdy segment.
 
 | Co | Komenda |
 |---|---|
-| przelot | `$F2 create --slug <nazwa> --plan <plik> [--branch <gałąź integracji>] [--budget USD] [--max-live 3] [--mandate merge,deploy] [--unattended] [--force]`; plan zmieniony za zgodą człowieka: `create --plan <plik> --replan --by human:<imię>` (ten sam przelot); `$F2 status`; `$F2 state planning\|running\|review\|gate` |
-| kryteria | `$F2 criteria list`: kryteria wczytane z planu przez `create --plan` (z komendą albo bez; `$F2 plan check <plik>` pokazuje podział). `criteria add --text <co> --read <co odczytać> --expected <wynik>` tylko w przelocie bez planu |
-| graf | `$F2 task add --id T1 --name <co> --files a,b --readers T3 --deps T0 --variant sonnet\|opus\|opus-high --verify "<komenda>"`; `task set T1,T2 --status running --spawn-sha <sha>` (rezerwacja frontu przed spawnem; `--force --note <powód>` poza frontem); `task set <id> --agent <id> --worktree <dir>` (rejestruje też worktree i jego gałąź do sprzątania); `task set <id> --status fixing\|dropped [--note]`; `task bump <id> --field rounds\|resumes`; `task list` |
-| front | `$F2 frontier`: zadania gotowe w wolnych miejscach (≤ 3 żywych agentów) |
-| odbiór | `$F2 accept T1 --worktree <dir> --merge [--timeout 900]`: dowód zadania na przypiętym SHA agenta, po `pass` `git merge --no-ff` w katalogu sesji (stoi na gałęzi integracji), status `merged` i front; konflikt cofa scalenie. Bez `--merge` tylko dowód i SHA do scalenia |
-| dowód | `$F2 evidence run [C1 …] [--timeout 900]`: wykonuje komendy kryteriów w katalogu sesji (HEAD integracji, drzewo czyste: bez zmian i plików nieśledzonych) i zapisuje dowody; kod 0 tylko przy komplecie `pass`. `$F2 evidence add --for C3\|T1 --cmd "<co odczytano>" --sha <sha> --result "<wynik>" --verdict pass\|fail\|unverified [--file <plik>]`: dowód weryfikatora dla kryterium bez komendy (kryterium z komendą przyjmuje ręcznie tylko `unverified`); `evidence check`: dowody nieaktualne wobec HEAD |
-| decyzja | `$F2 decide ask --kind auto\|challenge\|approval --question <q> --options "a \| b" --rec a [--blocks T2 --unblock-on a]`; odpowiedź: `decide answer <id> rec\|<opcja> --by human` |
-| własność | `$F2 own add worktree\|branch\|process\|cron\|coffee\|account\|pr <ref>`; `own done <ref>` |
-| człowiek | `$F2 human add "<krok, który wykona tylko człowiek>"` |
-| koniec | `$F2 close [--state partial\|blocked] [--note <powód>] [--head <sha>]` (werdykt z pliku; `done` tylko przy komplecie `pass` na HEAD integracji); `report [--html plik]`; `resume` (przekazanie nowej sesji); koszt: `$F2 cost --scan` (zużycie per sesja i agent z zapisów sesji, trafia do raportu) |
+| przelot | `$FM create --slug <nazwa> --plan <plik> [--branch <gałąź integracji>] [--budget USD] [--max-live 3] [--mandate merge,deploy] [--unattended] [--gate "<bramka repo>"] [--force]`; `--gate` (zwykle `profile.verify` złączone `&&`) ustawia też ponowny `create`, ale zmianę i zdjęcie ustawionej bramki tylko z `--by human:<imię>` (także przy `--replan`); plan zmieniony za zgodą człowieka: `create --plan <plik> --replan --by human:<imię>` (ten sam przelot); `$FM status`; `$FM state planning\|running\|review\|gate` |
+| kryteria | `$FM criteria list`: kryteria wczytane z planu przez `create --plan` (z komendą albo bez; `$FM plan check <plik>` pokazuje podział). `criteria add --text <co> --read <co odczytać> --expected <wynik>` tylko w przelocie bez planu |
+| graf | `$FM task add --id T1 --name <co> --files a,b --readers T3 --deps T0 --variant sonnet\|opus\|opus-high --verify "<komenda>"`; `task set T1,T2 --status running --spawn-sha <sha>` (rezerwacja frontu przed spawnem; `--force --note <powód>` poza frontem); `task set <id> --agent <id> --worktree <dir>` (rejestruje też worktree i jego gałąź do sprzątania); `task set <id> --status fixing\|dropped [--note]` (fixing podbija `resumes`); `task bump <id> --field rounds\|resumes`; `task list` |
+| front | `$FM frontier`: zadania gotowe w wolnych miejscach (≤ 3 żywych agentów) |
+| odbiór | `$FM accept T1 --worktree <dir> --merge [--reported-sha <SHA z raportu>] [--timeout 900]`: dowód zadania na przypiętym SHA agenta (z `--reported-sha` bez drugiego przebiegu komendy, tylko z bramką repo), po `pass` `git merge --no-ff` w katalogu sesji (stoi na gałęzi integracji), status `merged` i front; konflikt cofa scalenie. Bez `--merge` tylko dowód i SHA do scalenia |
+| dowód | `$FM evidence run [C1 … G] [--again] [--timeout 900]`: wykonuje komendy kryteriów i bramkę repo (cel G) w katalogu sesji (HEAD integracji, drzewo czyste: bez zmian i plików nieśledzonych) i zapisuje dowody; cel z `pass` tej samej komendy na HEAD nie mierzy się drugi raz (`--again` wymusza); kod 0 tylko przy komplecie `pass`. `$FM evidence add --for C3\|T1 --cmd "<co odczytano>" --sha <sha> --result "<wynik>" --verdict pass\|fail\|unverified [--file <plik>]`: dowód weryfikatora dla kryterium bez komendy (kryterium z komendą przyjmuje ręcznie tylko `unverified`); `evidence check`: dowody nieaktualne wobec HEAD |
+| decyzja | `$FM decide ask --kind auto\|challenge\|approval --question <q> --options "a \| b" --rec a [--blocks T2 --unblock-on a]`; odpowiedź: `decide answer <id> rec\|<opcja> --by human` |
+| własność | `$FM own add worktree\|branch\|process\|cron\|coffee\|account\|pr <ref>`; `own done <ref>` |
+| człowiek | `$FM human add "<krok, który wykona tylko człowiek>"` |
+| koniec | `$FM close [--state partial\|blocked] [--note <powód>] [--head <sha>]` (werdykt z pliku; `done` tylko przy komplecie `pass` na HEAD integracji); `report [--html plik]`; `resume` (przekazanie nowej sesji); koszt: `$FM cost --scan` (zużycie per sesja i agent z zapisów sesji, trafia do raportu) |
 
 Hook Stop tego skilla blokuje koniec tury, gdy front ma gotowe zadania i wolne
 miejsca, gdy zadania są `running` bez agentów w tle albo etap skończył się bez `close`.
@@ -54,7 +54,7 @@ Plan jest zamrożony od `create`: zmiana pliku planu zatrzymuje `accept` i `evid
 `close` daje najwyżej `partial`, z komendą `diff`, która pokazuje zmianę. Kryterium albo
 Granicę zmienia człowiek w planie, potem `create --replan`; bez nadzoru robi to ze swojego
 terminala. Twoje ustalenia, architektura, kontrakt i opis grafu mieszkają w `kontrakt.md`
-w katalogu przelotu (`$F2 status` podaje ścieżkę). Gdzie BRIEF.md i WIEDZA.md każą zapisać
+w katalogu przelotu (`$FM status` podaje ścieżkę). Gdzie BRIEF.md i WIEDZA.md każą zapisać
 coś w planie, a rzecz nie jest kryterium ani Granicą, piszesz do `kontrakt.md`.
 
 Dowód kryterium ma dwa źródła i raport pokazuje je osobno. Kryterium, którego lewa strona
@@ -70,7 +70,7 @@ odczyt przez `evidence add`: to słowo modelu i tak stoi w werdykcie.
 - `POSTMORTEM.md`: po przelocie bez nadzoru, po drabinie wariantów, po blokadzie.
 - `PLAN.md`: szablon planu i co jest czym. Gdy `plan check` zgłasza braki albo człowiek pyta, jak napisać plan.
 - `WIEDZA.md`: reguły z wyzwalaczem w nagłówku sekcji. W rekonesansie, tylko pasujące sekcje.
-- `$F2 profile`: konwencje repo (instalacja, bramki, CI, baza worktree, skill weryfikacji na żywo) z repo i profilu użytkownika. W rekonesansie.
+- `$FM profile`: konwencje repo (instalacja, bramki, CI, baza worktree, skill weryfikacji na żywo) z repo i profilu użytkownika. W rekonesansie.
 
 ## Czy to przelot
 
@@ -88,27 +88,29 @@ dziesięć), zakres bez kryteriów odbioru, robota wymagająca rozmowy co kilka 
 sesja. Zakres mieszany (jedna zmiana warstwowa i paczka drobnych poprawek): zadania
 grafu dostaje tylko część spełniająca warunek, a drobne poprawki idą jednym zadaniem
 jednego wykonawcy. Tryb bez nadzoru sam floty nie uzasadnia. Mówisz wtedy jednym zdaniem, że przelot
-tu nie pasuje i dlaczego, i robisz zmianę sam, z tym samym zapisem: `$F2 create --slug
-<nazwa> --plan <plik> --branch <bieżąca gałąź>` → zmiana i commit → bramki repo → jedna
-runda Codexa na diffie → `$F2 evidence run` → odczyt kryteriów bez komendy (`evidence add`)
-→ `$F2 close` → `$F2 report`. Plan bez kryteriów: skill `spec`.
+tu nie pasuje i dlaczego, i robisz zmianę sam, z tym samym zapisem: `$FM create --slug
+<nazwa> --plan <plik> --branch <bieżąca gałąź> --gate "<profile.verify>"` → zmiana
+i commit → jedna runda Codexa na diffie → `$FM evidence run` (bramka i kryteria) → odczyt kryteriów bez komendy (`evidence add`)
+→ `$FM close` → `$FM report`. Plan bez kryteriów: skill `spec`.
 
 ## Etapy
 
-Etap kończy się, gdy spełnia swoje „Gotowe, gdy”; wtedy `$F2 state <etap>`.
+Etap kończy się, gdy spełnia swoje „Gotowe, gdy”; wtedy `$FM state <etap>`.
 
 ### 0. Kontrakt (`planning`)
 
 Plan dostaje drugą opinię, zanim człowiek go zatwierdzi, bo po `create` jest zamrożony:
-`$F2 plan check <plik>`, potem `codex exec -s read-only -c 'model_reasoning_effort="high"'
+`$FM plan check <plik>`, potem `codex exec -s read-only -c 'model_reasoning_effort="high"'
 "<pytania: które kryterium przejdzie przy niedziałającej ścieżce użytkownika; czy komenda
 kryterium mierzy to, co obiecuje jego prawa strona; które kryterium bez komendy da się
 zamienić na komendę; brakujący czytelnicy (konsument schematu, stare wiersze, bramka CI);
-czy Granice pokrywają dane i koszt>" < plan.md`. Bez Codexa: `foreman2-recenzent` z planem
+czy Granice pokrywają dane i koszt>" < plan.md`. Bez Codexa: `foreman-recenzent` z planem
 i wskazanymi plikami kodu. Finding to hipoteza: odtwarzasz go w kodzie (wejście → zły
 wynik), nieodtworzony odrzucasz z powodem. Przyjęte findingi i braki z `plan check`
 pokazujesz człowiekowi; plan poprawia on albo Ty na jego słowo, nie obchodzisz.
-`$F2 create --plan <plik>` po zgodzie człowieka wczytuje kryteria. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
+`$FM create --plan <plik> --gate "<profile.verify złączone &&>"` po zgodzie człowieka wczytuje
+kryteria i ustawia bramkę repo: jedyny pełny przebieg testów na integracji, warunek
+`close` i siatka pod `accept --reported-sha`. Kryteria 2–5; każde mówi, co odczytać (ekran, odpowiedź API, wiersz
 w bazie, czas mierzony tym samym narzędziem i kontem) i jaki wynik ma wyjść. „Testy
 zielone” nie jest kryterium. Plan ma ścieżkę użytkownika jednym zdaniem i „poza
 zakresem”. Fala większego planu: kryteria tej fali, pozostałe obietnice w planie
@@ -120,15 +122,15 @@ poprawi zakresu. Sekcja „Pojęcia” mówi „brak nowych pojęć”, a plan n
 których użytkownik dotąd nie widział, albo pojęcia się nakładają: pytasz człowieka
 przed startem, czy najpierw słownik skillem `/mattpocock-skills:domain-modeling`;
 słownika nie piszesz sam.
-Gotowe, gdy: `$F2 plan check <plik>` czysto, z `--unattended`, gdy przelot jest
+Gotowe, gdy: `$FM plan check <plik>` czysto, z `--unattended`, gdy przelot jest
 `--unattended` albo sesja idzie bez pytań o zgodę (bypass/auto), bo wtedy hooki
 odmawiają zamiast pytać (Granice, BEZ-NADZORU.md); druga opinia planu przyjęta albo
-odrzucona z powodem przed zgodą człowieka; `$F2 criteria list` pokazuje kryteria planu.
+odrzucona z powodem przed zgodą człowieka; `$FM criteria list` pokazuje kryteria planu.
 
 ### 1. Rekonesans
 
 Kod kontraktu (funkcje i typy, których dotknie zmiana) czytasz sam; szerokość
-oddajesz agentowi Explore (sonnet). `$F2 profile`. WIEDZA.md czytasz sekcjami,
+oddajesz agentowi Explore (sonnet). `$FM profile`. WIEDZA.md czytasz sekcjami,
 których wyzwalacz w nagłówku pasuje do planu, i każdą trafioną regułę wpisujesz do
 grafu, briefu albo `kontrakt.md`. Klocek, na którym stoi kontrakt, sprawdzasz odczytem
 skutku na żywo (wiersz w bazie, szerokość na ekranie), nie lekturą kodu, bo klocek
@@ -148,10 +150,12 @@ biegnie równolegle z innym albo wymaga własnego rozpoznania; łańcuch drobnyc
 jednego właściciela. Zadania tekstu (pomoc, dokument) zależą od zadań zachowania. Zmiana
 masowa oceniana modelem zaczyna się próbką (BEZ-NADZORU.md „Sędzia”). Zdarzenia
 mają tożsamość i deduplikację, stan ma tabelę przejść, lista ma wrażliwość per
-element, atomowość jest nazwana. `$F2 task add` dla każdego zadania z plikami,
+element, atomowość jest nazwana. `$FM task add` dla każdego zadania z plikami,
 czytelnikami, zależnościami, wariantem i komendą weryfikacji; zadanie kontraktu
-(typy, enumy, szkielet) idzie pierwsze.
-Gotowe, gdy: `$F2 task list` ma cały graf; żaden plik nie ma dwóch właścicieli;
+(typy, enumy, szkielet) idzie pierwsze. PR-y publikowane razem (jedno wdrożenie) to
+jeden PR fali z commitami per zadanie; stos PR-ów tylko przy osobnych wdrożeniach
+w czasie, bo każde piętro stosu to merge z konfliktami, cykl CI i drugi odbiór.
+Gotowe, gdy: `$FM task list` ma cały graf; żaden plik nie ma dwóch właścicieli;
 każde zadanie ma komendę weryfikacji.
 
 ### 3. Gałąź
@@ -164,24 +168,26 @@ lokalne w wersji lokalnej albo testowej (dane testowe, `.env` bez kluczy produkc
 w `.worktreeinclude`; sekrety produkcji zostają u Ciebie, bo strażnik komend łapie
 pomyłki, nie każdą drogę do zdalnej zmiany. Porównujesz cwd sesji z repo planu
 i mówisz wynik: sesja spoza repo nie ma jego hooków. <!-- LC-084 -->
-`$F2 own add branch <nazwa>`.
+`$FM own add branch <nazwa>`.
 Gotowe, gdy: gałąź ma commit kontraktu i agent może zrobić `merge --ff-only`;
-`$F2 state running`.
+`$FM state running`.
 
 ### 4. Front (`running`)
 
-Pętla: `$F2 frontier` → `task set <ids frontu> --status running --spawn-sha <HEAD
+Pętla: `$FM frontier` → `task set <ids frontu> --status running --spawn-sha <HEAD
 integracji>` (rezerwacja przed spawnem) → spawn każdego zarezerwowanego zadania naraz
-(`foreman2-wykonawca`, model z wariantu, `run_in_background: true`, brief z BRIEF.md)
+(`foreman-wykonawca`, model z wariantu, `run_in_background: true`, brief z BRIEF.md)
 → `task set <id> --agent --worktree` → koniec tury, gdy nic nie jest gotowe
 (powiadomienia wracają) → odbiór.
-Odbiór: `$F2 accept <T> --worktree <dir> --merge` (BRIEF.md „Protokół odbioru”). Raport agenta
+Odbiór: `$FM accept <T> --worktree <dir> --merge` (BRIEF.md „Protokół odbioru”), z `--reported-sha
+<SHA>`, gdy raport agenta podaje SHA weryfikacji. Raport agenta
 jest hipotezą. <!-- LC-077 --> Przyjęte: `accept` scala przypięty SHA, nie nazwę gałęzi,
 ustawia `merged` i wypisuje front. Nieprzyjęte: SendMessage do
-tego samego agenta z dowodem (`accept` już podbił `rounds`).
+tego samego agenta z dowodem. `rounds` liczy tylko fail komendy; nieprzyjęcie księgowe
+(plik poza zakresem, SHA spawnu nie przodkiem) nie zbliża drabiny.
 Nowy wykonawca z SHA, raportem i dowodem: po trzecim wznowieniu <!-- LC-115 -->, gdy
 `accept` wypisze „następna poprawka: nowy wykonawca” (kontekst agenta > 200k) i w
-drabinie: sonnet/opus po 2 nieprzyjętych → opus-high (`task set --variant opus-high`
+drabinie: sonnet/opus po 2 failach komendy (`rounds`) → opus-high (`task set --variant opus-high`
 zeruje `rounds`; nowy wykonawca na tym samym wariancie licznika nie zeruje);
 opus-high po 2 własnych nieprzyjętych → `task set --status blocked --note "<czego
 brakuje, co próbowano>"`; zależne czekają, reszta frontu idzie.
@@ -191,14 +197,14 @@ SendMessage). Konflikt przy merge = błąd podziału grafu: ten sam agent przez
 SendMessage dociąga integrację i rozwiązuje. Robota > 2× zapowiedzianej albo mała
 prośba, która odsłania dług → `decide ask --kind approval --rec <cięcie> --blocks
 <zadanie>`, reszta frontu idzie, bo to zakres. <!-- LC-036 -->
-Gotowe, gdy: brak zadań `ready`/`running`/`fixing`; pełna weryfikacja repo na
-integracji (`profile.verify`) zielona; `$F2 evidence run` na HEAD integracji.
+Gotowe, gdy: brak zadań `ready`/`running`/`fixing`; `$FM evidence run` zielony na HEAD
+integracji (bramka repo G i kryteria z komendą).
 
 ### 5. Recenzja na przypiętym SHA (`review`)
 
 `SHA=$(git rev-parse <integracja>)`; `git diff <baza>...$SHA > <tmp>/diff.patch`;
 katalog odbioru `git worktree add <tmp>/odbior $SHA` (`own add worktree`). <!-- LC-116 --> Na tym
-samym SHA: Codex (`codex exec -s read-only … < diff.patch`) i `foreman2-recenzent`
+samym SHA: Codex (`codex exec -s read-only … < diff.patch`) i `foreman-recenzent`
 bez parametru `model` (definicja agenta: opus; oś tekstu dla użytkownika, gdy zmiana
 ma napisy). Recenzent dostaje diff bez plików testów (`-- . ':!*.test.*'`); test
 czyta wtedy, gdy sprawdza, czy test utrwala zły napis. Diff recenzenta ponad 1500
@@ -207,38 +213,39 @@ z diffem jej plików i regułami planu tych zadań, w limicie żywych agentów. 
 recenzent na większym diffie wchodzi w kompakcję w trakcie czytania. <!-- LC-126 --> Bez Codexa: `/code-review high` zamiast niego, recenzent sprawdza także
 poprawność, a PR dostaje notkę „bez drugiego modelu”. Findingi łączysz w jedną rundę
 poprawek: finding w plikach jednego zadania wraca SendMessage do jego agenta (`task
-set <id> --status fixing` przestawia bazę odbioru na HEAD integracji, `task bump <id>
---field resumes`; SendMessage każe zacząć od `git merge <HEAD integracji>`, odbiór znów
+set <id> --status fixing` przestawia bazę odbioru na HEAD integracji i podbija `resumes`;
+SendMessage każe zacząć od `git merge <HEAD integracji>`, odbiór znów
 `accept`), bo zna ten kod; nowe zadanie (`task add --files` plikami zadań scalonych) dostaje
 tylko finding przecinający kilka zadań albo zadanie, którego agenta nie wznowisz
 (inna sesja, trzecie wznowienie, kontekst > 200k). Delta dostaje drugą rundę Codexa
 tylko przy migracji albo uprawnieniach. Po dwóch rundach tekstu redagowanie staje:
 zdanie bez pokrycia w kodzie wylatuje, a gdy jego brak łamie kryterium, to blokada;
-tekst zmieniony po stopie przechodzi recenzję prawdziwości jeszcze raz. Odbiór na żywo: `foreman2-weryfikator` ze skillem z profilu
+tekst zmieniony po stopie przechodzi recenzję prawdziwości jeszcze raz. Odbiór na żywo: `foreman-weryfikator` ze skillem z profilu
 (`live_verify_skill`), bez skilla gstack `/browse` na adresie z planu; bez obu
 kryterium ekranu zostaje `unverified`. Progi czasu na opublikowanej wersji.
-Odczyt weryfikatora → `$F2 evidence add --for <C>` dla kryteriów bez komendy; po
-ostatniej poprawce `$F2 evidence run`, bo dowód liczy się na końcowym SHA.
-Gotowe, gdy: `$F2 evidence check` zielony na HEAD integracji.
+Odczyt weryfikatora → `$FM evidence add --for <C>` dla kryteriów bez komendy; po
+ostatniej poprawce `$FM evidence run`, bo dowód liczy się na końcowym SHA (powtórka na
+tym samym SHA nic nie mierzy).
+Gotowe, gdy: `$FM evidence check` zielony na HEAD integracji.
 
 ### 6. Brama i dostawa (`gate`)
 
-Bramki repo (`profile.verify`; bez nich kroki CI z tymi samymi parametrami). Merge
-gałęzi domyślnej do integracji; numery migracji i wpisów dziennika ostateczne po
-nim, a dowody kryteriów nieaktualne: `$F2 evidence run` jeszcze raz. Push i PR z integracji (`gh pr create --body-file <plik>` osobnym wywołaniem).
+Merge gałęzi domyślnej do integracji; numery migracji i wpisów dziennika ostateczne
+po nim, a dowody bramki i kryteriów nieaktualne: `$FM evidence run` jeszcze raz (przelot
+bez bramki: kroki CI z tymi samymi parametrami ręcznie). Push i PR z integracji (`gh pr create --body-file <plik>` osobnym wywołaniem).
 Merge i deploy tylko z mandatem w `run.json` i bez blokad; bez mandatu PR czeka,
 przelot kończy się `partial`. Main zielony = zielony przebieg na commicie merge'a
 każdego workflow push-to-main (`gh run list --commit <sha> --limit 50`); workflow
 uruchamiany ręcznie czytasz przed uruchomieniem (kroki wyjścia). <!-- LC-121 --> Smoke
 przez ścieżkę produkcyjną → dowód. Dowód wdrożenia to odczyt żywego stanu (wersja
 funkcji, wiersz w bazie), nie wynik komendy deploy. Trzy osobne kamienie: merge, deploy, odbiór produkcyjny.
-Gotowe, gdy: `$F2 close` daje `done` albo `partial`/`blocked` z listą braków.
+Gotowe, gdy: `$FM close` daje `done` albo `partial`/`blocked` z listą braków.
 
 ### 7. Raport i sprzątanie
 
 POSTMORTEM.md przed sprzątaniem, póki przelot jest w kontekście, gdy przelot był
 bez nadzoru, zadziałała drabina albo była blokada.
-`$F2 cost --scan`, potem `$F2 report`: meldunek po kryteriach (oczekiwanie → odczyt →
+`$FM cost --scan`, potem `$FM report`: meldunek po kryteriach (oczekiwanie → odczyt →
 dowód i jego źródło → status),
 „Twoja uwaga” (decyzje czekające, kroki tylko-ludzkie, blokady), koszt. Rejestr
 własności do zera: worktree i gałęzie (lokalne i zdalne, po merge'u PR i po `git

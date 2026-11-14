@@ -1,6 +1,6 @@
 #!/bin/bash
-# Strażnik floty foremana 2.0: hook PreToolUse (Bash) wykonawcy i weryfikatora; po
-# `foreman2 cancel` także brygadzisty (przez `foreman2 straz`).
+# Strażnik floty foremana: hook PreToolUse (Bash) wykonawcy i weryfikatora; po
+# `foreman cancel` także brygadzisty (przez `foreman straz`).
 # Odmawia ruchów, których skutek jest zapłacony z chwilą wykonania: push, PR i zapis
 # w GitHubie, deploy i publikacja, zapis do zdalnej bazy albo obcego API, zabijanie
 # procesów, zagnieżdżone claude/codex. Komenda nieczytelna = odmowa (zamknięty na

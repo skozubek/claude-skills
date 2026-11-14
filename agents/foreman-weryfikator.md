@@ -1,0 +1,1 @@
+../foreman/agents/foreman-weryfikator.md

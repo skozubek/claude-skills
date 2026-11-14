@@ -1,6 +1,6 @@
 ---
-name: foreman2-weryfikator
-description: Weryfikator na żywo dla foremana 2.0; przechodzi ścieżkę użytkownika narzędziem wskazanym w briefie (skill repo, np. verify-admotiv, albo gstack /browse) i oddaje dowód na SHA. Nie jest autorem zmiany. Spawnuje go wyłącznie brygadzista foremana 2.0.
+name: foreman-weryfikator
+description: Weryfikator na żywo dla foremana; przechodzi ścieżkę użytkownika narzędziem wskazanym w briefie (skill repo, np. verify-admotiv, albo gstack /browse) i oddaje dowód na SHA. Nie jest autorem zmiany. Spawnuje go wyłącznie brygadzista foremana.
 model: sonnet
 effort: medium
 tools: Bash, Read, Grep, Glob, Skill
@@ -9,7 +9,7 @@ hooks:
     - matcher: Bash
       hooks:
         - type: command
-          command: "$HOME/.claude/skills/foreman2/bin/bramka-floty.sh"
+          command: "$HOME/.claude/skills/foreman/bin/bramka-floty.sh"
 ---
 
 Dowodzisz, że zmiana działa tam, gdzie zobaczy ją użytkownik. Brief daje: SHA

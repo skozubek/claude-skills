@@ -1,7 +1,7 @@
-# Macierz źródeł foremana 2.0
+# Macierz źródeł foremana
 
 Co wołamy z zewnątrz, co trzymamy lokalnie, co odrzucamy. Wersje z chwili decyzji;
-`bin/foreman2 create` zapisuje wersje źródeł w `run.json` każdego przelotu.
+`bin/foreman create` zapisuje wersje źródeł w `run.json` każdego przelotu.
 Status: `obowiązuje` | `odłożone` (kandydat, warunek powrotu w powodzie) |
 `uchylone` (edycja wpisu, nie nowy wiersz).
 
@@ -14,7 +14,7 @@ Codex CLI 0.159.3 (model z `~/.codex/config.toml`).
 |---|---|---|---|---|---|
 | `/browse` | gstack | przeglądarka headless, odczyt DOM `$B js` | **wołamy** (weryfikator, gdy repo nie ma własnego skilla) | jedyne niezależne od człowieka źródło dowodu ekranu; własna kopia zgniłaby | obowiązuje |
 | kontrakt decyzji (`decisions.jsonl`: auto/approval/user_challenge, statusy, gramatyka `rec`/`<id><opcja>`) | gstack | kolejka decyzji dla trybu bez nadzoru | **adaptacja interfejsu**: te same rodzaje i statusy w `decisions.jsonl` przelotu, odpowiedź `rec \| <opcja> \| reject` | binaria gstack piszą do katalogu sesji gstack i telemetrii; nasz plik stanu jest jeden | obowiązuje |
-| skill-contract (hook Stop blokujący raz) | gstack | wymusza domknięcie kontraktu skilla przed końcem tury | **adaptacja**: `foreman2 stop-check` z semantyką frontu (gotowe zadania + wolne miejsca + brak tła), najwyżej dwie blokady | kontrakt gstack nie zna grafu zadań | obowiązuje |
+| skill-contract (hook Stop blokujący raz) | gstack | wymusza domknięcie kontraktu skilla przed końcem tury | **adaptacja**: `foreman stop-check` z semantyką frontu (gotowe zadania + wolne miejsca + brak tła), najwyżej dwie blokady | kontrakt gstack nie zna grafu zadań | obowiązuje |
 | `/verify` | gstack | odkrywa i uruchamia bramki repo | **odłożone**: `profile.verify` czyta skrypty i workflow wprost | preambuła i telemetria za jedną listę komend; wraca, gdy profil nie znajduje bramek w realnym repo | odłożone |
 | `/codex` | gstack | opakowanie Codexa | **odrzucone**: `codex exec -s read-only …` jedną linią | opakowanie dodaje tryby i tekst, nie dowód | obowiązuje |
 | `/review`, `/autoplan`, `plan-*-review`, `/ship` | gstack | recenzja PR, auto-decyzje planu, dostawa | **odrzucone** | recenzję robi natywny `/code-review high` + Codex + recenzent na jednym SHA; autoplan rozstrzyga pytania produktowe modelem (zgoda modeli nic nie autoryzuje); `/ship` ma własną ceremonię (VERSION, CHANGELOG) obok bramek repo | obowiązuje |
@@ -22,7 +22,7 @@ Codex CLI 0.159.3 (model z `~/.codex/config.toml`).
 | `/write-skill` | gstack | dieta i kontrola dryfu tekstu skilla | **odłożone**: niezależną kontrolę tekstu robi Codex | jedna kontrola wystarczy; wraca przy drugiej iteracji tekstu | odłożone |
 | show-me-your-work (TSV `ts phase decision why evidence result`) | pstack | dziennik decyzji agenta | **adaptacja interfejsu**: `log.tsv` o tych samych 6 kolumnach | zgodny format pozwala czytać oba cudzymi narzędziami | obowiązuje |
 | orchestrate, autonomous-run, never-block-on-the-human | pstack | świeży wykonawca per zadanie, weryfikator z innej rodziny, werdykt per SHA, dwa powtórzenia i porzucenie, pytanie tylko przy nieodwracalnym | **zachowane lokalnie** (etap 5, drabina, dowód na SHA, Codex jako inna rodzina) | zasady pokrywają się z 1.x; cytujemy źródło, nie kopiujemy playbooku | obowiązuje |
-| session-pickup, pause-safely | pstack | przekazanie między sesjami | **adaptacja**: `foreman2 resume` z pliku stanu | stan w pliku zamiast prozy w kontekście | obowiązuje |
+| session-pickup, pause-safely | pstack | przekazanie między sesjami | **adaptacja**: `foreman resume` z pliku stanu | stan w pliku zamiast prozy w kontekście | obowiązuje |
 | swarm, reflect, correct, figure-it-out | pstack | równoległe agenty, refleksja, autokorekta | **odrzucone**; z reflect przyjęta zasada „regułę dowodzisz na incydencie z historii” (POSTMORTEM 6) | mamy postmortem i drabinę; Skill tool odmawia większości skilli pstack, slugi modeli nieprzenośne | obowiązuje |
 | writing-for-agents | Pocock | wskaźniki kontekstu, hierarchia, progresywne ujawnianie, kryteria ukończenia, instrukcje pozytywne | **metodologia** tekstu 2.0 („gotowe, gdy” per etap, pliki na żądanie) | — | obowiązuje |
 | implement-spec, to-tickets | Pocock | osobny orkiestrator: świeży implementer per ticket + tdd + merger; tickety pionowe z `Blocked by` | **odrzucone** jako konkurencyjny orkiestrator; przyjęty front zadań z zależnościami (`frontier`) | graf w `run.json` zamiast ticketów w plikach | obowiązuje |
@@ -35,7 +35,7 @@ Codex CLI 0.159.3 (model z `~/.codex/config.toml`).
 | `codex exec -s read-only` | Codex CLI | druga opinia planu, diffu, postmortemu | **wołamy** | inna rodzina modeli; model z konfiguracji, bez `-m` | obowiązuje |
 | `verify-admotiv` | to repo | przejście AdMotiv ścieżką użytkownika | **wołamy przez profil** (`live_verify_skill`), rdzeń nie zna produktu | uniwersalność | obowiązuje |
 | `bramka-floty.sh` | 1.x | odmowa push/PR/deploy/kill/claude/codex w Bash floty | **adaptacja**: własna kopia `bin/bramka-floty.sh` na wykonawcy i weryfikatorze, po `cancel` także na brygadziście | wzorce 1.x przepuszczały `git --no-pager push`, `npm run deploy`, zapis do zdalnej bazy i obcego API; test czułości w `tests/` | obowiązuje |
-| `koszty.py` | 1.x | koszt sesji i kontekst agenta | **adaptacja**: reguła zużycia powtórzona w `foreman2 cost --scan`, który przypina agenta do zadania; `bin/koszty.py` liczy tę samą regułę dla dowolnych zapisów sesji i jest wzorcem w teście zgodności | analiza kosztu poza przelotem (porównania, postmortem) | obowiązuje |
+| `koszty.py` | 1.x | koszt sesji i kontekst agenta | **adaptacja**: reguła zużycia powtórzona w `foreman cost --scan`, który przypina agenta do zadania; `bin/koszty.py` liczy tę samą regułę dla dowolnych zapisów sesji i jest wzorcem w teście zgodności | analiza kosztu poza przelotem (porównania, postmortem) | obowiązuje |
 | dowód kryterium wykonany przez narzędzie (`evidence run`) | lokalne | komenda kryterium z planu wykonana w repo na HEAD integracji, dowód z polem `by` | **zbudowane**: kryterium z komendą nie przyjmuje ręcznego werdyktu, kryterium bez komendy zostaje słowem modelu i tak stoi w raporcie | dowód wpisany tekstem przez model, który sam robił zmianę, dowodzi tylko zgodności SHA | obowiązuje |
 | plan zamrożony od `create` (skrót w `run.json`, `create --replan --by human:<imię>`) | lokalne | kryteria wczytane z planu; zmiana pliku zatrzymuje odbiór i `done` | **zbudowane**: ustalenia brygadzisty idą do `kontrakt.md`, nie do planu | plan zatwierdzony przez człowieka przepisywany w miejscu przez model przestaje być tym, co człowiek zatwierdził | obowiązuje |
 | druga opinia planu w przelocie (etap po grafie) | lokalne | Codex na planie po rekonesansie | **przeniesione** przed zgodę człowieka (etap 0) | finding do zamrożonego planu nie ma dokąd trafić; człowiek zatwierdza plan już po drugiej opinii | obowiązuje |

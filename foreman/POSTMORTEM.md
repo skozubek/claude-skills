@@ -9,7 +9,7 @@ trzy linie w meldunku.
    skill był dwuznaczny, gdzie się wahałeś, czego szukałeś i nie znalazłeś, co
    obszedłeś, który krok był ceremonią), każde z miejscem w skillu, i hipoteza,
    co poszło nie tak.
-2. Koszt: `foreman2 cost --scan` (per sesja i agent); jedna linia do meldunku.
+2. Koszt: `foreman cost --scan` (per sesja i agent); jedna linia do meldunku.
 3. Oś czasu z drutu: `log.tsv`, `decisions.jsonl`, `git log` integracji i zapisy
    sesji (błędy narzędzi, „Connection refused”, SendMessage do martwego agenta,
    agent z liczbą odpowiedzi ponad dwukrotność mediany, czerwone CI), bo `log.tsv`
